@@ -1,9 +1,0 @@
-name = "hl-stats"
-main = "src/worker.ts"
-compatibility_date = "2024-12-02"
-
-[vars]
-HL_CHAIN = "Mainnet"
-
-[assets]
-directory = "./public"

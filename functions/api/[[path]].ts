@@ -11,7 +11,6 @@ const cache = new Map<string, { value: unknown; expiresAt: number }>();
 const windowKeys = ["day", "week", "month", "allTime"] as const;
 
 type Env = {
-  ASSETS: Fetcher;
   HL_CHAIN?: string;
 };
 
@@ -201,15 +200,9 @@ async function handleApi(chain: string, req: Request, url: URL) {
   return notFound();
 }
 
-export default {
-  async fetch(req: Request, env: Env) {
-    const url = new URL(req.url);
-    const chain = env.HL_CHAIN ?? "Mainnet";
+export async function onRequest({ request, env }: { request: Request; env: Env }) {
+  const url = new URL(request.url);
+  const chain = env.HL_CHAIN ?? "Mainnet";
 
-    if (url.pathname.startsWith("/api/")) {
-      return handleApi(chain, req, url);
-    }
-
-    return env.ASSETS.fetch(req);
-  },
-};
+  return handleApi(chain, request, url);
+}

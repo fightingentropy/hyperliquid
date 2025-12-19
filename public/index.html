@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>HL Top Positions</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/styles.css" />
+    <script src="/app.js" defer></script>
+  </head>
+  <body>
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
+
+    <nav class="top-nav">
+      <a class="brand" href="/">HL Stats</a>
+      <div class="nav-links">
+        <a class="nav-link active" href="/">Top Positions</a>
+        <a class="nav-link" href="/liquidations.html">Liquidation Clusters</a>
+      </div>
+    </nav>
+
+    <header class="hero">
+      <div class="hero-content">
+        <p class="eyebrow">Hyperliquid Intelligence</p>
+        <h1>Top HYPE, BTC, and ETH Positions</h1>
+        <p class="lede">
+          Scan the most capitalized wallets on Hyperliquid to surface the largest open positions for the
+          asset you care about. Switch coins to see who is most exposed.
+        </p>
+        <div class="hero-actions">
+          <button id="refresh-button" class="primary">Refresh Data</button>
+          <button id="clear-selection" class="ghost">Clear Selection</button>
+        </div>
+      </div>
+      <div class="hero-metrics">
+        <div class="metric">
+          <span class="label">Positions</span>
+          <span id="leaderboard-count" class="value">0</span>
+        </div>
+        <div class="metric">
+          <span class="label">Updated</span>
+          <span id="leaderboard-updated" class="value">--</span>
+        </div>
+        <div class="metric">
+          <span class="label">Asset</span>
+          <span id="asset-label" class="value">HYPE</span>
+        </div>
+      </div>
+    </header>
+
+    <main class="layout">
+      <section class="panel leaderboard-panel">
+        <div class="panel-header">
+          <div>
+            <h2>Top Positions</h2>
+            <p class="muted">Largest open positions across the top accounts.</p>
+          </div>
+          <div class="controls">
+            <div class="segmented" id="asset-toggle">
+              <button data-asset="HYPE" class="active">HYPE</button>
+              <button data-asset="BTC">BTC</button>
+              <button data-asset="ETH">ETH</button>
+            </div>
+            <div class="search">
+              <input id="search-input" type="search" placeholder="Search by address or name" />
+            </div>
+            <div class="filters">
+              <span id="asset-status" class="filter-status">Ready</span>
+            </div>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Rank</th>
+                <th>Account</th>
+                <th>Side</th>
+                <th data-sort="szi">Size</th>
+                <th data-sort="entryPx">Entry</th>
+                <th data-sort="positionValue">Position Value</th>
+                <th data-sort="unrealizedPnl">uPnL</th>
+              </tr>
+            </thead>
+            <tbody id="leaderboard-body"></tbody>
+          </table>
+        </div>
+
+        <div class="detail-section">
+          <div class="section-header">
+            <h3>Open Positions</h3>
+            <label class="filter-toggle">
+              <input id="positions-filter-toggle" type="checkbox" />
+              Show BTC/ETH/HYPE
+            </label>
+          </div>
+          <div class="table-wrap small">
+            <table>
+              <thead>
+                <tr>
+                  <th>Market</th>
+                  <th>Side</th>
+                  <th>Size</th>
+                  <th>Entry</th>
+                  <th>Value</th>
+                  <th>Liq Px</th>
+                  <th>uPnL</th>
+                </tr>
+              </thead>
+              <tbody id="positions-body"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="detail-section">
+          <div class="section-header">
+            <h3>Liquidations (last 30d)</h3>
+            <div class="pill" id="liquidations-count">0 events</div>
+          </div>
+          <div class="table-wrap small">
+            <table>
+              <thead>
+                <tr>
+                  <th>Time</th>
+                  <th>Market</th>
+                  <th>Role</th>
+                  <th>Method</th>
+                  <th>Mark Px</th>
+                  <th>Size</th>
+                </tr>
+              </thead>
+              <tbody id="liquidations-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <aside class="panel detail-panel">
+        <div class="panel-header">
+          <div>
+            <h2>Account Detail</h2>
+            <p class="muted">Click a position row to inspect positions and liquidations.</p>
+          </div>
+          <a id="explorer-link" class="link" href="https://hypurrscan.io" target="_blank" rel="noreferrer">
+            Open Explorer
+          </a>
+        </div>
+
+        <div class="detail-section" id="detail-summary">
+          <div class="summary-top">
+            <div>
+              <p class="muted">Selected</p>
+              <h3 id="detail-name">None</h3>
+              <p id="detail-address" class="mono">—</p>
+            </div>
+            <button id="copy-address" class="ghost">Copy</button>
+          </div>
+          <div class="stat-grid" id="summary-metrics">
+            <div class="stat">
+              <span class="label">Account Value</span>
+              <span id="summary-account" class="value">—</span>
+            </div>
+            <div class="stat">
+              <span class="label">Total Margin Used</span>
+              <span id="summary-margin" class="value">—</span>
+            </div>
+            <div class="stat">
+              <span class="label">Total Notional</span>
+              <span id="summary-notional" class="value">—</span>
+            </div>
+            <div class="stat">
+              <span class="label">Withdrawable</span>
+              <span id="summary-withdrawable" class="value">—</span>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </main>
+
+    <footer class="footer">
+      <p>Data: stats-data.hyperliquid.xyz + api.hyperliquid.xyz</p>
+    </footer>
+  </body>
+</html>

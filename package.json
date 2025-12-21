@@ -5,5 +5,8 @@
   "scripts": {
     "dev": "bun --hot index.ts",
     "start": "bun index.ts"
+  },
+  "dependencies": {
+    "@types/node": "^25.0.3"
   }
 }

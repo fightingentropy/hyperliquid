@@ -4,10 +4,11 @@ const CHAIN = process.env.HL_CHAIN ?? "Mainnet";
 const INFO_ENDPOINT = "https://api.hyperliquid.xyz/info";
 const STATS_BASE = "https://stats-data.hyperliquid.xyz";
 
-const leaderboardTtlMs = 60_000;
-const positionsTtlMs = 15_000;
-const fillsTtlMs = 30_000;
-const midsTtlMs = 10_000;
+const DAY_MS = 24 * 60 * 60 * 1000;
+const leaderboardTtlMs = DAY_MS;
+const positionsTtlMs = DAY_MS;
+const fillsTtlMs = DAY_MS;
+const midsTtlMs = DAY_MS;
 
 const cache = new Map();
 
@@ -49,6 +50,14 @@ async function cached(key, ttlMs, fetcher) {
   return setCached(key, value, ttlMs);
 }
 
+async function cachedWithBypass(key, ttlMs, fetcher, bypassCache) {
+  if (bypassCache) {
+    const value = await fetcher();
+    return setCached(key, value, ttlMs);
+  }
+  return cached(key, ttlMs, fetcher);
+}
+
 async function fetchJson(url, options) {
   const response = await fetch(url, options);
   if (!response.ok) {
@@ -67,7 +76,9 @@ async function fetchInfo(payload) {
 }
 
 function normalizeWindowPerformances(list) {
-  const windows = Object.fromEntries(windowKeys.map((key) => [key, { pnl: 0, roi: 0, vlm: 0 }]));
+  const windows = Object.fromEntries(
+    windowKeys.map((key) => [key, { pnl: 0, roi: 0, vlm: 0 }]),
+  );
   for (const [key, stats] of list ?? []) {
     windows[key] = {
       pnl: Number(stats?.pnl ?? 0),
@@ -91,12 +102,25 @@ function isAddress(value) {
   return /^0x[a-fA-F0-9]{40}$/.test(value);
 }
 
+function shouldBypassCache(url) {
+  const refresh = url.searchParams.get("refresh");
+  return refresh === "1" || refresh === "true";
+}
+
 async function handleLeaderboard(url) {
-  const limit = Math.min(1000, Math.max(1, Number(url.searchParams.get("limit") ?? "500")));
+  const limit = Math.min(
+    5000,
+    Math.max(1, Number(url.searchParams.get("limit") ?? "500")),
+  );
   const key = `leaderboard:${CHAIN}`;
-  const leaderboard = await cached(key, leaderboardTtlMs, async () => {
-    return fetchJson(`${STATS_BASE}/${CHAIN}/leaderboard`);
-  });
+  const leaderboard = await cachedWithBypass(
+    key,
+    leaderboardTtlMs,
+    async () => {
+      return fetchJson(`${STATS_BASE}/${CHAIN}/leaderboard`);
+    },
+    shouldBypassCache(url),
+  );
 
   const rows = (leaderboard?.leaderboardRows ?? [])
     .map(normalizeLeaderboardRow)
@@ -107,41 +131,61 @@ async function handleLeaderboard(url) {
   return jsonResponse({ chain: CHAIN, limit, updatedAt: Date.now(), rows });
 }
 
-async function handlePositions(address) {
+async function handlePositions(address, bypassCache) {
   const key = `positions:${address}`;
-  const data = await cached(key, positionsTtlMs, async () => {
-    return fetchInfo({ type: "clearinghouseState", user: address });
-  });
+  const data = await cachedWithBypass(
+    key,
+    positionsTtlMs,
+    async () => {
+      return fetchInfo({ type: "clearinghouseState", user: address });
+    },
+    bypassCache,
+  );
 
   return jsonResponse({ address, data });
 }
 
-async function handleFills(address, url) {
-  const days = Math.min(90, Math.max(1, Number(url.searchParams.get("days") ?? "30")));
+async function handleFills(address, url, bypassCache) {
+  const days = Math.min(
+    90,
+    Math.max(1, Number(url.searchParams.get("days") ?? "30")),
+  );
   const now = Date.now();
   const startTime = now - days * 24 * 60 * 60 * 1000;
   const key = `fills:${address}:${days}`;
 
-  const fills = await cached(key, fillsTtlMs, async () => {
-    return fetchInfo({
-      type: "userFillsByTime",
-      user: address,
-      startTime,
-      endTime: now,
-      aggregateByTime: true,
-    });
-  });
+  const fills = await cachedWithBypass(
+    key,
+    fillsTtlMs,
+    async () => {
+      return fetchInfo({
+        type: "userFillsByTime",
+        user: address,
+        startTime,
+        endTime: now,
+        aggregateByTime: true,
+      });
+    },
+    bypassCache,
+  );
 
-  const liquidations = (Array.isArray(fills) ? fills : []).filter((fill) => fill.liquidation);
+  const liquidations = (Array.isArray(fills) ? fills : []).filter(
+    (fill) => fill.liquidation,
+  );
 
   return jsonResponse({ address, days, items: liquidations });
 }
 
-async function handleMids() {
+async function handleMids(bypassCache) {
   const key = `mids:${CHAIN}`;
-  const mids = await cached(key, midsTtlMs, async () => {
-    return fetchInfo({ type: "allMids" });
-  });
+  const mids = await cachedWithBypass(
+    key,
+    midsTtlMs,
+    async () => {
+      return fetchInfo({ type: "allMids" });
+    },
+    bypassCache,
+  );
 
   return jsonResponse({ chain: CHAIN, updatedAt: Date.now(), mids });
 }
@@ -150,6 +194,8 @@ async function handleApi(req, url) {
   if (req.method !== "GET") {
     return jsonResponse({ error: "Method not allowed" }, 405);
   }
+
+  const bypassCache = shouldBypassCache(url);
 
   if (url.pathname === "/api/leaderboard") {
     try {
@@ -166,7 +212,7 @@ async function handleApi(req, url) {
     }
 
     try {
-      return await handlePositions(address);
+      return await handlePositions(address, bypassCache);
     } catch (error) {
       return jsonResponse({ error: String(error) }, 502);
     }
@@ -179,7 +225,7 @@ async function handleApi(req, url) {
     }
 
     try {
-      return await handleFills(address, url);
+      return await handleFills(address, url, bypassCache);
     } catch (error) {
       return jsonResponse({ error: String(error) }, 502);
     }
@@ -187,7 +233,7 @@ async function handleApi(req, url) {
 
   if (url.pathname === "/api/mids") {
     try {
-      return await handleMids();
+      return await handleMids(bypassCache);
     } catch (error) {
       return jsonResponse({ error: String(error) }, 502);
     }
@@ -197,7 +243,8 @@ async function handleApi(req, url) {
 }
 
 async function serveStatic(pathname) {
-  const safePath = pathname === "/" ? "index.html" : pathname.replace(/^\/+/, "");
+  const safePath =
+    pathname === "/" ? "index.html" : pathname.replace(/^\/+/, "");
   if (safePath.includes("..")) return notFound();
 
   const file = Bun.file(new URL(`./public/${safePath}`, import.meta.url));

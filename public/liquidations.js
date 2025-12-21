@@ -10,18 +10,20 @@ const state = {
   midPrice: null,
   binPercent: 0.005,
   sideFilter: "all",
-  accountLimit: 500,
-  leaderboardLimit: 500,
+  accountLimit: 5000,
+  leaderboardLimit: 5000,
 };
 
 const ASSET = "HYPE";
 const CLUSTER_PRICE_MIN = 1;
 const CLUSTER_PRICE_MAX = 100;
 const POSITION_SCAN_CONCURRENCY = 8;
+const DAY_MS = 24 * 60 * 60 * 1000;
+const POSITION_CACHE_TTL_MS = DAY_MS;
 const LEADERBOARD_CACHE_KEY = "hl-liquidations-leaderboard:v1";
-const LEADERBOARD_CACHE_TTL_MS = 30 * 60 * 1000;
+const LEADERBOARD_CACHE_TTL_MS = DAY_MS;
 const LIQUIDATION_POINTS_CACHE_KEY = "hl-liquidations-points:v1";
-const LIQUIDATION_POINTS_CACHE_TTL_MS = 30 * 60 * 1000;
+const LIQUIDATION_POINTS_CACHE_TTL_MS = DAY_MS;
 
 const ui = {
   refreshButton: document.getElementById("refresh-button"),
@@ -92,7 +94,9 @@ function formatNumber(value, decimals = 0) {
   if (value === null || value === undefined) return "--";
   const num = Number(value);
   if (!Number.isFinite(num)) return "--";
-  return new Intl.NumberFormat("en-US", { maximumFractionDigits: decimals }).format(num);
+  return new Intl.NumberFormat("en-US", {
+    maximumFractionDigits: decimals,
+  }).format(num);
 }
 
 function formatPrice(value) {
@@ -100,7 +104,9 @@ function formatPrice(value) {
   const num = Number(value);
   if (!Number.isFinite(num)) return "--";
   const decimals = num >= 1000 ? 2 : num >= 1 ? 4 : 6;
-  return new Intl.NumberFormat("en-US", { maximumFractionDigits: decimals }).format(num);
+  return new Intl.NumberFormat("en-US", {
+    maximumFractionDigits: decimals,
+  }).format(num);
 }
 
 function formatTime(value) {
@@ -185,7 +191,8 @@ function clearPointsCache() {
 function getCachedPoints(limit) {
   const cache = readPointsCache();
   if (!cache?.updatedAt) return null;
-  if (Date.now() - cache.updatedAt > LIQUIDATION_POINTS_CACHE_TTL_MS) return null;
+  if (Date.now() - cache.updatedAt > LIQUIDATION_POINTS_CACHE_TTL_MS)
+    return null;
   if (cache.limit !== limit) return null;
   if (cache.asset !== ASSET) return null;
   if (cache.leaderboardLimit !== state.leaderboardLimit) return null;
@@ -257,7 +264,9 @@ function matchesAsset(position, asset) {
 }
 
 function getAssetPositions(data, asset) {
-  return getOpenPositions(data).filter((position) => matchesAsset(position, asset));
+  return getOpenPositions(data).filter((position) =>
+    matchesAsset(position, asset),
+  );
 }
 
 function getPositionValue(position) {
@@ -422,7 +431,10 @@ function buildClusters(points) {
   });
 
   points.forEach((point) => {
-    const index = Math.min(binCount - 1, Math.max(0, Math.floor((point.price - minBin) / size)));
+    const index = Math.min(
+      binCount - 1,
+      Math.max(0, Math.floor((point.price - minBin) / size)),
+    );
     const bin = bins[index];
     bin.total += point.value;
     bin.count += 1;
@@ -512,7 +524,10 @@ function renderClusters(clusterData) {
   });
 
   renderAxisTicks(min, max);
-  setText(ui.priceRange, `${formatPrice(min)} - ${formatPrice(max)} | Bin ${formatPrice(size)}`);
+  setText(
+    ui.priceRange,
+    `${formatPrice(min)} - ${formatPrice(max)} | Bin ${formatPrice(size)}`,
+  );
 
   if (ui.currentPriceLine) {
     const mid = state.midPrice;
@@ -538,13 +553,18 @@ function renderBucketTable(bins) {
   }
 
   setText(ui.bucketCount, `${bins.length} buckets`);
-  const sorted = bins.slice().sort((a, b) => b.total - a.total).slice(0, 8);
+  const sorted = bins
+    .slice()
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 8);
   ui.bucketBody.innerHTML = "";
   const fragment = document.createDocumentFragment();
 
   sorted.forEach((bin) => {
     const row = document.createElement("tr");
-    row.appendChild(createCell(`${formatPrice(bin.from)} - ${formatPrice(bin.to)}`));
+    row.appendChild(
+      createCell(`${formatPrice(bin.from)} - ${formatPrice(bin.to)}`),
+    );
     row.appendChild(createCell(formatUsd(bin.total)));
     row.appendChild(createCell(formatNumber(bin.count, 0)));
     fragment.appendChild(row);
@@ -560,11 +580,16 @@ function createCell(value) {
 }
 
 function updateMetrics(points, summary) {
-  const accountText = state.scanTotal ? `${state.scanChecked}/${state.scanTotal}` : "0";
+  const accountText = state.scanTotal
+    ? `${state.scanChecked}/${state.scanTotal}`
+    : "0";
   setText(ui.accountsCount, accountText);
   setText(ui.pointsCount, formatNumber(points.length, 0));
   setText(ui.totalNotional, formatUsd(summary.total));
-  setText(ui.lastUpdated, state.lastUpdated ? formatTime(state.lastUpdated) : "--");
+  setText(
+    ui.lastUpdated,
+    state.lastUpdated ? formatTime(state.lastUpdated) : "--",
+  );
   setText(ui.longNotional, formatUsd(summary.long));
   setText(ui.shortNotional, formatUsd(summary.short));
 }
@@ -577,26 +602,49 @@ function renderAll() {
   renderClusters(clusters);
 }
 
-async function fetchJson(url) {
-  const response = await fetch(url);
+function withRefresh(url, refresh) {
+  if (!refresh) return url;
+  const separator = url.includes("?") ? "&" : "?";
+  return `${url}${separator}refresh=1`;
+}
+
+async function fetchJson(url, options = {}) {
+  const response = await fetch(withRefresh(url, options.refresh === true));
   if (!response.ok) {
     throw new Error(`Request failed (${response.status})`);
   }
   return response.json();
 }
 
-async function getPositions(address) {
-  if (state.positionsCache.has(address)) {
-    return state.positionsCache.get(address);
+function getCachedPositions(address) {
+  const entry = state.positionsCache.get(address);
+  if (!entry) return null;
+  if (Date.now() - entry.updatedAt > POSITION_CACHE_TTL_MS) {
+    state.positionsCache.delete(address);
+    return null;
   }
-  const data = await fetchJson(`/api/positions/${address}`);
-  state.positionsCache.set(address, data);
+  return entry.data;
+}
+
+function setCachedPositions(address, data) {
+  state.positionsCache.set(address, { data, updatedAt: Date.now() });
+}
+
+async function getPositions(address, options = {}) {
+  const refresh = options.refresh === true;
+  if (!refresh) {
+    const cached = getCachedPositions(address);
+    if (cached) return cached;
+  }
+  const data = await fetchJson(`/api/positions/${address}`, { refresh });
+  setCachedPositions(address, data);
   return data;
 }
 
-async function loadMidPrice() {
+async function loadMidPrice(options = {}) {
   try {
-    const data = await fetchJson("/api/mids");
+    const refresh = options.refresh === true;
+    const data = await fetchJson("/api/mids", { refresh });
     const price = toNumber(data?.mids?.[ASSET]);
     if (price) {
       state.midPrice = price;
@@ -612,7 +660,7 @@ async function loadMidPrice() {
   }
 }
 
-function applyLeaderboardRows(rows) {
+function applyLeaderboardRows(rows, options = {}) {
   state.rows = Array.isArray(rows) ? rows : [];
   if (state.rows.length && state.accountLimit > state.rows.length) {
     state.accountLimit = state.rows.length;
@@ -621,24 +669,28 @@ function applyLeaderboardRows(rows) {
       updateAccountRangeValue();
     }
   }
-  scanPositions();
+  scanPositions(options);
 }
 
 async function loadLeaderboard(options = {}) {
-  const force = options?.force === true;
+  const refresh = options.refresh === true;
+  const force = options.force === true || refresh;
   if (!force) {
     const cachedRows = getCachedLeaderboard(state.leaderboardLimit);
     if (cachedRows) {
-      applyLeaderboardRows(cachedRows);
+      applyLeaderboardRows(cachedRows, options);
       return;
     }
   }
 
   try {
-    const data = await fetchJson(`/api/leaderboard?limit=${state.leaderboardLimit}`);
+    const data = await fetchJson(
+      `/api/leaderboard?limit=${state.leaderboardLimit}`,
+      { refresh },
+    );
     const rows = Array.isArray(data.rows) ? data.rows : [];
     setCachedLeaderboard(state.leaderboardLimit, rows);
-    applyLeaderboardRows(rows);
+    applyLeaderboardRows(rows, { refresh });
   } catch (error) {
     state.rows = [];
     state.points = [];
@@ -648,7 +700,8 @@ async function loadLeaderboard(options = {}) {
 }
 
 async function scanPositions(options = {}) {
-  const force = options?.force === true;
+  const refresh = options.refresh === true;
+  const force = options.force === true || refresh;
   if (!state.rows.length) {
     state.points = [];
     state.scanChecked = 0;
@@ -682,8 +735,8 @@ async function scanPositions(options = {}) {
   sample.forEach((row) => {
     const address = row.ethAddress;
     if (!address) return;
-    if (state.positionsCache.has(address)) {
-      const data = state.positionsCache.get(address);
+    const data = getCachedPositions(address);
+    if (data) {
       points.push(...extractPoints(data));
       state.scanChecked += 1;
     } else {
@@ -716,7 +769,7 @@ async function scanPositions(options = {}) {
         if (index >= pending.length) return;
         const address = pending[index];
         try {
-          const positions = await getPositions(address);
+          const positions = await getPositions(address, { refresh });
           if (requestId !== state.scanRequestId) return;
           points.push(...extractPoints(positions));
         } catch (error) {
@@ -741,7 +794,7 @@ async function scanPositions(options = {}) {
   renderAll();
 }
 
-function refreshAll() {
+async function refreshAll() {
   state.scanRequestId += 1;
   state.positionsCache.clear();
   clearPointsCache();
@@ -751,8 +804,10 @@ function refreshAll() {
   state.scanLoading = false;
   state.lastUpdated = null;
   updateScanStatus();
-  loadMidPrice();
-  loadLeaderboard({ force: true });
+  await Promise.all([
+    loadMidPrice({ refresh: true }),
+    loadLeaderboard({ force: true, refresh: true }),
+  ]);
 }
 
 function attachEvents() {

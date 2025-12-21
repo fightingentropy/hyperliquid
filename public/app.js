@@ -21,9 +21,12 @@ const state = {
 const ASSET_OPTIONS = ["HYPE", "BTC", "ETH"];
 const MAJOR_ASSETS = ["BTC", "ETH", "HYPE"];
 const POSITION_SCAN_CONCURRENCY = 8;
+const LEADERBOARD_LIMIT = 5000;
 const HYPE_TOP_LIMIT = 10;
-const TOP_POSITIONS_CACHE_KEY = "hl-top-positions:v1";
-const TOP_POSITIONS_CACHE_TTL_MS = 15 * 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
+const TOP_POSITIONS_CACHE_KEY = "hl-top-positions:v2";
+const TOP_POSITIONS_CACHE_TTL_MS = DAY_MS;
+const POSITION_CACHE_TTL_MS = DAY_MS;
 
 const ui = {
   leaderboardBody: document.getElementById("leaderboard-body"),
@@ -92,7 +95,9 @@ function formatNumber(value, decimals = 2) {
   if (value === null || value === undefined) return "--";
   const num = Number(value);
   if (!Number.isFinite(num)) return "--";
-  return new Intl.NumberFormat("en-US", { maximumFractionDigits: decimals }).format(num);
+  return new Intl.NumberFormat("en-US", {
+    maximumFractionDigits: decimals,
+  }).format(num);
 }
 
 function formatPrice(value) {
@@ -100,7 +105,9 @@ function formatPrice(value) {
   const num = Number(value);
   if (!Number.isFinite(num)) return "--";
   const decimals = num >= 1000 ? 2 : num >= 1 ? 4 : 6;
-  return new Intl.NumberFormat("en-US", { maximumFractionDigits: decimals }).format(num);
+  return new Intl.NumberFormat("en-US", {
+    maximumFractionDigits: decimals,
+  }).format(num);
 }
 
 function formatAddress(address) {
@@ -178,13 +185,17 @@ function matchesAsset(position, asset) {
 }
 
 function getAssetPositions(data, asset) {
-  return getOpenPositions(data).filter((position) => matchesAsset(position, asset));
+  return getOpenPositions(data).filter((position) =>
+    matchesAsset(position, asset),
+  );
 }
 
 function isExcludedOpenPosition(position) {
   const coin = normalizeCoin(position?.coin);
   if (!coin) return false;
-  return MAJOR_ASSETS.some((asset) => coin === asset || coin.startsWith(`${asset}-`));
+  return MAJOR_ASSETS.some(
+    (asset) => coin === asset || coin.startsWith(`${asset}-`),
+  );
 }
 
 function filterOpenPositions(positions) {
@@ -267,7 +278,10 @@ function updateAssetStatus() {
     setText(ui.assetStatus, `Scanning ${checked}/${total} accounts`);
     return;
   }
-  setText(ui.assetStatus, `Showing ${getDisplayedTopPositionsCount()} positions`);
+  setText(
+    ui.assetStatus,
+    `Showing ${getDisplayedTopPositionsCount()} positions`,
+  );
 }
 
 let positionsRenderQueued = false;
@@ -307,6 +321,20 @@ function clearTopPositionsCache() {
   }
 }
 
+function getCachedPositions(address) {
+  const entry = state.positionsCache.get(address);
+  if (!entry) return null;
+  if (Date.now() - entry.updatedAt > POSITION_CACHE_TTL_MS) {
+    state.positionsCache.delete(address);
+    return null;
+  }
+  return entry.data;
+}
+
+function setCachedPositions(address, data) {
+  state.positionsCache.set(address, { data, updatedAt: Date.now() });
+}
+
 function getCachedTopPositions(asset) {
   const cache = readTopPositionsCache();
   const entry = cache?.assets?.[asset];
@@ -341,6 +369,13 @@ function shouldRefreshTopPositions(asset) {
   return Date.now() - entry.updatedAt > TOP_POSITIONS_CACHE_TTL_MS;
 }
 
+function isTopPositionsCacheStale(asset) {
+  const cache = readTopPositionsCache();
+  const entry = cache?.assets?.[asset];
+  if (!entry?.updatedAt) return false;
+  return Date.now() - entry.updatedAt > TOP_POSITIONS_CACHE_TTL_MS;
+}
+
 function renderTopPositions() {
   if (!ui.leaderboardBody) return;
   if (!state.rows.length) {
@@ -350,16 +385,26 @@ function renderTopPositions() {
   }
 
   const term = state.searchTerm.trim().toLowerCase();
-  const filtered = state.topPositions.filter((entry) => matchesSearch(entry, term));
+  const filtered = state.topPositions.filter((entry) =>
+    matchesSearch(entry, term),
+  );
   const sorted = sortPositions(filtered);
   const limited = limitTopPositions(sorted);
 
   ui.leaderboardBody.innerHTML = "";
   if (!limited.length) {
     if (state.assetScanLoading) {
-      setTableMessage(ui.leaderboardBody, `Scanning ${state.asset} positions...`, 7);
+      setTableMessage(
+        ui.leaderboardBody,
+        `Scanning ${state.asset} positions...`,
+        7,
+      );
     } else {
-      setTableMessage(ui.leaderboardBody, `No open ${state.asset} positions found.`, 7);
+      setTableMessage(
+        ui.leaderboardBody,
+        `No open ${state.asset} positions found.`,
+        7,
+      );
     }
     setText(ui.leaderboardCount, String(limited.length));
     return;
@@ -448,7 +493,10 @@ function setSortState(key) {
   ui.sortableHeaders.forEach((header) => {
     const headerKey = header.dataset.sort;
     if (headerKey === state.sortKey) {
-      header.setAttribute("aria-sort", state.sortDir === "asc" ? "ascending" : "descending");
+      header.setAttribute(
+        "aria-sort",
+        state.sortDir === "asc" ? "ascending" : "descending",
+      );
     } else {
       header.removeAttribute("aria-sort");
     }
@@ -469,20 +517,28 @@ function setAsset(asset) {
   scanTopPositions();
 }
 
-async function fetchJson(url) {
-  const response = await fetch(url);
+function withRefresh(url, refresh) {
+  if (!refresh) return url;
+  const separator = url.includes("?") ? "&" : "?";
+  return `${url}${separator}refresh=1`;
+}
+
+async function fetchJson(url, options = {}) {
+  const response = await fetch(withRefresh(url, options.refresh === true));
   if (!response.ok) {
     throw new Error(`Request failed (${response.status})`);
   }
   return response.json();
 }
 
-async function getPositions(address) {
-  if (state.positionsCache.has(address)) {
-    return state.positionsCache.get(address);
+async function getPositions(address, options = {}) {
+  const refresh = options.refresh === true;
+  if (!refresh) {
+    const cached = getCachedPositions(address);
+    if (cached) return cached;
   }
-  const data = await fetchJson(`/api/positions/${address}`);
-  state.positionsCache.set(address, data);
+  const data = await fetchJson(`/api/positions/${address}`, { refresh });
+  setCachedPositions(address, data);
   return data;
 }
 
@@ -494,8 +550,8 @@ function collectCachedPositions(rows, asset) {
   rows.forEach((row) => {
     const address = row.ethAddress;
     if (!address) return;
-    if (state.positionsCache.has(address)) {
-      const data = state.positionsCache.get(address);
+    const data = getCachedPositions(address);
+    if (data) {
       getAssetPositions(data, asset).forEach((position) => {
         entries.push(createPositionEntry(row, position));
       });
@@ -508,7 +564,7 @@ function collectCachedPositions(rows, asset) {
   return { entries, checked, pending };
 }
 
-async function scanTopPositions() {
+async function scanTopPositions(options = {}) {
   if (!state.rows.length) {
     state.topPositions = [];
     state.assetScanChecked = 0;
@@ -521,8 +577,15 @@ async function scanTopPositions() {
 
   const requestId = (state.assetScanRequestId += 1);
   const asset = state.asset;
+  const refresh = options.refresh === true;
+  if (refresh || isTopPositionsCacheStale(asset)) {
+    state.positionsCache.clear();
+  }
 
-  const { entries, checked, pending } = collectCachedPositions(state.rows, asset);
+  const { entries, checked, pending } = collectCachedPositions(
+    state.rows,
+    asset,
+  );
   state.topPositions = entries;
   state.assetScanChecked = checked;
   state.assetScanTotal = checked + pending.length;
@@ -544,7 +607,7 @@ async function scanTopPositions() {
         const address = pending[index];
         const row = rowByAddress.get(address);
         try {
-          const positions = await getPositions(address);
+          const positions = await getPositions(address, { refresh });
           if (requestId !== state.assetScanRequestId) return;
           getAssetPositions(positions, asset).forEach((position) => {
             entries.push(createPositionEntry(row, position));
@@ -570,15 +633,22 @@ async function scanTopPositions() {
   renderTopPositions();
 }
 
-async function loadLeaderboard() {
+async function loadLeaderboard(options = {}) {
   setTableMessage(ui.leaderboardBody, "Loading accounts...", 7);
   try {
-    const data = await fetchJson("/api/leaderboard?limit=500");
+    const refresh = options.refresh === true;
+    const data = await fetchJson(
+      `/api/leaderboard?limit=${LEADERBOARD_LIMIT}`,
+      { refresh },
+    );
     state.rows = Array.isArray(data.rows) ? data.rows : [];
     state.updatedAt = data.updatedAt ?? Date.now();
-    setText(ui.leaderboardUpdated, new Date(state.updatedAt).toLocaleTimeString());
+    setText(
+      ui.leaderboardUpdated,
+      new Date(state.updatedAt).toLocaleTimeString(),
+    );
     if (!applyCachedTopPositions(state.asset)) {
-      scanTopPositions();
+      scanTopPositions({ refresh });
     }
   } catch (error) {
     setTableMessage(ui.leaderboardBody, "Failed to load accounts.", 7);
@@ -608,7 +678,11 @@ function renderPositions(data) {
     row.appendChild(createCell(formatNumber(Math.abs(size), 4)));
     row.appendChild(createCell(formatPrice(position.entryPx)));
     row.appendChild(createCell(formatUsd(getPositionValue(position))));
-    row.appendChild(createCell(position.liquidationPx ? formatPrice(position.liquidationPx) : "--"));
+    row.appendChild(
+      createCell(
+        position.liquidationPx ? formatPrice(position.liquidationPx) : "--",
+      ),
+    );
 
     const pnlCell = createCell(formatUsd(position.unrealizedPnl));
     const pnlClass = classForSign(position.unrealizedPnl);
@@ -632,8 +706,13 @@ function extractLiquidationMeta(fill) {
 
   const role =
     liq.role ??
-    (liq.liquidator ? "Liquidator" : liq.liquidated ? "Liquidated" : "Liquidation");
-  const method = liq.method ?? liq.type ?? liq.liquidationType ?? liq.reason ?? "--";
+    (liq.liquidator
+      ? "Liquidator"
+      : liq.liquidated
+        ? "Liquidated"
+        : "Liquidation");
+  const method =
+    liq.method ?? liq.type ?? liq.liquidationType ?? liq.reason ?? "--";
   const markPx = liq.markPx ?? liq.liqPx ?? liq.liquidationPx ?? fill?.px;
 
   return { role, method, markPx };
@@ -689,7 +768,8 @@ function updateDetailBase(row) {
   state.selectedRow = row;
   state.selectedAddress = row?.ethAddress ?? null;
   const address = state.selectedAddress;
-  const name = row?.displayName?.trim() || (address ? formatAddress(address) : "None");
+  const name =
+    row?.displayName?.trim() || (address ? formatAddress(address) : "None");
 
   setText(ui.detailName, name);
   setText(ui.detailAddress, address ?? "--");
@@ -705,7 +785,7 @@ function updateDetailBase(row) {
     : "https://hypurrscan.io";
 }
 
-async function selectAccount(row) {
+async function selectAccount(row, options = {}) {
   if (!row) {
     clearSelection();
     return;
@@ -713,6 +793,7 @@ async function selectAccount(row) {
 
   state.detailRequestId += 1;
   const requestId = state.detailRequestId;
+  const refresh = options.refresh === true;
   updateDetailBase(row);
   state.selectedPositionsData = null;
   renderTopPositions();
@@ -722,8 +803,8 @@ async function selectAccount(row) {
 
   try {
     const [positions, fills] = await Promise.all([
-      getPositions(row.ethAddress),
-      fetchJson(`/api/fills/${row.ethAddress}?days=30`),
+      getPositions(row.ethAddress, { refresh }),
+      fetchJson(`/api/fills/${row.ethAddress}?days=30`, { refresh }),
     ]);
 
     if (requestId !== state.detailRequestId) return;
@@ -744,7 +825,11 @@ function clearSelection() {
   state.selectedPositionsData = null;
   updateDetailBase(null);
   setTableMessage(ui.positionsBody, "Select an account to see positions.", 7);
-  setTableMessage(ui.liquidationsBody, "Select an account to see liquidations.", 6);
+  setTableMessage(
+    ui.liquidationsBody,
+    "Select an account to see liquidations.",
+    6,
+  );
   renderTopPositions();
 }
 
@@ -759,7 +844,7 @@ function handleCopy() {
   });
 }
 
-function refreshAll() {
+async function refreshAll() {
   state.assetScanRequestId += 1;
   state.positionsCache.clear();
   state.topPositions = [];
@@ -767,7 +852,15 @@ function refreshAll() {
   state.assetScanTotal = 0;
   state.assetScanLoading = false;
   clearTopPositionsCache();
-  loadLeaderboard();
+  await loadLeaderboard({ refresh: true });
+  if (state.selectedAddress) {
+    const row = state.rows.find(
+      (item) => item.ethAddress === state.selectedAddress,
+    );
+    if (row) {
+      await selectAccount(row, { refresh: true });
+    }
+  }
 }
 
 function attachEvents() {

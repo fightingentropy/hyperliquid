@@ -7,18 +7,18 @@ Small Bun server that proxies Hyperliquid stats/info endpoints, adds light cachi
 - Serves a simple web UI from `public/`.
 - Exposes a few JSON endpoints under `/api/` that wrap Hyperliquid APIs.
 - Normalizes leaderboard rows and window stats for consistent client usage.
-- Caches responses in-memory for short TTLs to reduce upstream calls.
+- Caches responses in-memory for 24 hours to reduce upstream calls.
 
 ## API endpoints
 
-All endpoints are GET-only and return JSON.
+All endpoints are GET-only and return JSON. Add `refresh=1` to bypass cache.
 
 ### `GET /api/leaderboard`
 
 Returns the top accounts by account value for the configured chain.
 
 Query params:
-- `limit` (default `500`, max `1000`): number of rows returned.
+- `limit` (default `500`, max `5000`): number of rows returned.
 
 Response fields:
 - `chain`: chain name (from `HL_CHAIN`).
@@ -59,4 +59,4 @@ The server logs the local URL on startup.
 ## Notes
 
 - Upstream sources: `https://api.hyperliquid.xyz/info` and `https://stats-data.hyperliquid.xyz`.
-- Cache TTLs are short (10s to 60s) and in-memory only.
+- Cache TTLs are 24 hours by default and in-memory only.

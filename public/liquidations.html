@@ -1,161 +1,186 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>HYPE Liquidation Clusters</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
-      rel="stylesheet"
-    />
-    <link rel="stylesheet" href="/styles.css" />
-    <script src="/liquidations.js" defer></script>
-  </head>
-  <body>
-    <div class="orb orb-1"></div>
-    <div class="orb orb-2"></div>
-    <div class="orb orb-3"></div>
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>HYPE Liquidation Clusters</title>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link
+            href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
+            rel="stylesheet"
+        />
+        <link rel="stylesheet" href="/styles.css" />
+        <script src="/liquidations.js" defer></script>
+    </head>
+    <body>
+        <div class="orb orb-1"></div>
+        <div class="orb orb-2"></div>
+        <div class="orb orb-3"></div>
 
-    <nav class="top-nav">
-      <a class="brand" href="/">HL Stats</a>
-      <div class="nav-links">
-        <a class="nav-link" href="/">Top Positions</a>
-        <a class="nav-link active" href="/liquidations.html">Liquidation Clusters</a>
-      </div>
-    </nav>
-
-    <header class="hero">
-      <div class="hero-content">
-        <p class="eyebrow">Hyperliquid Intelligence</p>
-        <h1>HYPE Liquidation Clusters</h1>
-        <p class="lede">
-          See where liquidation notional stacks up across price buckets for HYPE, aggregated from the
-          largest accounts.
-        </p>
-        <div class="hero-actions">
-          <button id="refresh-button" class="primary">Refresh Scan</button>
-        </div>
-      </div>
-      <div class="hero-metrics">
-        <div class="metric">
-          <span class="label">Accounts</span>
-          <span id="accounts-count" class="value">0</span>
-        </div>
-        <div class="metric">
-          <span class="label">Liq Points</span>
-          <span id="points-count" class="value">0</span>
-        </div>
-        <div class="metric">
-          <span class="label">Notional</span>
-          <span id="total-notional" class="value">--</span>
-        </div>
-        <div class="metric">
-          <span class="label">Updated</span>
-          <span id="last-updated" class="value">--</span>
-        </div>
-      </div>
-    </header>
-
-    <main class="layout">
-      <section class="panel cluster-panel">
-        <div class="panel-header">
-          <div>
-            <h2>Liquidation Distribution</h2>
-            <p class="muted">Bucketed HYPE liquidation notional by price level.</p>
-          </div>
-          <div class="controls">
-            <div class="segmented" id="side-toggle">
-              <button data-side="all" class="active">All</button>
-              <button data-side="long">Long</button>
-              <button data-side="short">Short</button>
+        <nav class="top-nav">
+            <a class="brand" href="/">HL Stats</a>
+            <div class="nav-links">
+                <a class="nav-link" href="/">Top Positions</a>
+                <a class="nav-link active" href="/liquidations.html"
+                    >Liquidation Clusters</a
+                >
             </div>
-          </div>
-        </div>
+        </nav>
 
-        <div class="chart-shell">
-          <div class="chart-meta">
-            <span class="pill" id="scan-status">Ready</span>
-            <span class="muted" id="price-range">--</span>
-          </div>
-          <div class="chart-area">
-            <div class="cluster-bars" id="cluster-bars"></div>
-            <div class="price-line" id="current-price-line">
-              <span id="current-price-label">--</span>
+        <header class="hero">
+            <div class="hero-content">
+                <p class="eyebrow">Hyperliquid Intelligence</p>
+                <h1>HYPE Liquidation Clusters</h1>
+                <p class="lede">
+                    See where liquidation notional stacks up across price
+                    buckets for HYPE, aggregated from the largest accounts.
+                </p>
+                <div class="hero-actions">
+                    <button id="refresh-button" class="primary">
+                        Refresh Scan
+                    </button>
+                </div>
             </div>
-          </div>
-          <div class="chart-axis" id="chart-axis"></div>
-        </div>
-
-        <div class="chart-legend">
-          <span class="legend-item"><span class="legend-swatch short"></span>Mostly short</span>
-          <span class="legend-item"><span class="legend-swatch long"></span>Mostly long</span>
-        </div>
-      </section>
-
-      <aside class="panel detail-panel">
-        <div class="panel-header">
-          <div>
-            <h2>Cluster Breakdown</h2>
-            <p class="muted">Largest liquidation pockets by bucket.</p>
-          </div>
-        </div>
-
-        <div class="detail-section">
-          <div class="section-header">
-            <h3>Top Buckets</h3>
-            <div class="pill" id="bucket-count">0 buckets</div>
-          </div>
-          <div class="table-wrap small">
-            <table>
-              <thead>
-                <tr>
-                  <th>Price Range</th>
-                  <th>Notional</th>
-                  <th>Positions</th>
-                </tr>
-              </thead>
-              <tbody id="bucket-body"></tbody>
-            </table>
-          </div>
-        </div>
-
-        <div class="detail-section">
-          <div class="section-header">
-            <h3>Scan Settings</h3>
-          </div>
-          <div class="range-control">
-            <div class="range-header">
-              <span>Top Accounts</span>
-              <span id="account-range-value" class="mono">500</span>
+            <div class="hero-metrics">
+                <div class="metric">
+                    <span class="label">Accounts</span>
+                    <span id="accounts-count" class="value">0</span>
+                </div>
+                <div class="metric">
+                    <span class="label">Liq Points</span>
+                    <span id="points-count" class="value">0</span>
+                </div>
+                <div class="metric">
+                    <span class="label">Notional</span>
+                    <span id="total-notional" class="value">--</span>
+                </div>
+                <div class="metric">
+                    <span class="label">Updated</span>
+                    <span id="last-updated" class="value">--</span>
+                </div>
             </div>
-            <input id="account-range" type="range" min="100" max="500" step="50" value="500" />
-            <p class="muted">Scan liquidation prices across leaderboard accounts.</p>
-          </div>
-        </div>
+        </header>
 
-        <div class="detail-section">
-          <div class="stat-grid">
-            <div class="stat">
-              <span class="label">Current Price</span>
-              <span id="current-price" class="value">--</span>
-            </div>
-            <div class="stat">
-              <span class="label">Long Notional</span>
-              <span id="long-notional" class="value">--</span>
-            </div>
-            <div class="stat">
-              <span class="label">Short Notional</span>
-              <span id="short-notional" class="value">--</span>
-            </div>
-          </div>
-        </div>
-      </aside>
-    </main>
+        <main class="layout">
+            <section class="panel cluster-panel">
+                <div class="panel-header">
+                    <div>
+                        <h2>Liquidation Distribution</h2>
+                        <p class="muted">
+                            Bucketed HYPE liquidation notional by price level.
+                        </p>
+                    </div>
+                    <div class="controls">
+                        <div class="segmented" id="side-toggle">
+                            <button data-side="all" class="active">All</button>
+                            <button data-side="long">Long</button>
+                            <button data-side="short">Short</button>
+                        </div>
+                    </div>
+                </div>
 
-    <footer class="footer">
-      <p>Data: stats-data.hyperliquid.xyz + api.hyperliquid.xyz</p>
-    </footer>
-  </body>
+                <div class="chart-shell">
+                    <div class="chart-meta">
+                        <span class="pill" id="scan-status">Ready</span>
+                        <span class="muted" id="price-range">--</span>
+                    </div>
+                    <div class="chart-area">
+                        <div class="cluster-bars" id="cluster-bars"></div>
+                        <div class="price-line" id="current-price-line">
+                            <span id="current-price-label">--</span>
+                        </div>
+                    </div>
+                    <div class="chart-axis" id="chart-axis"></div>
+                </div>
+
+                <div class="chart-legend">
+                    <span class="legend-item"
+                        ><span class="legend-swatch short"></span>Mostly
+                        short</span
+                    >
+                    <span class="legend-item"
+                        ><span class="legend-swatch long"></span>Mostly
+                        long</span
+                    >
+                </div>
+            </section>
+
+            <aside class="panel detail-panel">
+                <div class="panel-header">
+                    <div>
+                        <h2>Cluster Breakdown</h2>
+                        <p class="muted">
+                            Largest liquidation pockets by bucket.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="detail-section">
+                    <div class="section-header">
+                        <h3>Top Buckets</h3>
+                        <div class="pill" id="bucket-count">0 buckets</div>
+                    </div>
+                    <div class="table-wrap small">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Price Range</th>
+                                    <th>Notional</th>
+                                    <th>Positions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="bucket-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="detail-section">
+                    <div class="section-header">
+                        <h3>Scan Settings</h3>
+                    </div>
+                    <div class="range-control">
+                        <div class="range-header">
+                            <span>Top Accounts</span>
+                            <span id="account-range-value" class="mono"
+                                >5000</span
+                            >
+                        </div>
+                        <input
+                            id="account-range"
+                            type="range"
+                            min="100"
+                            max="5000"
+                            step="50"
+                            value="5000"
+                        />
+                        <p class="muted">
+                            Scan liquidation prices across leaderboard accounts.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="detail-section">
+                    <div class="stat-grid">
+                        <div class="stat">
+                            <span class="label">Current Price</span>
+                            <span id="current-price" class="value">--</span>
+                        </div>
+                        <div class="stat">
+                            <span class="label">Long Notional</span>
+                            <span id="long-notional" class="value">--</span>
+                        </div>
+                        <div class="stat">
+                            <span class="label">Short Notional</span>
+                            <span id="short-notional" class="value">--</span>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+        </main>
+
+        <footer class="footer">
+            <p>Data: stats-data.hyperliquid.xyz + api.hyperliquid.xyz</p>
+        </footer>
+    </body>
 </html>

@@ -12,6 +12,9 @@ const state = {
   sideFilter: "all",
   accountLimit: 5000,
   leaderboardLimit: 5000,
+  settings: {
+    showBinSize: false,
+  },
 };
 
 const ASSET = "HYPE";
@@ -24,6 +27,12 @@ const LEADERBOARD_CACHE_KEY = "hl-liquidations-leaderboard:v1";
 const LEADERBOARD_CACHE_TTL_MS = DAY_MS;
 const LIQUIDATION_POINTS_CACHE_KEY = "hl-liquidations-points:v1";
 const LIQUIDATION_POINTS_CACHE_TTL_MS = DAY_MS;
+const SETTINGS_KEY = "hl-settings:v1";
+const DEFAULT_SETTINGS = {
+  showBinSize: false,
+  binPercent: 0.005,
+  accountLimit: 5000,
+};
 
 const ui = {
   refreshButton: document.getElementById("refresh-button"),
@@ -66,6 +75,21 @@ const DARK_COLOR = { r: 0, g: 0, b: 0 };
 function setText(element, value) {
   if (!element) return;
   element.textContent = value;
+}
+
+function loadSettings() {
+  try {
+    const raw = localStorage.getItem(SETTINGS_KEY);
+    if (!raw) return { ...DEFAULT_SETTINGS };
+    const parsed = JSON.parse(raw);
+    return { ...DEFAULT_SETTINGS, ...parsed };
+  } catch (error) {
+    return { ...DEFAULT_SETTINGS };
+  }
+}
+
+function saveSettings(settings) {
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
 }
 
 function toNumber(value) {
@@ -524,10 +548,11 @@ function renderClusters(clusterData) {
   });
 
   renderAxisTicks(min, max);
-  setText(
-    ui.priceRange,
-    `${formatPrice(min)} - ${formatPrice(max)} | Bin ${formatPrice(size)}`,
-  );
+  let rangeLabel = `${formatPrice(min)} - ${formatPrice(max)}`;
+  if (state.settings.showBinSize) {
+    rangeLabel += ` | Bin ${formatPrice(size)}`;
+  }
+  setText(ui.priceRange, rangeLabel);
 
   if (ui.currentPriceLine) {
     const mid = state.midPrice;
@@ -815,6 +840,8 @@ function attachEvents() {
   ui.accountRange?.addEventListener("input", () => updateAccountRangeValue());
   ui.accountRange?.addEventListener("change", (event) => {
     state.accountLimit = Number(event.target.value);
+    state.settings = { ...state.settings, accountLimit: state.accountLimit };
+    saveSettings(state.settings);
     updateAccountRangeValue();
     state.scanChecked = 0;
     scanPositions();
@@ -823,6 +850,8 @@ function attachEvents() {
     const button = event.target.closest("button[data-bin]");
     if (!button) return;
     state.binPercent = Number(button.dataset.bin);
+    state.settings = { ...state.settings, binPercent: state.binPercent };
+    saveSettings(state.settings);
     ui.binToggle.querySelectorAll("button").forEach((node) => {
       node.classList.toggle("active", node === button);
     });
@@ -840,6 +869,10 @@ function attachEvents() {
 }
 
 function init() {
+  const settings = loadSettings();
+  state.settings = settings;
+  state.binPercent = settings.binPercent;
+  state.accountLimit = settings.accountLimit;
   if (ui.accountRange) {
     ui.accountRange.value = String(state.accountLimit);
     updateAccountRangeValue();
@@ -848,6 +881,19 @@ function init() {
   attachEvents();
   loadMidPrice();
   loadLeaderboard();
+
+  window.addEventListener("storage", (event) => {
+    if (event.key !== SETTINGS_KEY) return;
+    const next = loadSettings();
+    state.settings = next;
+    state.binPercent = next.binPercent;
+    state.accountLimit = next.accountLimit;
+    if (ui.accountRange) {
+      ui.accountRange.value = String(state.accountLimit);
+      updateAccountRangeValue();
+    }
+    renderAll();
+  });
 }
 
 init();

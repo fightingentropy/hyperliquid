@@ -280,8 +280,69 @@ a {
     grid-template-columns: minmax(0, 1fr);
 }
 
+.about-layout {
+    grid-template-columns: minmax(0, 1.3fr) minmax(0, 0.9fr);
+}
+
 .settings-panel {
     gap: 24px;
+}
+
+.about-grid {
+    display: grid;
+    gap: 16px;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.about-card {
+    background: var(--bg-alt);
+    border: 1px solid var(--panel-border);
+    border-radius: 16px;
+    padding: 16px;
+    display: grid;
+    gap: 10px;
+}
+
+.about-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: grid;
+    gap: 12px;
+}
+
+.about-list li {
+    border: 1px solid var(--panel-border);
+    border-radius: 12px;
+    padding: 12px 14px;
+    background: #f7f2ea;
+    display: grid;
+    gap: 6px;
+}
+
+.about-list strong {
+    font-size: 0.7rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+}
+
+.about-callout {
+    background: linear-gradient(
+        135deg,
+        rgba(229, 107, 59, 0.12),
+        rgba(31, 127, 109, 0.12)
+    );
+    border: 1px solid var(--panel-border);
+    border-radius: 16px;
+    padding: 16px;
+    display: grid;
+    gap: 8px;
+}
+
+.about-meta {
+    display: grid;
+    gap: 12px;
 }
 
 .settings-grid {

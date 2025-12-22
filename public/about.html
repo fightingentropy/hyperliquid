@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>About HL Stats</title>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link
+            href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
+            rel="stylesheet"
+        />
+        <link rel="stylesheet" href="/styles.css" />
+    </head>
+    <body>
+        <div class="orb orb-1"></div>
+        <div class="orb orb-2"></div>
+        <div class="orb orb-3"></div>
+
+        <nav class="top-nav">
+            <a class="brand" href="/">HL Stats</a>
+            <div class="nav-links">
+                <a class="nav-link" href="/">Top Positions</a>
+                <a class="nav-link" href="/liquidations.html"
+                    >Liquidation Clusters</a
+                >
+                <a class="nav-link active" href="/about.html">About</a>
+                <a
+                    class="icon-button"
+                    href="/settings.html"
+                    aria-label="Settings"
+                >
+                    <svg
+                        viewBox="0 0 24 24"
+                        aria-hidden="true"
+                        focusable="false"
+                    >
+                        <path
+                            d="M11.99 2.5a1 1 0 0 1 .98.8l.3 1.54a7.47 7.47 0 0 1 1.74.72l1.35-.86a1 1 0 0 1 1.27.14l1.28 1.28a1 1 0 0 1 .14 1.27l-.86 1.35c.3.55.55 1.13.72 1.74l1.54.3a1 1 0 0 1 .8.98v1.82a1 1 0 0 1-.8.98l-1.54.3a7.47 7.47 0 0 1-.72 1.74l.86 1.35a1 1 0 0 1-.14 1.27l-1.28 1.28a1 1 0 0 1-1.27.14l-1.35-.86a7.47 7.47 0 0 1-1.74.72l-.3 1.54a1 1 0 0 1-.98.8h-1.82a1 1 0 0 1-.98-.8l-.3-1.54a7.47 7.47 0 0 1-1.74-.72l-1.35.86a1 1 0 0 1-1.27-.14L4.1 19.78a1 1 0 0 1-.14-1.27l.86-1.35a7.47 7.47 0 0 1-.72-1.74l-1.54-.3a1 1 0 0 1-.8-.98v-1.82a1 1 0 0 1 .8-.98l1.54-.3c.17-.61.42-1.19.72-1.74l-.86-1.35a1 1 0 0 1 .14-1.27l1.28-1.28a1 1 0 0 1 1.27-.14l1.35.86a7.47 7.47 0 0 1 1.74-.72l.3-1.54a1 1 0 0 1 .98-.8h1.82Zm-3.09 9.5a3 3 0 1 0 6 0 3 3 0 0 0-6 0Z"
+                            fill="currentColor"
+                        />
+                    </svg>
+                </a>
+            </div>
+        </nav>
+
+        <header class="hero about-hero">
+            <div class="hero-content">
+                <p class="eyebrow">Hyperliquid Intelligence</p>
+                <h1>About HL Stats</h1>
+                <p class="lede">
+                    HL Stats is a lightweight dashboard for scanning the largest
+                    Hyperliquid accounts. It highlights top open positions,
+                    clusters liquidation exposure, and lets you drill into each
+                    wallet in context.
+                </p>
+            </div>
+            <div class="hero-metrics">
+                <div class="metric">
+                    <span class="label">Dashboards</span>
+                    <span class="value">3 core views</span>
+                </div>
+                <div class="metric">
+                    <span class="label">Assets</span>
+                    <span class="value">HYPE, BTC, ETH</span>
+                </div>
+                <div class="metric">
+                    <span class="label">Data Sources</span>
+                    <span class="value">2 endpoints</span>
+                </div>
+            </div>
+        </header>
+
+        <main class="layout about-layout">
+            <section class="panel">
+                <div class="panel-header">
+                    <div>
+                        <h2>What It Tracks</h2>
+                        <p class="muted">
+                            Actionable snapshots of size, risk, and positioning
+                            across Hyperliquid leaderboard accounts.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="about-grid">
+                    <div class="about-card">
+                        <h3>Top Positions</h3>
+                        <p class="muted">
+                            Ranks the largest open positions by notional value
+                            for HYPE, BTC, and ETH, so you can see where the
+                            concentration sits.
+                        </p>
+                    </div>
+                    <div class="about-card">
+                        <h3>Liquidation Clusters</h3>
+                        <p class="muted">
+                            Buckets liquidation prices into ranges to show
+                            stacked risk zones and the long/short bias at each
+                            level.
+                        </p>
+                    </div>
+                    <div class="about-card">
+                        <h3>Account Detail</h3>
+                        <p class="muted">
+                            Click any wallet to inspect open positions,
+                            liquidation history, and key account stats with a
+                            direct link to the explorer.
+                        </p>
+                    </div>
+                    <div class="about-card">
+                        <h3>Settings</h3>
+                        <p class="muted">
+                            Tune scan limits, bucket sizes, and display
+                            preferences. Settings save locally in your browser.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="detail-section">
+                    <div class="section-header">
+                        <h3>How It Works</h3>
+                    </div>
+                    <ul class="about-list">
+                        <li>
+                            <strong>Leaderboard focus</strong>
+                            <span class="muted">
+                                Uses the largest Hyperliquid accounts to surface
+                                market-wide positioning signals.
+                            </span>
+                        </li>
+                        <li>
+                            <strong>Asset toggles</strong>
+                            <span class="muted">
+                                Switch between HYPE, BTC, and ETH views without
+                                losing your selected wallet context.
+                            </span>
+                        </li>
+                        <li>
+                            <strong>On-demand refresh</strong>
+                            <span class="muted">
+                                Refresh buttons pull the latest public snapshot
+                                so you can re-check conditions quickly.
+                            </span>
+                        </li>
+                    </ul>
+                </div>
+            </section>
+
+            <aside class="panel detail-panel">
+                <div class="panel-header">
+                    <div>
+                        <h2>Data + Usage</h2>
+                        <p class="muted">
+                            Built for quick reads, not heavy spreadsheets.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="detail-section">
+                    <div class="about-callout">
+                        <h3>Browser-first</h3>
+                        <p class="muted">
+                            HL Stats runs entirely in your browser and stores
+                            view preferences locally to keep repeat visits fast.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="detail-section">
+                    <div class="section-header">
+                        <h3>Data Sources</h3>
+                    </div>
+                    <div class="about-meta">
+                        <p class="muted">
+                            Market and leaderboard data are pulled from
+                            Hyperliquid public endpoints:
+                        </p>
+                        <div class="stat">
+                            <span class="label">Leaderboard</span>
+                            <span class="value mono">stats-data.hyperliquid.xyz</span>
+                        </div>
+                        <div class="stat">
+                            <span class="label">Account + Market</span>
+                            <span class="value mono">api.hyperliquid.xyz</span>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+        </main>
+
+        <footer class="footer">
+            <p>Data: stats-data.hyperliquid.xyz + api.hyperliquid.xyz</p>
+        </footer>
+    </body>
+</html>

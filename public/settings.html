@@ -1,135 +1,142 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>HL Settings</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
-      rel="stylesheet"
-    />
-    <link rel="stylesheet" href="/styles.css" />
-    <script src="/settings.js" defer></script>
-  </head>
-  <body>
-    <div class="orb orb-1"></div>
-    <div class="orb orb-2"></div>
-    <div class="orb orb-3"></div>
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>HL Settings</title>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link
+            href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
+            rel="stylesheet"
+        />
+        <link rel="stylesheet" href="/styles.css" />
+        <script src="/settings.js" defer></script>
+    </head>
+    <body>
+        <div class="orb orb-1"></div>
+        <div class="orb orb-2"></div>
+        <div class="orb orb-3"></div>
 
-    <nav class="top-nav">
-      <a class="brand" href="/">HL Stats</a>
-      <div class="nav-links">
-        <a class="nav-link" href="/">Top Positions</a>
-        <a class="nav-link" href="/liquidations.html">Liquidation Clusters</a>
-        <a class="icon-button active" href="/settings.html" aria-label="Settings">
-          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-            <path
-              d="M11.99 2.5a1 1 0 0 1 .98.8l.3 1.54a7.47 7.47 0 0 1 1.74.72l1.35-.86a1 1 0 0 1 1.27.14l1.28 1.28a1 1 0 0 1 .14 1.27l-.86 1.35c.3.55.55 1.13.72 1.74l1.54.3a1 1 0 0 1 .8.98v1.82a1 1 0 0 1-.8.98l-1.54.3a7.47 7.47 0 0 1-.72 1.74l.86 1.35a1 1 0 0 1-.14 1.27l-1.28 1.28a1 1 0 0 1-1.27.14l-1.35-.86a7.47 7.47 0 0 1-1.74.72l-.3 1.54a1 1 0 0 1-.98.8h-1.82a1 1 0 0 1-.98-.8l-.3-1.54a7.47 7.47 0 0 1-1.74-.72l-1.35.86a1 1 0 0 1-1.27-.14L4.1 19.78a1 1 0 0 1-.14-1.27l.86-1.35a7.47 7.47 0 0 1-.72-1.74l-1.54-.3a1 1 0 0 1-.8-.98v-1.82a1 1 0 0 1 .8-.98l1.54-.3c.17-.61.42-1.19.72-1.74l-.86-1.35a1 1 0 0 1 .14-1.27l1.28-1.28a1 1 0 0 1 1.27-.14l1.35.86a7.47 7.47 0 0 1 1.74-.72l.3-1.54a1 1 0 0 1 .98-.8h1.82Zm-3.09 9.5a3 3 0 1 0 6 0 3 3 0 0 0-6 0Z"
-              fill="currentColor"
-            />
-          </svg>
-        </a>
-      </div>
-    </nav>
-
-    <header class="hero settings-hero">
-      <div class="hero-content">
-        <p class="eyebrow">Hyperliquid Control</p>
-        <h1>Settings</h1>
-        <p class="lede">
-          Dial in how the dashboards render and set your default scan behavior.
-          Changes save automatically for this browser.
-        </p>
-      </div>
-      <div class="hero-metrics">
-        <div class="metric">
-          <span class="label">Scope</span>
-          <span class="value">Local</span>
-        </div>
-        <div class="metric">
-          <span class="label">Applies To</span>
-          <span class="value">All Pages</span>
-        </div>
-        <div class="metric">
-          <span class="label">Status</span>
-          <span class="value">Ready</span>
-        </div>
-      </div>
-    </header>
-
-    <main class="layout settings-layout">
-      <section class="panel settings-panel">
-        <div class="panel-header">
-          <div>
-            <h2>Liquidation Clusters</h2>
-            <p class="muted">Tune the bucket display and scan defaults.</p>
-          </div>
-          <button id="settings-reset" class="ghost">Reset Defaults</button>
-        </div>
-
-        <div class="settings-grid">
-          <div class="setting-card">
-            <div>
-              <h3>Range Label</h3>
-              <p class="muted">Show or hide the bin size in the chart header.</p>
+        <nav class="top-nav">
+            <a class="brand" href="/">HL Stats</a>
+            <div class="nav-links">
+                <a class="nav-link" href="/">Top Positions</a>
+                <a class="nav-link" href="/liquidations.html"
+                    >Liquidation Clusters</a
+                >
+                <a class="nav-link" href="/about.html">About</a>
+                <a
+                    class="icon-button active"
+                    href="/settings.html"
+                    aria-label="Settings"
+                >
+                    <svg
+                        viewBox="0 0 24 24"
+                        aria-hidden="true"
+                        focusable="false"
+                    >
+                        <path
+                            d="M11.99 2.5a1 1 0 0 1 .98.8l.3 1.54a7.47 7.47 0 0 1 1.74.72l1.35-.86a1 1 0 0 1 1.27.14l1.28 1.28a1 1 0 0 1 .14 1.27l-.86 1.35c.3.55.55 1.13.72 1.74l1.54.3a1 1 0 0 1 .8.98v1.82a1 1 0 0 1-.8.98l-1.54.3a7.47 7.47 0 0 1-.72 1.74l.86 1.35a1 1 0 0 1-.14 1.27l-1.28 1.28a1 1 0 0 1-1.27.14l-1.35-.86a7.47 7.47 0 0 1-1.74.72l-.3 1.54a1 1 0 0 1-.98.8h-1.82a1 1 0 0 1-.98-.8l-.3-1.54a7.47 7.47 0 0 1-1.74-.72l-1.35.86a1 1 0 0 1-1.27-.14L4.1 19.78a1 1 0 0 1-.14-1.27l.86-1.35a7.47 7.47 0 0 1-.72-1.74l-1.54-.3a1 1 0 0 1-.8-.98v-1.82a1 1 0 0 1 .8-.98l1.54-.3c.17-.61.42-1.19.72-1.74l-.86-1.35a1 1 0 0 1 .14-1.27l1.28-1.28a1 1 0 0 1 1.27-.14l1.35.86a7.47 7.47 0 0 1 1.74-.72l.3-1.54a1 1 0 0 1 .98-.8h1.82Zm-3.09 9.5a3 3 0 1 0 6 0 3 3 0 0 0-6 0Z"
+                            fill="currentColor"
+                        />
+                    </svg>
+                </a>
             </div>
-            <label class="filter-toggle settings-toggle">
-              <input id="show-bin-size" type="checkbox" />
-              Show bin size in price range
-            </label>
-          </div>
+        </nav>
 
-          <div class="setting-card">
-            <div>
-              <h3>Bin Size</h3>
-              <p class="muted">Default bucket size as a percent of mid price.</p>
+        <header class="hero settings-hero">
+            <div class="hero-content">
+                <p class="eyebrow">Hyperliquid Control</p>
+                <h1>Settings</h1>
             </div>
-            <div class="range-control">
-              <div class="range-header">
-                <span>Cluster bin size</span>
-                <span id="bin-percent-value" class="mono">0.50%</span>
-              </div>
-              <input
-                id="bin-percent"
-                type="range"
-                min="0.001"
-                max="0.02"
-                step="0.001"
-                value="0.005"
-              />
-              <p class="muted">Lower values mean tighter, more granular buckets.</p>
+            <div class="hero-metrics">
+                <div class="metric">
+                    <span class="label">Scope</span>
+                    <span class="value">Local</span>
+                </div>
+                <div class="metric">
+                    <span class="label">Applies To</span>
+                    <span class="value">All Pages</span>
+                </div>
+                <div class="metric">
+                    <span class="label">Status</span>
+                    <span class="value">Ready</span>
+                </div>
             </div>
-          </div>
+        </header>
 
-          <div class="setting-card">
-            <div>
-              <h3>Account Scan Limit</h3>
-              <p class="muted">Default number of leaderboard accounts to scan.</p>
-            </div>
-            <div class="range-control">
-              <div class="range-header">
-                <span>Accounts</span>
-                <span id="account-limit-value" class="mono">5000</span>
-              </div>
-              <input
-                id="account-limit"
-                type="range"
-                min="100"
-                max="5000"
-                step="50"
-                value="5000"
-              />
-              <p class="muted">Lower values speed up scans, higher values add coverage.</p>
-            </div>
-          </div>
-        </div>
-      </section>
-    </main>
+        <main class="layout settings-layout">
+            <section class="panel settings-panel">
+                <div class="panel-header">
+                    <div>
+                        <h2>Liquidation Clusters</h2>
+                    </div>
+                    <button id="settings-reset" class="ghost">
+                        Reset Defaults
+                    </button>
+                </div>
 
-    <footer class="footer">
-      <p>Data: stats-data.hyperliquid.xyz + api.hyperliquid.xyz</p>
-    </footer>
-  </body>
+                <div class="settings-grid">
+                    <div class="setting-card">
+                        <div>
+                            <h3>Range Label</h3>
+                        </div>
+                        <label class="filter-toggle settings-toggle">
+                            <input id="show-bin-size" type="checkbox" />
+                            Show bin size in price range
+                        </label>
+                    </div>
+
+                    <div class="setting-card">
+                        <div>
+                            <h3>Bin Size</h3>
+                        </div>
+                        <div class="range-control">
+                            <div class="range-header">
+                                <span>Cluster bin size</span>
+                                <span id="bin-percent-value" class="mono"
+                                    >0.50%</span
+                                >
+                            </div>
+                            <input
+                                id="bin-percent"
+                                type="range"
+                                min="0.001"
+                                max="0.02"
+                                step="0.001"
+                                value="0.005"
+                            />
+                        </div>
+                    </div>
+
+                    <div class="setting-card">
+                        <div>
+                            <h3>Account Scan Limit</h3>
+                        </div>
+                        <div class="range-control">
+                            <div class="range-header">
+                                <span>Accounts</span>
+                                <span id="account-limit-value" class="mono"
+                                    >5000</span
+                                >
+                            </div>
+                            <input
+                                id="account-limit"
+                                type="range"
+                                min="100"
+                                max="5000"
+                                step="50"
+                                value="5000"
+                            />
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <footer class="footer">
+            <p>Data: stats-data.hyperliquid.xyz + api.hyperliquid.xyz</p>
+        </footer>
+    </body>
 </html>

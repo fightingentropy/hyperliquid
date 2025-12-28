@@ -22,7 +22,7 @@ const ASSET_OPTIONS = ["HYPE", "BTC", "ETH"];
 const MAJOR_ASSETS = ["BTC", "ETH", "HYPE"];
 const POSITION_SCAN_CONCURRENCY = 8;
 const LEADERBOARD_LIMIT = 5000;
-const HYPE_TOP_LIMIT = 10;
+const TOP_POSITIONS_LIMIT = 30;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const TOP_POSITIONS_CACHE_KEY = "hl-top-positions:v2";
 const TOP_POSITIONS_CACHE_TTL_MS = DAY_MS;
@@ -473,13 +473,11 @@ function renderTopPositions() {
 }
 
 function limitTopPositions(entries) {
-  if (state.asset !== "HYPE") return entries;
-  return entries.slice(0, HYPE_TOP_LIMIT);
+  return entries.slice(0, TOP_POSITIONS_LIMIT);
 }
 
 function getDisplayedTopPositionsCount() {
-  if (state.asset !== "HYPE") return state.topPositions.length;
-  return Math.min(state.topPositions.length, HYPE_TOP_LIMIT);
+  return Math.min(state.topPositions.length, TOP_POSITIONS_LIMIT);
 }
 
 function setSortState(key) {

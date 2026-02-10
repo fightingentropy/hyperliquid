@@ -1,11 +1,13 @@
 const INFO_ENDPOINT = "https://api.hyperliquid.xyz/info";
 const STATS_BASE = "https://stats-data.hyperliquid.xyz";
+const HYPURRSCAN_API = "https://api.hypurrscan.io";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const leaderboardTtlMs = DAY_MS;
 const positionsTtlMs = DAY_MS;
 const fillsTtlMs = DAY_MS;
 const midsTtlMs = DAY_MS;
+const unstakingTtlMs = 5 * 60 * 1000; // 5 minutes
 
 const cache = new Map<string, { value: unknown; expiresAt: number }>();
 
@@ -203,6 +205,85 @@ async function handleMids(chain: string, bypassCache: boolean) {
   return jsonResponse({ chain, updatedAt: Date.now(), mids });
 }
 
+async function handleUnstaking(bypassCache: boolean) {
+  const key = "unstaking:queue";
+  const raw: any[] = await cachedWithBypass(
+    key,
+    unstakingTtlMs,
+    async () => {
+      return fetchJson(`${HYPURRSCAN_API}/fullUnstakingQueue`);
+    },
+    bypassCache,
+  );
+
+  const now = Date.now();
+  const WEI_DECIMALS = 1e8;
+
+  const future: any[] = [];
+  const pending: any[] = [];
+
+  for (const entry of raw) {
+    if (entry.time == null) {
+      pending.push(entry);
+    } else if (entry.time > now) {
+      future.push(entry);
+    }
+  }
+
+  const days: Array<{
+    date: string;
+    dayOfWeek: string;
+    hype: number;
+    count: number;
+    top: Array<{ user: string; hype: number; time: number }>;
+  }> = [];
+
+  for (let i = 0; i < 7; i++) {
+    const dayStart = now + i * DAY_MS;
+    const dayEnd = dayStart + DAY_MS;
+    let totalWei = 0;
+    let count = 0;
+    const topEntries: any[] = [];
+
+    for (const entry of future) {
+      if (entry.time >= dayStart && entry.time < dayEnd) {
+        totalWei += entry.wei;
+        count += 1;
+        topEntries.push(entry);
+      }
+    }
+
+    topEntries.sort((a, b) => b.wei - a.wei);
+
+    days.push({
+      date: new Date(dayStart).toISOString().slice(0, 10),
+      dayOfWeek: new Date(dayStart).toLocaleDateString("en-US", {
+        weekday: "short",
+      }),
+      hype: totalWei / WEI_DECIMALS,
+      count,
+      top: topEntries.slice(0, 10).map((e) => ({
+        user: e.user,
+        hype: e.wei / WEI_DECIMALS,
+        time: e.time,
+      })),
+    });
+  }
+
+  const totalFutureHype = future.reduce((s, e) => s + e.wei, 0) / WEI_DECIMALS;
+  const totalPendingHype =
+    pending.reduce((s, e) => s + e.wei, 0) / WEI_DECIMALS;
+
+  return jsonResponse({
+    updatedAt: now,
+    totalEntries: future.length,
+    totalHype: totalFutureHype,
+    pendingEntries: pending.length,
+    pendingHype: totalPendingHype,
+    days,
+  });
+}
+
 async function handleApi(chain: string, req: Request, url: URL) {
   if (req.method !== "GET") {
     return jsonResponse({ error: "Method not allowed" }, 405);
@@ -247,6 +328,14 @@ async function handleApi(chain: string, req: Request, url: URL) {
   if (url.pathname === "/api/mids") {
     try {
       return await handleMids(chain, bypassCache);
+    } catch (error) {
+      return jsonResponse({ error: String(error) }, 502);
+    }
+  }
+
+  if (url.pathname === "/api/unstaking") {
+    try {
+      return await handleUnstaking(bypassCache);
     } catch (error) {
       return jsonResponse({ error: String(error) }, 502);
     }

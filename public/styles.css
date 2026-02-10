@@ -750,6 +750,73 @@ a.ghost {
     font-weight: 600;
 }
 
+.unstaking-chart-area {
+    height: 280px;
+    padding: 8px 4px;
+}
+
+.unstaking-bars {
+    --bins: 7;
+    display: grid;
+    grid-template-columns: repeat(var(--bins), minmax(0, 1fr));
+    gap: 10px;
+    align-items: end;
+    height: 100%;
+}
+
+.unstaking-bar-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    height: 100%;
+    justify-content: flex-end;
+}
+
+.unstaking-bar {
+    width: 100%;
+    border-radius: 12px 12px 8px 8px;
+    min-height: 8px;
+    box-shadow: 0 12px 20px rgba(31, 26, 20, 0.12);
+    transition:
+        transform 0.2s ease,
+        filter 0.2s ease;
+    position: relative;
+    cursor: default;
+}
+
+.unstaking-bar:hover {
+    transform: translateY(-4px);
+    filter: brightness(1.08);
+}
+
+.unstaking-bar-label {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--muted);
+    white-space: nowrap;
+}
+
+.unstaking-bar-tooltip {
+    display: none;
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--ink);
+    color: #fff;
+    padding: 4px 10px;
+    border-radius: 8px;
+    font-size: 0.72rem;
+    white-space: nowrap;
+    pointer-events: none;
+    z-index: 5;
+}
+
+.unstaking-bar:hover .unstaking-bar-tooltip {
+    display: block;
+}
+
 .footer {
     padding: 24px 6vw 40px;
     color: var(--muted);

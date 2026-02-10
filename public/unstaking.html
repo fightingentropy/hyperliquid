@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>HYPE Unstaking Queue</title>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link
+            href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
+            rel="stylesheet"
+        />
+        <link rel="stylesheet" href="/styles.css" />
+        <script src="/unstaking.js" defer></script>
+    </head>
+    <body>
+        <div class="orb orb-1"></div>
+        <div class="orb orb-2"></div>
+        <div class="orb orb-3"></div>
+
+        <nav class="top-nav">
+            <a class="brand" href="/">HL Stats</a>
+            <div class="nav-links">
+                <a class="nav-link" href="/">Top Positions</a>
+                <a class="nav-link" href="/liquidations.html"
+                    >Liquidation Clusters</a
+                >
+                <a class="nav-link active" href="/unstaking.html"
+                    >Unstaking Queue</a
+                >
+                <a class="nav-link" href="/about.html">About</a>
+                <a
+                    class="icon-button"
+                    href="/settings.html"
+                    aria-label="Settings"
+                >
+                    <svg
+                        viewBox="0 0 24 24"
+                        aria-hidden="true"
+                        focusable="false"
+                    >
+                        <path
+                            d="M11.99 2.5a1 1 0 0 1 .98.8l.3 1.54a7.47 7.47 0 0 1 1.74.72l1.35-.86a1 1 0 0 1 1.27.14l1.28 1.28a1 1 0 0 1 .14 1.27l-.86 1.35c.3.55.55 1.13.72 1.74l1.54.3a1 1 0 0 1 .8.98v1.82a1 1 0 0 1-.8.98l-1.54.3a7.47 7.47 0 0 1-.72 1.74l.86 1.35a1 1 0 0 1-.14 1.27l-1.28 1.28a1 1 0 0 1-1.27.14l-1.35-.86a7.47 7.47 0 0 1-1.74.72l-.3 1.54a1 1 0 0 1-.98.8h-1.82a1 1 0 0 1-.98-.8l-.3-1.54a7.47 7.47 0 0 1-1.74-.72l-1.35.86a1 1 0 0 1-1.27-.14L4.1 19.78a1 1 0 0 1-.14-1.27l.86-1.35a7.47 7.47 0 0 1-.72-1.74l-1.54-.3a1 1 0 0 1-.8-.98v-1.82a1 1 0 0 1 .8-.98l1.54-.3c.17-.61.42-1.19.72-1.74l-.86-1.35a1 1 0 0 1 .14-1.27l1.28-1.28a1 1 0 0 1 1.27-.14l1.35.86a7.47 7.47 0 0 1 1.74-.72l.3-1.54a1 1 0 0 1 .98-.8h1.82Zm-3.09 9.5a3 3 0 1 0 6 0 3 3 0 0 0-6 0Z"
+                            fill="currentColor"
+                        />
+                    </svg>
+                </a>
+            </div>
+        </nav>
+
+        <header class="hero">
+            <div class="hero-content">
+                <p class="eyebrow">Hyperliquid Staking</p>
+                <h1>HYPE Unstaking Queue</h1>
+                <p class="lede">
+                    Track the HYPE tokens scheduled to unlock from the 7-day
+                    unstaking queue. Data sourced from Hypurrscan.
+                </p>
+                <div class="hero-actions">
+                    <button id="refresh-button" class="primary">
+                        Refresh Data
+                    </button>
+                </div>
+            </div>
+            <div class="hero-metrics">
+                <div class="metric">
+                    <span class="label">7-Day Total</span>
+                    <span id="total-hype" class="value">--</span>
+                </div>
+                <div class="metric">
+                    <span class="label">Entries</span>
+                    <span id="total-entries" class="value">0</span>
+                </div>
+                <div class="metric">
+                    <span class="label">Pending</span>
+                    <span id="pending-hype" class="value">--</span>
+                </div>
+                <div class="metric">
+                    <span class="label">Updated</span>
+                    <span id="last-updated" class="value">--</span>
+                </div>
+            </div>
+        </header>
+
+        <main class="layout">
+            <section class="panel">
+                <div class="panel-header">
+                    <div>
+                        <h2>Daily Unlock Schedule</h2>
+                        <p class="muted">
+                            HYPE tokens unlocking each day over the next 7 days
+                        </p>
+                    </div>
+                    <div class="controls">
+                        <span id="chart-status" class="filter-status"
+                            >Loading...</span
+                        >
+                    </div>
+                </div>
+
+                <div class="chart-shell">
+                    <div class="chart-area unstaking-chart-area">
+                        <div class="unstaking-bars" id="unstaking-bars"></div>
+                    </div>
+                    <div class="chart-axis" id="chart-axis"></div>
+                </div>
+
+                <div class="detail-section">
+                    <div class="section-header">
+                        <h3>Daily Breakdown</h3>
+                        <div class="pill" id="day-count">7 days</div>
+                    </div>
+                    <div class="table-wrap">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Day</th>
+                                    <th>HYPE Unlocking</th>
+                                    <th>Entries</th>
+                                    <th>% of Total</th>
+                                </tr>
+                            </thead>
+                            <tbody id="daily-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <aside class="panel detail-panel">
+                <div class="panel-header">
+                    <div>
+                        <h2>Largest Unlocks</h2>
+                        <p class="muted">
+                            Top individual unstaking entries across all days
+                        </p>
+                    </div>
+                </div>
+
+                <div class="detail-section">
+                    <div class="section-header">
+                        <h3>Top Entries</h3>
+                        <div class="pill" id="top-count">0 entries</div>
+                    </div>
+                    <div class="table-wrap small">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Address</th>
+                                    <th>HYPE</th>
+                                    <th>Unlocks</th>
+                                </tr>
+                            </thead>
+                            <tbody id="top-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="detail-section">
+                    <div class="stat-grid">
+                        <div class="stat">
+                            <span class="label">Avg Daily Unlock</span>
+                            <span id="avg-daily" class="value">--</span>
+                        </div>
+                        <div class="stat">
+                            <span class="label">Peak Day</span>
+                            <span id="peak-day" class="value">--</span>
+                        </div>
+                        <div class="stat">
+                            <span class="label">Peak Amount</span>
+                            <span id="peak-amount" class="value">--</span>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+        </main>
+
+        <footer class="footer">
+            <p>
+                Data: api.hypurrscan.io/fullUnstakingQueue +
+                api.hyperliquid.xyz
+            </p>
+        </footer>
+    </body>
+</html>

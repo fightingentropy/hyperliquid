@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Wallet Lookup · HL Stats</title>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link
+            href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
+            rel="stylesheet"
+        />
+        <link rel="stylesheet" href="/styles.css" />
+        <link rel="stylesheet" href="/wallet.css" />
+        <script src="/wallet.js" defer></script>
+    </head>
+    <body>
+        <div class="orb orb-1"></div>
+        <div class="orb orb-2"></div>
+        <div class="orb orb-3"></div>
+
+        <nav class="top-nav">
+            <a class="brand" href="/">HL Stats</a>
+            <div class="nav-links">
+                <a class="nav-link" href="/">Top Positions</a>
+                <a class="nav-link" href="/liquidations.html"
+                    >Liquidation Clusters</a
+                >
+                <a class="nav-link" href="/unstaking.html"
+                    >Unstaking Queue</a
+                >
+                <a class="nav-link active" href="/wallet.html">Wallet</a>
+                <a class="nav-link" href="/about.html">About</a>
+                <a
+                    class="icon-button"
+                    href="/settings.html"
+                    aria-label="Settings"
+                >
+                    <svg
+                        viewBox="0 0 24 24"
+                        aria-hidden="true"
+                        focusable="false"
+                    >
+                        <path
+                            d="M11.99 2.5a1 1 0 0 1 .98.8l.3 1.54a7.47 7.47 0 0 1 1.74.72l1.35-.86a1 1 0 0 1 1.27.14l1.28 1.28a1 1 0 0 1 .14 1.27l-.86 1.35c.3.55.55 1.13.72 1.74l1.54.3a1 1 0 0 1 .8.98v1.82a1 1 0 0 1-.8.98l-1.54.3a7.47 7.47 0 0 1-.72 1.74l.86 1.35a1 1 0 0 1-.14 1.27l-1.28 1.28a1 1 0 0 1-1.27.14l-1.35-.86a7.47 7.47 0 0 1-1.74.72l-.3 1.54a1 1 0 0 1-.98.8h-1.82a1 1 0 0 1-.98-.8l-.3-1.54a7.47 7.47 0 0 1-1.74-.72l-1.35.86a1 1 0 0 1-1.27-.14L4.1 19.78a1 1 0 0 1-.14-1.27l.86-1.35a7.47 7.47 0 0 1-.72-1.74l-1.54-.3a1 1 0 0 1-.8-.98v-1.82a1 1 0 0 1 .8-.98l1.54-.3c.17-.61.42-1.19.72-1.74l-.86-1.35a1 1 0 0 1 .14-1.27l1.28-1.28a1 1 0 0 1 1.27-.14l1.35.86a7.47 7.47 0 0 1 1.74-.72l.3-1.54a1 1 0 0 1 .98-.8h1.82Zm-3.09 9.5a3 3 0 1 0 6 0 3 3 0 0 0-6 0Z"
+                            fill="currentColor"
+                        />
+                    </svg>
+                </a>
+            </div>
+        </nav>
+
+        <header class="hero wallet-hero">
+            <div class="hero-content">
+                <p class="eyebrow">Hyperliquid Intelligence</p>
+                <h1>Wallet Lookup</h1>
+                <p class="lede">
+                    Enter an Ethereum address to view open positions, spot
+                    holdings, and recent trades.
+                </p>
+                <div class="wallet-search">
+                    <input
+                        id="address-input"
+                        type="text"
+                        placeholder="0x..."
+                        spellcheck="false"
+                        autocomplete="off"
+                    />
+                    <button id="lookup-button" class="primary">
+                        Look up
+                    </button>
+                </div>
+                <p id="address-error" class="address-error" aria-live="polite"></p>
+            </div>
+            <div class="hero-metrics" id="wallet-metrics">
+                <div class="metric">
+                    <span class="label">Account value</span>
+                    <span id="metric-account-value" class="value">—</span>
+                </div>
+                <div class="metric">
+                    <span class="label">Margin used</span>
+                    <span id="metric-margin" class="value">—</span>
+                </div>
+                <div class="metric">
+                    <span class="label">Withdrawable</span>
+                    <span id="metric-withdrawable" class="value">—</span>
+                </div>
+            </div>
+        </header>
+
+        <main class="layout wallet-layout" id="wallet-main" hidden>
+            <section class="panel wallet-panel">
+                <div class="panel-header">
+                    <div>
+                        <h2 id="wallet-address-title" class="mono">—</h2>
+                        <a
+                            id="explorer-link"
+                            class="link"
+                            href="#"
+                            target="_blank"
+                            rel="noreferrer"
+                        >
+                            Open in Explorer
+                        </a>
+                    </div>
+                </div>
+
+                <div class="wallet-tabs" role="tablist">
+                    <button
+                        type="button"
+                        role="tab"
+                        id="tab-positions"
+                        aria-selected="true"
+                        aria-controls="panel-positions"
+                    >
+                        Positions
+                    </button>
+                    <button
+                        type="button"
+                        role="tab"
+                        id="tab-holdings"
+                        aria-selected="false"
+                        aria-controls="panel-holdings"
+                    >
+                        Holdings
+                    </button>
+                    <button
+                        type="button"
+                        role="tab"
+                        id="tab-trades"
+                        aria-selected="false"
+                        aria-controls="panel-trades"
+                    >
+                        Trades
+                    </button>
+                </div>
+
+                <div id="panel-positions" role="tabpanel" class="wallet-tabpanel">
+                    <div class="detail-section">
+                        <div class="section-header">
+                            <h3>Open positions</h3>
+                        </div>
+                        <div class="table-wrap wallet-table">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Market</th>
+                                        <th>Side</th>
+                                        <th>Size</th>
+                                        <th>Entry</th>
+                                        <th>Value</th>
+                                        <th>Liq Px</th>
+                                        <th>uPnL</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="positions-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="panel-holdings" role="tabpanel" class="wallet-tabpanel" hidden>
+                    <div class="detail-section">
+                        <div class="section-header">
+                            <h3>Spot balances</h3>
+                        </div>
+                        <div class="table-wrap wallet-table">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Asset</th>
+                                        <th>Total</th>
+                                        <th>Hold</th>
+                                        <th>Available</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="holdings-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="panel-trades" role="tabpanel" class="wallet-tabpanel" hidden>
+                    <div class="detail-section">
+                        <div class="section-header trades-header">
+                            <div>
+                                <h3>Recent trades</h3>
+                                <p id="trades-summary" class="trades-summary muted"></p>
+                            </div>
+                            <div class="trades-controls">
+                                <label class="filter-toggle aggregate-toggle">
+                                    <input id="aggregate-fills" type="checkbox" />
+                                    Aggregate fills
+                                </label>
+                                <button id="trades-refresh" class="ghost" type="button">Refresh</button>
+                            </div>
+                        </div>
+                        <div class="table-wrap wallet-table trades-scroll">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Time</th>
+                                        <th>Type</th>
+                                        <th>Coin</th>
+                                        <th>Dir</th>
+                                        <th>Price</th>
+                                        <th>Size</th>
+                                        <th>Notional</th>
+                                        <th>Fee</th>
+                                        <th>PnL</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="trades-body"></tbody>
+                            </table>
+                        </div>
+                        <div id="trades-pagination" class="trades-pagination" hidden>
+                            <button id="trades-prev" class="ghost" type="button">Previous</button>
+                            <span id="trades-page-info" class="trades-page-info muted"></span>
+                            <button id="trades-next" class="ghost" type="button">Next</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <footer class="footer">
+            <p>Data: stats-data.hyperliquid.xyz + api.hyperliquid.xyz</p>
+        </footer>
+    </body>
+</html>

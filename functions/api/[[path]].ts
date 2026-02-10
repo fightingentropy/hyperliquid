@@ -8,6 +8,7 @@ const positionsTtlMs = DAY_MS;
 const fillsTtlMs = DAY_MS;
 const midsTtlMs = DAY_MS;
 const unstakingTtlMs = 5 * 60 * 1000; // 5 minutes
+const DEFAULT_MAX_USER_FILLS = 2000;
 
 const cache = new Map<string, { value: unknown; expiresAt: number }>();
 
@@ -121,6 +122,29 @@ function shouldBypassCache(url: URL) {
   return refresh === "1" || refresh === "true";
 }
 
+function toTimeMs(value: unknown): number {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value < 1e12 ? value * 1000 : value; // seconds -> ms
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return 0;
+    const asNum = Number(trimmed);
+    if (Number.isFinite(asNum)) return asNum < 1e12 ? asNum * 1000 : asNum; // seconds -> ms
+    const asDate = Date.parse(trimmed);
+    if (Number.isFinite(asDate)) return asDate;
+  }
+  return 0;
+}
+
+function fillSortTimeMs(fill: any): number {
+  return Math.max(
+    toTimeMs(fill?.time),
+    toTimeMs(fill?.endTime),
+    toTimeMs(fill?.startTime),
+  );
+}
+
 async function handleLeaderboard(chain: string, url: URL) {
   const limit = Math.min(
     5000,
@@ -162,7 +186,7 @@ async function handlePositions(address: string, bypassCache: boolean) {
 
 async function handleFills(address: string, url: URL, bypassCache: boolean) {
   const days = Math.min(
-    90,
+    180,
     Math.max(1, Number(url.searchParams.get("days") ?? "30")),
   );
   const now = Date.now();
@@ -187,8 +211,64 @@ async function handleFills(address: string, url: URL, bypassCache: boolean) {
   const liquidations = (Array.isArray(fills) ? fills : []).filter(
     (fill) => fill.liquidation,
   );
+  liquidations.sort((a: any, b: any) => fillSortTimeMs(b) - fillSortTimeMs(a));
 
   return jsonResponse({ address, days, items: liquidations });
+}
+
+async function handleUserFills(address: string, url: URL, bypassCache: boolean) {
+  const days = Math.min(
+    180,
+    Math.max(1, Number(url.searchParams.get("days") ?? "30")),
+  );
+  const limitRaw = Number(
+    url.searchParams.get("limit") ?? String(DEFAULT_MAX_USER_FILLS),
+  );
+  const limit = Math.min(
+    2000,
+    Math.max(
+      1,
+      Number.isFinite(limitRaw) ? limitRaw : DEFAULT_MAX_USER_FILLS,
+    ),
+  );
+  const now = Date.now();
+  const startTime = now - days * 24 * 60 * 60 * 1000;
+  const key = `userFills:${address}:${days}:${limit}`;
+
+  const fills = await cachedWithBypass(
+    key,
+    fillsTtlMs,
+    async () => {
+      // `userFillsByTime` is capped and returns fills closest to `startTime`.
+      // For a "Recent trades" UI we want the most recent fills, so use
+      // `userFills` which returns the latest fills directly.
+      return fetchInfo({ type: "userFills", user: address });
+    },
+    bypassCache,
+  );
+
+  const items = (Array.isArray(fills) ? fills : [])
+    .filter((fill) => {
+      const t = fillSortTimeMs(fill);
+      return t >= startTime && t <= now;
+    })
+    .sort((a: any, b: any) => fillSortTimeMs(b) - fillSortTimeMs(a))
+    .slice(0, limit);
+  return jsonResponse({ address, days, startTime, endTime: now, items });
+}
+
+async function handleSpotState(address: string, bypassCache: boolean) {
+  const key = `spot:${address}`;
+  const data = await cachedWithBypass(
+    key,
+    positionsTtlMs,
+    async () => {
+      return fetchInfo({ type: "spotClearinghouseState", user: address });
+    },
+    bypassCache,
+  );
+
+  return jsonResponse({ address, data });
 }
 
 async function handleMids(chain: string, bypassCache: boolean) {
@@ -320,6 +400,32 @@ async function handleApi(chain: string, req: Request, url: URL) {
 
     try {
       return await handleFills(address, url, bypassCache);
+    } catch (error) {
+      return jsonResponse({ error: String(error) }, 502);
+    }
+  }
+
+  if (url.pathname.startsWith("/api/userFills/")) {
+    const address = decodeURIComponent(url.pathname.split("/")[3] ?? "");
+    if (!isAddress(address)) {
+      return jsonResponse({ error: "Invalid address" }, 400);
+    }
+
+    try {
+      return await handleUserFills(address, url, bypassCache);
+    } catch (error) {
+      return jsonResponse({ error: String(error) }, 502);
+    }
+  }
+
+  if (url.pathname.startsWith("/api/spot/")) {
+    const address = decodeURIComponent(url.pathname.split("/")[3] ?? "");
+    if (!isAddress(address)) {
+      return jsonResponse({ error: "Invalid address" }, 400);
+    }
+
+    try {
+      return await handleSpotState(address, bypassCache);
     } catch (error) {
       return jsonResponse({ error: String(error) }, 502);
     }

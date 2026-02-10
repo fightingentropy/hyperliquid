@@ -1,0 +1,2 @@
+# Serve wallet page for /wallets/:address URLs (e.g. /wallets/0x519c...)
+/wallets/*  /wallet.html  200

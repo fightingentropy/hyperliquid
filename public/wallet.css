@@ -1,0 +1,195 @@
+/* Wallet page overrides and tab layout */
+
+.wallet-hero .hero-metrics {
+  min-width: 200px;
+}
+
+.wallet-search {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-top: 20px;
+  flex-wrap: wrap;
+}
+
+.wallet-search input {
+  flex: 1;
+  min-width: 280px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  border: 1px solid var(--panel-border);
+  font-family: var(--font-mono, "IBM Plex Mono", ui-monospace, monospace);
+  font-size: 0.95rem;
+}
+
+.wallet-search input::placeholder {
+  color: var(--muted);
+}
+
+.address-error {
+  margin-top: 10px;
+  font-size: 0.9rem;
+  color: var(--accent);
+  min-height: 1.4em;
+}
+
+.wallet-layout {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.wallet-panel {
+  max-width: 100%;
+}
+
+.wallet-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  background: #f1ebe2;
+  border-radius: 999px;
+  width: fit-content;
+}
+
+.wallet-tabs [role="tab"] {
+  padding: 8px 18px;
+  border: none;
+  background: transparent;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+  color: var(--muted);
+  transition: color 0.2s ease, background 0.2s ease;
+}
+
+.wallet-tabs [role="tab"]:hover {
+  color: var(--ink);
+}
+
+.wallet-tabs [role="tab"][aria-selected="true"] {
+  background: var(--ink);
+  color: #fff;
+}
+
+.wallet-tabpanel {
+  padding-top: 8px;
+}
+
+.wallet-table {
+  max-height: 420px;
+}
+
+.trades-scroll {
+  max-height: 480px;
+}
+
+.trades-header {
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.trades-summary {
+  font-size: 0.85rem;
+  margin-top: 4px;
+}
+
+.trades-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.trades-controls .filter-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.trades-controls input[type="number"] {
+  width: 4ch;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--panel-border);
+  font-weight: 600;
+}
+
+/* Direction pills (OPEN LONG / CLOSE LONG / Buy / Sell) */
+.dir-pill {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.dir-pill.long-open,
+.dir-pill.buy {
+  background: rgba(31, 127, 109, 0.2);
+  color: #1f7f6d;
+}
+
+.dir-pill.short-open,
+.dir-pill.sell {
+  background: rgba(194, 70, 47, 0.2);
+  color: #c2462f;
+}
+
+.dir-pill.neutral {
+  background: rgba(33, 27, 20, 0.1);
+  color: var(--muted);
+}
+
+/* Aggregate fills: type pill and time range */
+.type-pill {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  background: rgba(33, 27, 20, 0.1);
+  color: var(--muted);
+}
+
+.trades-time-cell {
+  white-space: nowrap;
+}
+
+.trades-time-cell div + div {
+  margin-top: 2px;
+}
+
+.trades-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 12px 0 0;
+  margin-top: 8px;
+  border-top: 1px solid var(--panel-border);
+}
+
+.trades-page-info {
+  font-size: 0.9rem;
+  min-width: 6ch;
+  text-align: center;
+}
+
+@media (max-width: 720px) {
+  .wallet-search {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .wallet-search input {
+    min-width: 0;
+  }
+
+  .wallet-tabs {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .wallet-tabs [role="tab"] {
+    flex: 1;
+  }
+}

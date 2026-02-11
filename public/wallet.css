@@ -1,214 +1,222 @@
 /* Wallet page overrides and tab layout */
 
 .wallet-hero .hero-metrics {
-  min-width: 200px;
+    min-width: 200px;
 }
 
 .wallet-search {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  margin-top: 20px;
-  flex-wrap: wrap;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-top: 20px;
+    flex-wrap: wrap;
 }
 
 .wallet-search input {
-  flex: 1;
-  min-width: 280px;
-  padding: 12px 16px;
-  border-radius: 12px;
-  border: 1px solid var(--panel-border);
-  background: var(--panel);
-  color: var(--ink);
-  font-family: var(--font-mono);
-  font-size: 0.95rem;
+    flex: 1;
+    min-width: 280px;
+    padding: 11px 14px;
+    border-radius: 10px;
+    border: 1px solid var(--panel-border);
+    background: var(--bg-elevated);
+    color: var(--ink);
+    font-family: var(--font-mono);
+    font-size: 0.88rem;
 }
 
 .wallet-search input::placeholder {
-  color: var(--muted);
+    color: var(--muted-2);
 }
 
 .address-error {
-  margin-top: 10px;
-  font-size: 0.9rem;
-  color: var(--accent);
-  min-height: 1.4em;
+    margin-top: 8px;
+    font-size: 0.86rem;
+    color: var(--accent);
+    min-height: 1.4em;
 }
 
 .wallet-layout {
-  grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr);
 }
 
 .wallet-panel {
-  max-width: 100%;
+    max-width: 100%;
 }
 
 .wallet-tabs {
-  display: flex;
-  gap: 4px;
-  padding: 4px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid var(--panel-border);
-  border-radius: 999px;
-  width: fit-content;
+    display: flex;
+    gap: 4px;
+    padding: 4px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--panel-border);
+    border-radius: 10px;
+    width: fit-content;
 }
 
 .wallet-tabs [role="tab"] {
-  padding: 8px 18px;
-  border: none;
-  background: transparent;
-  border-radius: 999px;
-  font-weight: 600;
-  font-size: 0.85rem;
-  cursor: pointer;
-  color: var(--muted);
-  transition: color 0.2s ease, background 0.2s ease;
+    padding: 8px 16px;
+    border: 1px solid transparent;
+    background: transparent;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 0.78rem;
+    letter-spacing: 0.02em;
+    cursor: pointer;
+    color: var(--muted);
+    transition:
+        color 0.2s ease,
+        background 0.2s ease,
+        border-color 0.2s ease;
 }
 
 .wallet-tabs [role="tab"]:hover {
-  color: var(--ink);
+    color: var(--ink);
+    background: rgba(255, 255, 255, 0.04);
 }
 
 .wallet-tabs [role="tab"][aria-selected="true"] {
-  background: rgba(239, 111, 46, 0.14);
-  color: var(--ink);
+    background: var(--hover);
+    color: var(--ink);
+    border-color: var(--panel-border-strong);
 }
 
 .wallet-tabpanel {
-  padding-top: 8px;
+    padding-top: 8px;
 }
 
 .wallet-table {
-  max-height: 420px;
+    max-height: 420px;
 }
 
 .asset-cell {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 600;
 }
 
 .asset-badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 3px 8px;
-  border-radius: 999px;
-  font-size: 0.7rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  border: 1px solid rgba(239, 111, 46, 0.35);
-  background: rgba(239, 111, 46, 0.14);
-  color: var(--ink);
-  font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 8px;
+    border-radius: 999px;
+    font-size: 0.65rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    border: 1px solid rgba(255, 90, 31, 0.32);
+    background: rgba(255, 90, 31, 0.16);
+    color: var(--ink);
+    font-weight: 700;
 }
 
 .trades-scroll {
-  max-height: 480px;
+    max-height: 480px;
 }
 
 .trades-header {
-  flex-wrap: wrap;
-  gap: 12px;
+    flex-wrap: wrap;
+    gap: 12px;
 }
 
 .trades-summary {
-  font-size: 0.85rem;
-  margin-top: 4px;
-  white-space: pre-line;
+    font-size: 0.82rem;
+    margin-top: 4px;
+    white-space: pre-line;
 }
 
 .trades-controls {
-  display: flex;
-  align-items: center;
-  gap: 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
 }
 
 .trades-controls .filter-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
 }
 
 .trades-controls input[type="number"] {
-  width: 4ch;
-  padding: 6px 8px;
-  border-radius: 8px;
-  border: 1px solid var(--panel-border);
-  font-weight: 600;
+    width: 4ch;
+    padding: 6px 8px;
+    border-radius: 8px;
+    border: 1px solid var(--panel-border);
+    font-weight: 600;
 }
 
 /* Direction pills (OPEN LONG / CLOSE LONG / Buy / Sell) */
 .dir-pill {
-  display: inline-block;
-  padding: 4px 10px;
-  border-radius: 999px;
-  font-size: 0.78rem;
-  font-weight: 600;
+    display: inline-block;
+    padding: 3px 9px;
+    border-radius: 999px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
 }
 
 .dir-pill.long-open,
 .dir-pill.buy {
-  background: rgba(31, 127, 109, 0.2);
-  color: #1f7f6d;
+    background: var(--profit-bg);
+    color: var(--profit);
 }
 
 .dir-pill.short-open,
 .dir-pill.sell {
-  background: rgba(194, 70, 47, 0.2);
-  color: #c2462f;
+    background: var(--loss-bg);
+    color: var(--loss);
 }
 
 .dir-pill.neutral {
-  background: rgba(33, 27, 20, 0.1);
-  color: var(--muted);
+    background: rgba(127, 139, 154, 0.16);
+    color: var(--muted);
 }
 
 /* Aggregate fills: type pill and time range */
 .type-pill {
-  display: inline-block;
-  padding: 4px 10px;
-  border-radius: 999px;
-  font-size: 0.78rem;
-  font-weight: 600;
-  background: rgba(33, 27, 20, 0.1);
-  color: var(--muted);
+    display: inline-block;
+    padding: 3px 9px;
+    border-radius: 999px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    background: rgba(127, 139, 154, 0.16);
+    color: var(--muted);
+    border: 1px solid transparent;
 }
 
 .type-pill.twap {
-  background: rgba(47, 120, 255, 0.18);
-  color: #2f78ff;
-  border: 1px solid rgba(47, 120, 255, 0.25);
+    background: rgba(47, 120, 255, 0.16);
+    color: #5aa2ff;
+    border-color: rgba(47, 120, 255, 0.28);
 }
 
 .type-pill.fill {
-  background: rgba(255, 255, 255, 0.06);
-  color: rgba(255, 255, 255, 0.65);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(127, 139, 154, 0.14);
+    color: var(--muted);
+    border-color: rgba(127, 139, 154, 0.22);
 }
 
 .trades-time-cell {
-  white-space: nowrap;
+    white-space: nowrap;
 }
 
 .trades-time-cell div + div {
-  margin-top: 2px;
+    margin-top: 2px;
 }
 
 .trades-pagination {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 16px;
-  padding: 12px 0 0;
-  margin-top: 8px;
-  border-top: 1px solid var(--panel-border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    padding: 12px 0 0;
+    margin-top: 8px;
+    border-top: 1px solid var(--panel-border);
 }
 
 .trades-page-info {
-  font-size: 0.9rem;
-  min-width: 6ch;
-  text-align: center;
+    font-size: 0.86rem;
+    min-width: 6ch;
+    text-align: center;
 }
 
 /* Holdings table: keep numbers right-aligned (including Value USD). */
@@ -220,14 +228,14 @@
 #panel-holdings th:nth-child(3),
 #panel-holdings th:nth-child(4),
 #panel-holdings th:nth-child(5) {
-  text-align: right;
-  font-family: var(--font-mono);
+    text-align: right;
+    font-family: var(--font-mono);
 }
 
-/* Trades table tweaks (Qwantify-like: numbers in mono, right-aligned) */
+/* Trades table tweaks (market-flow-like: numbers in mono, right-aligned). */
 #panel-trades .table-wrap table {
-  font-family: var(--font-mono);
-  font-size: 0.9rem;
+    font-family: var(--font-mono);
+    font-size: 0.84rem;
 }
 
 #panel-trades td:nth-child(5),
@@ -240,34 +248,30 @@
 #panel-trades th:nth-child(7),
 #panel-trades th:nth-child(8),
 #panel-trades th:nth-child(9) {
-  text-align: right;
+    text-align: right;
 }
 
 #panel-trades td:nth-child(3) {
-  font-weight: 700;
-  letter-spacing: 0.02em;
-}
-
-#panel-trades .trades-pagination {
-  border-top-color: var(--trade-border);
+    font-weight: 700;
+    letter-spacing: 0.02em;
 }
 
 @media (max-width: 720px) {
-  .wallet-search {
-    flex-direction: column;
-    align-items: stretch;
-  }
+    .wallet-search {
+        flex-direction: column;
+        align-items: stretch;
+    }
 
-  .wallet-search input {
-    min-width: 0;
-  }
+    .wallet-search input {
+        min-width: 0;
+    }
 
-  .wallet-tabs {
-    width: 100%;
-    justify-content: stretch;
-  }
+    .wallet-tabs {
+        width: 100%;
+        justify-content: stretch;
+    }
 
-  .wallet-tabs [role="tab"] {
-    flex: 1;
-  }
+    .wallet-tabs [role="tab"] {
+        flex: 1;
+    }
 }

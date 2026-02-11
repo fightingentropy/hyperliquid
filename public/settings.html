@@ -4,12 +4,9 @@
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <title>HL Settings</title>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-        <link
-            href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
-            rel="stylesheet"
-        />
+        <meta name="theme-color" content="#09090b" />
+        <script src="/theme.js"></script>
+        <link rel="stylesheet" href="/geist.css" />
         <link rel="stylesheet" href="/styles.css" />
         <script src="/settings.js" defer></script>
     </head>
@@ -82,6 +79,26 @@
                 </div>
 
                 <div class="settings-grid">
+                    <div class="setting-card">
+                        <div>
+                            <h3>Theme</h3>
+                            <p class="muted">
+                                Pick a color scheme for all pages.
+                            </p>
+                        </div>
+                        <div class="segmented" id="theme-toggle">
+                            <button type="button" data-theme="dark">
+                                Dark
+                            </button>
+                            <button type="button" data-theme="light">
+                                Light
+                            </button>
+                            <button type="button" data-theme="system">
+                                System
+                            </button>
+                        </div>
+                    </div>
+
                     <div class="setting-card">
                         <div>
                             <h3>Range Label</h3>

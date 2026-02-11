@@ -18,7 +18,9 @@
   padding: 12px 16px;
   border-radius: 12px;
   border: 1px solid var(--panel-border);
-  font-family: var(--font-mono, "IBM Plex Mono", ui-monospace, monospace);
+  background: var(--panel);
+  color: var(--ink);
+  font-family: var(--font-mono);
   font-size: 0.95rem;
 }
 
@@ -45,7 +47,8 @@
   display: flex;
   gap: 4px;
   padding: 4px;
-  background: #f1ebe2;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--panel-border);
   border-radius: 999px;
   width: fit-content;
 }
@@ -67,8 +70,8 @@
 }
 
 .wallet-tabs [role="tab"][aria-selected="true"] {
-  background: var(--ink);
-  color: #fff;
+  background: rgba(239, 111, 46, 0.14);
+  color: var(--ink);
 }
 
 .wallet-tabpanel {
@@ -77,6 +80,27 @@
 
 .wallet-table {
   max-height: 420px;
+}
+
+.asset-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 600;
+}
+
+.asset-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border: 1px solid rgba(239, 111, 46, 0.35);
+  background: rgba(239, 111, 46, 0.14);
+  color: var(--ink);
+  font-weight: 700;
 }
 
 .trades-scroll {
@@ -91,6 +115,7 @@
 .trades-summary {
   font-size: 0.85rem;
   margin-top: 4px;
+  white-space: pre-line;
 }
 
 .trades-controls {
@@ -150,6 +175,18 @@
   color: var(--muted);
 }
 
+.type-pill.twap {
+  background: rgba(47, 120, 255, 0.18);
+  color: #2f78ff;
+  border: 1px solid rgba(47, 120, 255, 0.25);
+}
+
+.type-pill.fill {
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
 .trades-time-cell {
   white-space: nowrap;
 }
@@ -172,6 +209,47 @@
   font-size: 0.9rem;
   min-width: 6ch;
   text-align: center;
+}
+
+/* Holdings table: keep numbers right-aligned (including Value USD). */
+#panel-holdings td:nth-child(2),
+#panel-holdings td:nth-child(3),
+#panel-holdings td:nth-child(4),
+#panel-holdings td:nth-child(5),
+#panel-holdings th:nth-child(2),
+#panel-holdings th:nth-child(3),
+#panel-holdings th:nth-child(4),
+#panel-holdings th:nth-child(5) {
+  text-align: right;
+  font-family: var(--font-mono);
+}
+
+/* Trades table tweaks (Qwantify-like: numbers in mono, right-aligned) */
+#panel-trades .table-wrap table {
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+}
+
+#panel-trades td:nth-child(5),
+#panel-trades td:nth-child(6),
+#panel-trades td:nth-child(7),
+#panel-trades td:nth-child(8),
+#panel-trades td:nth-child(9),
+#panel-trades th:nth-child(5),
+#panel-trades th:nth-child(6),
+#panel-trades th:nth-child(7),
+#panel-trades th:nth-child(8),
+#panel-trades th:nth-child(9) {
+  text-align: right;
+}
+
+#panel-trades td:nth-child(3) {
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+#panel-trades .trades-pagination {
+  border-top-color: var(--trade-border);
 }
 
 @media (max-width: 720px) {

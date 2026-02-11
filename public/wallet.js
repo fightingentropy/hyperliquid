@@ -1,7 +1,12 @@
 (function () {
   const TRADES_PER_PAGE = 20;
   const TRADES_FETCH_DAYS = 90;
-  const AGGREGATE_WINDOW_MS = 24 * 60 * 60 * 1000; // 24h
+  const TRADES_FETCH_LIMIT = 8000; // total fills to accumulate client-side before stopping
+  const TRADES_PAGE_SIZE = 2000; // HL `userFills` page size cap
+  // Merge adjacent order-groups within a "trade session" window.
+  // HL tends to merge sequential orders that build/close a position over hours.
+  const AGGREGATE_MERGE_GAP_MS = 24 * 60 * 60 * 1000; // 24 hours
+  const AGGREGATE_MERGE_MAX_PX_DIFF = 0.12; // 12% relative difference guardrail
 
   const ui = {
     addressInput: document.getElementById("address-input"),
@@ -29,16 +34,27 @@
     tradesPrev: document.getElementById("trades-prev"),
     tradesNext: document.getElementById("trades-next"),
     tradesPageInfo: document.getElementById("trades-page-info"),
+    holdingsSortableHeaders: Array.from(
+      document.querySelectorAll("#panel-holdings th[data-sort]"),
+    ),
   };
 
   let state = {
     address: null,
     positionsData: null,
     spotData: null,
+    midsData: null,
     tradesData: null,
+    tradesLoading: false,
+    tradesNextCursorEnd: null,
+    tradesSeenKeys: new Set(),
+    tradesAllTwaps: [],
+    tradesLoadId: 0,
     tradesPage: 1,
     aggregateFills: false,
     loading: false,
+    holdingsSortKey: "usdValue",
+    holdingsSortDir: "desc",
   };
 
   function isAddress(value) {
@@ -76,6 +92,23 @@
     return new Intl.NumberFormat("en-US", { maximumFractionDigits: decimals }).format(num);
   }
 
+  function toNumber(value) {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  function normalizeCoin(value) {
+    return String(value ?? "").trim().toUpperCase();
+  }
+
+  function usdPriceForCoin(coin) {
+    const c = normalizeCoin(coin);
+    if (!c) return null;
+    if (c === "USDC" || c === "USDT" || c === "DAI") return 1;
+    const mids = state.midsData?.mids ?? null;
+    return mids ? toNumber(mids[c]) : null;
+  }
+
   function toTimeMs(value) {
     if (typeof value === "number" && Number.isFinite(value)) {
       return value < 1e12 ? value * 1000 : value; // seconds -> ms
@@ -97,6 +130,38 @@
     return new Date(t).toLocaleString();
   }
 
+  function tradeKey(fill) {
+    return String(fill?.tid ?? `${fill?.time ?? ""}:${fill?.oid ?? ""}:${fill?.hash ?? ""}`);
+  }
+
+  function appendUniqueFills(target, fills) {
+    for (const f of fills ?? []) {
+      const key = tradeKey(f);
+      if (state.tradesSeenKeys.has(key)) continue;
+      state.tradesSeenKeys.add(key);
+      target.push(f);
+    }
+  }
+
+  function computeTradesRangeMs(fills, twaps) {
+    let min = Infinity;
+    let max = -Infinity;
+    for (const f of fills ?? []) {
+      const t = toTimeMs(f?.time ?? f?.startTime ?? f?.endTime ?? 0);
+      if (!Number.isFinite(t) || t <= 0) continue;
+      if (t < min) min = t;
+      if (t > max) max = t;
+    }
+    for (const t of twaps ?? []) {
+      const tm = toTimeMs(t?.time ?? 0);
+      if (!Number.isFinite(tm) || tm <= 0) continue;
+      if (tm < min) min = tm;
+      if (tm > max) max = tm;
+    }
+    if (!Number.isFinite(min) || !Number.isFinite(max)) return null;
+    return { startTime: min, endTime: max };
+  }
+
   function setTableMessage(tbody, message, colSpan) {
     if (!tbody) return;
     tbody.innerHTML = "";
@@ -112,6 +177,25 @@
   function createCell(content) {
     const td = document.createElement("td");
     td.textContent = content ?? "—";
+    return td;
+  }
+
+  function createAssetCell(coin, kind) {
+    const td = document.createElement("td");
+    td.className = "asset-cell";
+
+    const label = document.createElement("span");
+    label.textContent = coin ?? "—";
+    td.appendChild(label);
+
+    if (kind) {
+      const badge = document.createElement("span");
+      badge.className = `asset-badge ${String(kind)}`;
+      if (kind === "delegated") badge.textContent = "DELEGATED";
+      else badge.textContent = String(kind).toUpperCase();
+      td.appendChild(badge);
+    }
+
     return td;
   }
 
@@ -171,52 +255,127 @@
     return fill?.dir ?? "—";
   }
 
-  /** Group fills by same coin and within AGGREGATE_WINDOW_MS of the group start. Returns array of { startTime, endTime, fills, coin, dir, totalSz, totalNotional, totalFee, totalPnl, avgPx }. */
+  function twapDirLabel(twap) {
+    const side = String(twap?.side ?? "").toLowerCase();
+    if (side === "b") return "BUY";
+    if (side === "a") return "SELL";
+    return "—";
+  }
+
+  function twapDirClass(twap) {
+    const side = String(twap?.side ?? "").toLowerCase();
+    if (side === "b") return "buy";
+    if (side === "a") return "sell";
+    return "neutral";
+  }
+
+  function twapStatusLabel(status) {
+    const s = String(status ?? "").trim();
+    if (!s) return "—";
+    return s[0].toUpperCase() + s.slice(1);
+  }
+
+  /**
+   * Aggregate fills similarly to the HL UI: group by order (oid) or TWAP (twapId),
+   * not by a time window. This avoids merging unrelated fills that happen to be
+   * near each other in time.
+   */
   function aggregateFillsByCoinAndTime(items) {
     if (!items.length) return [];
-    const sorted = items.slice().sort((a, b) => {
-      const c = (a.coin ?? "").localeCompare(b.coin ?? "");
-      if (c !== 0) return c;
-      return (Number(a.time) || 0) - (Number(b.time) || 0);
-    });
-    const groups = [];
-    let current = null;
+
+    const sortTime = (x) => toTimeMs(x?.time ?? x?.endTime ?? x?.startTime ?? 0) || 0;
+    const sorted = items.slice().sort((a, b) => sortTime(a) - sortTime(b)); // ascending for stable min/max
+
+    const groupsByKey = new Map();
     for (const fill of sorted) {
-      const t = Number(fill.time) || 0;
+      const t = sortTime(fill);
       const coin = fill.coin ?? "";
-      if (
-        current &&
-        current.coin === coin &&
-        t - current.startTime <= AGGREGATE_WINDOW_MS
-      ) {
-        current.fills.push(fill);
-        current.endTime = t;
-        const sz = Number(fill.sz) || 0;
-        const px = Number(fill.px) || 0;
-        current.totalSz += sz;
-        current.totalNotional += px * sz;
-        current.totalFee += Number(fill.fee) || 0;
-        current.totalPnl += Number(fill.closedPnl) || 0;
-      } else {
-        current = {
+      const isTwap = fill?.twapId != null;
+      const side = String(fill?.side ?? "").toLowerCase();
+      const dir = isTwap ? (side === "b" ? "BUY" : side === "a" ? "SELL" : dirLabel(fill)) : dirLabel(fill);
+      const oid = fill?.oid != null ? String(fill.oid) : "";
+      const twapId = fill?.twapId != null ? String(fill.twapId) : "";
+
+      // Prefer grouping by TWAP id, then by order id. Fallback keeps things separate.
+      const groupId = twapId ? `twap:${twapId}` : oid ? `oid:${oid}` : `t:${t}:h:${fill?.hash ?? ""}`;
+      const key = `${coin}|${dir}|${groupId}`;
+
+      let g = groupsByKey.get(key);
+      if (!g) {
+        g = {
           startTime: t,
           endTime: t,
           coin,
-          fills: [fill],
-          dir: dirLabel(fill),
+          fills: [],
+          isTwap,
+          twapId: twapId || null,
+          dir,
           dirClass: dirPillClass(fill),
-          totalSz: Number(fill.sz) || 0,
-          totalNotional: (Number(fill.px) || 0) * (Number(fill.sz) || 0),
-          totalFee: Number(fill.fee) || 0,
-          totalPnl: Number(fill.closedPnl) || 0,
+          totalSz: 0,
+          totalNotional: 0,
+          totalFee: 0,
+          totalPnl: 0,
+          avgPx: 0,
         };
-        groups.push(current);
+        groupsByKey.set(key, g);
       }
+
+      g.fills.push(fill);
+      if (t < g.startTime) g.startTime = t;
+      if (t > g.endTime) g.endTime = t;
+      const sz = Number(fill.sz) || 0;
+      const px = Number(fill.px) || 0;
+      g.totalSz += sz;
+      g.totalNotional += px * sz;
+      g.totalFee += Number(fill.fee) || 0;
+      g.totalPnl += Number(fill.closedPnl) || 0;
     }
+
+    const groups = Array.from(groupsByKey.values());
     groups.forEach((g) => {
       g.avgPx = g.totalSz > 0 ? g.totalNotional / g.totalSz : 0;
     });
-    return groups;
+
+    // Second pass: merge adjacent order-groups that are close in time (typical when
+    // a position is built/closed with a few sequential orders).
+    groups.sort((a, b) => (Number(a.startTime) || 0) - (Number(b.startTime) || 0));
+    const merged = [];
+    for (const g of groups) {
+      const prev = merged[merged.length - 1];
+      const pxOk = (() => {
+        // If either side doesn't have a meaningful price, allow the merge.
+        const a = Number(prev?.avgPx ?? 0);
+        const b = Number(g?.avgPx ?? 0);
+        if (!Number.isFinite(a) || !Number.isFinite(b) || a <= 0 || b <= 0) return true;
+        const rel = Math.abs(a - b) / Math.max(a, b);
+        return rel <= AGGREGATE_MERGE_MAX_PX_DIFF;
+      })();
+      if (
+        prev &&
+        prev.coin === g.coin &&
+        prev.dir === g.dir &&
+        // Don't merge unrelated TWAPs. Only merge TWAP groups if it's the same TWAP id.
+        ((prev.isTwap && g.isTwap && prev.twapId && prev.twapId === g.twapId) ||
+          (!prev.isTwap && !g.isTwap)) &&
+        pxOk &&
+        (Number(g.startTime) || 0) - (Number(prev.endTime) || 0) <= AGGREGATE_MERGE_GAP_MS
+      ) {
+        prev.fills.push(...g.fills);
+        prev.endTime = Math.max(Number(prev.endTime) || 0, Number(g.endTime) || 0);
+        prev.startTime = Math.min(Number(prev.startTime) || 0, Number(g.startTime) || 0);
+        prev.totalSz += g.totalSz;
+        prev.totalNotional += g.totalNotional;
+        prev.totalFee += g.totalFee;
+        prev.totalPnl += g.totalPnl;
+        prev.avgPx = prev.totalSz > 0 ? prev.totalNotional / prev.totalSz : 0;
+      } else {
+        merged.push(g);
+      }
+    }
+
+    // Most recent group first.
+    merged.sort((a, b) => (Number(b.endTime) || 0) - (Number(a.endTime) || 0));
+    return merged;
   }
 
   function renderPositions() {
@@ -254,38 +413,65 @@
     const balances = Array.isArray(raw) ? raw : (raw?.balances ?? []);
 
     if (!balances.length) {
-      setTableMessage(ui.holdingsBody, "No spot balances.", 4);
+      setTableMessage(ui.holdingsBody, "No spot balances.", 5);
       return;
     }
 
     const withValue = balances
       .map((b) => {
-        const total = Number(b?.total ?? b?.hold ?? 0);
-        const hold = Number(b?.hold ?? 0);
-        const available = total - hold;
+        const total = Number(b?.total ?? 0);
+        const kind = b?.kind ?? null;
+        const hold = kind ? null : Number(b?.hold ?? 0);
+        const available = hold == null ? null : total - hold;
         if (total === 0 && hold === 0) return null;
+        const usdPx = usdPriceForCoin(b?.coin);
+        const usdValue = usdPx == null ? null : usdPx * total;
         return {
           coin: b?.coin ?? "—",
           total,
           hold,
           available,
+          kind,
+          usdValue,
         };
       })
       .filter(Boolean);
 
     if (!withValue.length) {
-      setTableMessage(ui.holdingsBody, "No spot balances.", 4);
+      setTableMessage(ui.holdingsBody, "No spot balances.", 5);
       return;
     }
 
+    const sorted = withValue.slice().sort((a, b) => {
+      const dir = state.holdingsSortDir === "asc" ? 1 : -1;
+      if (state.holdingsSortKey === "usdValue") {
+        const av = a.usdValue;
+        const bv = b.usdValue;
+        const aOk = av != null && Number.isFinite(av);
+        const bOk = bv != null && Number.isFinite(bv);
+        if (aOk && bOk) return dir * (av - bv);
+        if (aOk && !bOk) return -1;
+        if (!aOk && bOk) return 1;
+        return normalizeCoin(a.coin).localeCompare(normalizeCoin(b.coin));
+      }
+      return normalizeCoin(a.coin).localeCompare(normalizeCoin(b.coin));
+    });
+
     ui.holdingsBody.innerHTML = "";
     const fragment = document.createDocumentFragment();
-    withValue.forEach((b) => {
+    sorted.forEach((b) => {
       const tr = document.createElement("tr");
-      tr.appendChild(createCell(b.coin));
+      tr.appendChild(createAssetCell(b.coin, b.kind));
       tr.appendChild(createCell(formatNumber(b.total, 6)));
-      tr.appendChild(createCell(formatNumber(b.hold, 6)));
-      tr.appendChild(createCell(formatNumber(b.available, 6)));
+      tr.appendChild(
+        createCell(
+          b.usdValue == null || !Number.isFinite(Number(b.usdValue))
+            ? "—"
+            : formatUsd(b.usdValue),
+        ),
+      );
+      tr.appendChild(createCell(b.hold == null ? "—" : formatNumber(b.hold, 6)));
+      tr.appendChild(createCell(b.available == null ? "—" : formatNumber(b.available, 6)));
       fragment.appendChild(tr);
     });
     ui.holdingsBody.appendChild(fragment);
@@ -295,27 +481,60 @@
 
   function renderTrades() {
     state.aggregateFills = ui.aggregateFills?.checked ?? false;
-    const items = state.tradesData?.items ?? [];
+    const fills = state.tradesData?.items ?? [];
+    const twaps = state.tradesData?.twaps ?? [];
     const start = state.tradesData?.startTime;
     const end = state.tradesData?.endTime;
 
-    if (state.tradesData && !items.length) {
+    if (state.tradesData && !fills.length && !twaps.length) {
       setTableMessage(ui.tradesBody, "No trades in the selected period.", TRADES_COL_COUNT);
       if (ui.tradesSummary) ui.tradesSummary.textContent = "Showing 0 trades.";
       if (ui.tradesPagination) ui.tradesPagination.hidden = true;
       return;
     }
 
-    if (!items.length) {
+    if (!fills.length && !twaps.length) {
       setTableMessage(ui.tradesBody, "Load an address to see trades.", TRADES_COL_COUNT);
       if (ui.tradesPagination) ui.tradesPagination.hidden = true;
       return;
     }
 
     const aggregate = state.aggregateFills;
-    let displayItems = aggregate ? aggregateFillsByCoinAndTime(items) : items;
-    const sortTime = (x) => toTimeMs(x.time ?? x.endTime ?? x.startTime ?? 0) || 0;
-    displayItems = displayItems.slice().sort((a, b) => sortTime(b) - sortTime(a));
+    const sortTime = (x) =>
+      toTimeMs(x?.time ?? x?.endTime ?? x?.startTime ?? 0) || 0;
+
+    let displayItems;
+    if (aggregate) {
+      const fillGroups = aggregateFillsByCoinAndTime(fills);
+      const twapGroups = twaps.map((t) => {
+        const tTime = sortTime(t);
+        return {
+          startTime: tTime,
+          endTime: tTime,
+          coin: t?.coin ?? "—",
+          dir: twapDirLabel(t),
+          dirClass: twapDirClass(t),
+          isTwap: true,
+          twapId: t?.twapId ?? null,
+          twapStatus: t?.status ?? null,
+          executedSz: Number(t?.executedSz ?? 0),
+          totalSzTarget: Number(t?.totalSz ?? 0),
+          avgPx: Number(t?.avgPx ?? 0),
+          totalSz: Number(t?.executedSz ?? 0),
+          totalNotional: Number(t?.executedNtl ?? 0),
+          totalFee: null,
+          totalPnl: null,
+          fills: [],
+        };
+      });
+      displayItems = fillGroups.concat(twapGroups).sort((a, b) => sortTime(b) - sortTime(a));
+    } else {
+      displayItems = fills
+        .map((f) => ({ kind: "fill", ...f }))
+        .concat(twaps.map((t) => ({ kind: "twap", ...t })))
+        .sort((a, b) => sortTime(b) - sortTime(a));
+    }
+
     const totalItems = displayItems.length;
     const totalPages = Math.max(1, Math.ceil(totalItems / TRADES_PER_PAGE));
     const page = Math.min(state.tradesPage, totalPages);
@@ -325,12 +544,15 @@
 
     if (ui.tradesSummary) {
       const range = start && end ? `${formatTime(start)} – ${formatTime(end)}` : "";
+      const status = state.tradesLoading ? " · Loading fills..." : "";
+      const fetched = `Fetched ${formatNumber(fills.length, 0)} fills · ${formatNumber(twaps.length, 0)} TWAPs`;
+      const perPage = `Showing ${TRADES_PER_PAGE} trades per page (fills + TWAPs).`;
       const from = startIdx + 1;
       const to = Math.min(startIdx + TRADES_PER_PAGE, totalItems);
       if (aggregate) {
-        ui.tradesSummary.textContent = `Showing ${from}–${to} of ${totalItems} groups (${items.length} fills). ${range}`;
+        ui.tradesSummary.textContent = `${perPage} · ${fetched}${status}\nShowing ${from}–${to} of ${totalItems} items. ${range}`;
       } else {
-        ui.tradesSummary.textContent = `Showing ${from}–${to} of ${totalItems} trades. ${range}`;
+        ui.tradesSummary.textContent = `${perPage} · ${fetched}${status}\nShowing ${from}–${to} of ${totalItems} trades. ${range}`;
       }
     }
 
@@ -364,7 +586,8 @@
         const typeCell = document.createElement("td");
         const typePill = document.createElement("span");
         typePill.className = "type-pill";
-        typePill.textContent = "Fill ×" + group.fills.length;
+        typePill.textContent = group.isTwap ? "TWAP" : "Fill ×" + group.fills.length;
+        typePill.classList.add(group.isTwap ? "twap" : "fill");
         typeCell.appendChild(typePill);
         tr.appendChild(typeCell);
         tr.appendChild(createCell(group.coin || "—"));
@@ -375,17 +598,64 @@
         dirCell.appendChild(pill);
         tr.appendChild(dirCell);
         tr.appendChild(createCell(formatPrice(group.avgPx)));
-        tr.appendChild(createCell(formatNumber(group.totalSz, 4)));
+        if (group.isTwap) {
+          tr.appendChild(
+            createCell(
+              `${formatNumber(group.executedSz, 2)}/${formatNumber(group.totalSzTarget, 2)}`,
+            ),
+          );
+        } else {
+          tr.appendChild(createCell(formatNumber(group.totalSz, 4)));
+        }
         tr.appendChild(createCell(formatUsd(group.totalNotional)));
-        tr.appendChild(createCell(formatUsd(group.totalFee)));
-        const pnlCell = createCell(formatUsd(group.totalPnl));
-        if (group.totalPnl > 0) pnlCell.classList.add("positive");
-        else if (group.totalPnl < 0) pnlCell.classList.add("negative");
-        tr.appendChild(pnlCell);
+        tr.appendChild(createCell(group.isTwap ? "—" : formatUsd(group.totalFee)));
+        if (group.isTwap) {
+          const statusCell = createCell(twapStatusLabel(group.twapStatus));
+          statusCell.classList.add("muted");
+          tr.appendChild(statusCell);
+        } else {
+          const pnlCell = createCell(formatUsd(group.totalPnl));
+          if (group.totalPnl > 0) pnlCell.classList.add("positive");
+          else if (group.totalPnl < 0) pnlCell.classList.add("negative");
+          tr.appendChild(pnlCell);
+        }
         fragment.appendChild(tr);
       });
     } else {
-      slice.forEach((fill) => {
+      slice.forEach((item) => {
+        if (item.kind === "twap") {
+          const tr = document.createElement("tr");
+          tr.appendChild(createCell(formatTime(item.time)));
+          const typeCell = document.createElement("td");
+          const typePill = document.createElement("span");
+          typePill.className = "type-pill";
+          typePill.textContent = "TWAP";
+          typePill.classList.add("twap");
+          typeCell.appendChild(typePill);
+          tr.appendChild(typeCell);
+          tr.appendChild(createCell(item.coin ?? "—"));
+          const dirCell = document.createElement("td");
+          const pill = document.createElement("span");
+          pill.className = "dir-pill " + twapDirClass(item);
+          pill.textContent = twapDirLabel(item);
+          dirCell.appendChild(pill);
+          tr.appendChild(dirCell);
+          tr.appendChild(createCell(formatPrice(item.avgPx)));
+          tr.appendChild(
+            createCell(
+              `${formatNumber(item.executedSz, 2)}/${formatNumber(item.totalSz, 2)}`,
+            ),
+          );
+          tr.appendChild(createCell(formatUsd(item.executedNtl)));
+          tr.appendChild(createCell("—"));
+          const statusCell = createCell(twapStatusLabel(item.status));
+          statusCell.classList.add("muted");
+          tr.appendChild(statusCell);
+          fragment.appendChild(tr);
+          return;
+        }
+
+        const fill = item;
         const px = Number(fill.px);
         const sz = Number(fill.sz);
         const notional = Number.isFinite(px) && Number.isFinite(sz) ? px * sz : null;
@@ -468,36 +738,148 @@
     ui.explorerLink.href = `https://hypurrscan.io/address/${encodeURIComponent(state.address)}`;
 
     state.tradesPage = 1;
+    state.tradesData = { items: [], twaps: [], startTime: null, endTime: null };
+    state.tradesLoading = false;
+    state.tradesNextCursorEnd = null;
+    state.tradesSeenKeys = new Set();
+    state.tradesAllTwaps = [];
 
     try {
-      const [positionsRes, spotRes, tradesRes] = await Promise.all([
+      const [positionsRes, spotRes, midsRes] = await Promise.all([
         fetch(`/api/positions/${encodeURIComponent(state.address)}`),
         fetch(`/api/spot/${encodeURIComponent(state.address)}`),
-        fetch(`/api/userFills/${encodeURIComponent(state.address)}?days=${TRADES_FETCH_DAYS}`),
+        fetch(`/api/mids`).catch(() => null),
       ]);
 
       if (!positionsRes.ok) throw new Error("Failed to load positions.");
       if (!spotRes.ok) throw new Error("Failed to load spot state.");
-      if (!tradesRes.ok) throw new Error("Failed to load trades.");
 
       state.positionsData = await positionsRes.json();
       state.spotData = await spotRes.json();
-      state.tradesData = await tradesRes.json();
+      if (midsRes && midsRes.ok) state.midsData = await midsRes.json();
+      else state.midsData = null;
     } catch (err) {
       showError(err.message || "Failed to load wallet data.");
       state.positionsData = null;
       state.spotData = null;
-      state.tradesData = null;
+      state.midsData = null;
     } finally {
       state.loading = false;
       if (ui.lookupButton) ui.lookupButton.disabled = false;
     }
 
-    ui.walletMain.hidden = !state.positionsData && !state.spotData && !state.tradesData;
+    ui.walletMain.hidden = !state.positionsData && !state.spotData;
     if (!ui.walletMain.hidden) {
       updateMetrics();
       renderPositions();
       switchTab(ui.tabPositions);
+    }
+
+    if (state.address) {
+      loadTrades(state.address, { refresh: false });
+    }
+  }
+
+  async function loadTrades(address, opts) {
+    const refresh = opts?.refresh ?? false;
+    const loadId = ++state.tradesLoadId;
+
+    state.tradesPage = 1;
+    state.tradesSeenKeys = new Set();
+    state.tradesAllTwaps = [];
+    state.tradesLoading = true;
+    state.tradesNextCursorEnd = null;
+    state.tradesData = { items: [], twaps: [], startTime: null, endTime: null };
+
+    const base = `/api/userFills/${encodeURIComponent(address)}?days=${TRADES_FETCH_DAYS}&includeTwaps=1`;
+    const firstUrl = refresh ? `${base}&refresh=1` : base;
+
+    try {
+      const firstRes = await fetch(firstUrl);
+      if (!firstRes.ok) throw new Error("Failed to load trades.");
+      const first = await firstRes.json();
+      if (loadId !== state.tradesLoadId) return;
+
+      const fills = [];
+      appendUniqueFills(fills, first.items ?? []);
+
+      const allTwaps = Array.isArray(first.twaps) ? first.twaps : [];
+      state.tradesAllTwaps = allTwaps;
+      state.tradesNextCursorEnd = first.nextCursorEnd ?? null;
+      state.tradesData = { items: fills, twaps: [], startTime: null, endTime: null };
+
+      const fillRange = computeTradesRangeMs(fills, []);
+      const visibleTwaps = fillRange
+        ? allTwaps.filter((t) => {
+          const tt = toTimeMs(t?.time ?? 0);
+          return Number.isFinite(tt) && tt >= fillRange.startTime && tt <= fillRange.endTime;
+        })
+        : allTwaps.slice();
+      state.tradesData.twaps = visibleTwaps;
+
+      const range = computeTradesRangeMs(fills, visibleTwaps);
+      if (range) {
+        state.tradesData.startTime = range.startTime;
+        state.tradesData.endTime = range.endTime;
+      }
+
+      renderTrades();
+
+      // Backfill older pages in the background.
+      while (
+        loadId === state.tradesLoadId &&
+        state.tradesLoading &&
+        state.tradesNextCursorEnd != null &&
+        fills.length < TRADES_FETCH_LIMIT
+      ) {
+        const cursor = state.tradesNextCursorEnd;
+        const pageUrl =
+          `/api/userFills/${encodeURIComponent(address)}?days=${TRADES_FETCH_DAYS}` +
+          `&cursorEnd=${encodeURIComponent(String(cursor))}&includeTwaps=0` +
+          (refresh ? `&refresh=1` : ``);
+
+        const pageRes = await fetch(pageUrl);
+        if (!pageRes.ok) break;
+        const page = await pageRes.json();
+        if (loadId !== state.tradesLoadId) return;
+
+        appendUniqueFills(fills, page.items ?? []);
+        state.tradesNextCursorEnd = page.nextCursorEnd ?? null;
+        if (page.done) state.tradesNextCursorEnd = null;
+
+        const fillRange2 = computeTradesRangeMs(fills, []);
+        const visibleTwaps2 = fillRange2
+          ? state.tradesAllTwaps.filter((t) => {
+            const tt = toTimeMs(t?.time ?? 0);
+            return Number.isFinite(tt) && tt >= fillRange2.startTime && tt <= fillRange2.endTime;
+          })
+          : state.tradesAllTwaps.slice();
+
+        const r = computeTradesRangeMs(fills, visibleTwaps2);
+        if (r) {
+          state.tradesData.startTime = r.startTime;
+          state.tradesData.endTime = r.endTime;
+        }
+        state.tradesData.items = fills;
+        state.tradesData.twaps = visibleTwaps2;
+
+        // Update UI while we're loading if Trades tab is active.
+        if (ui.panelTrades && !ui.panelTrades.hidden) {
+          renderTrades();
+        }
+
+        // Small pause to reduce rate limiting.
+        await new Promise((r2) => setTimeout(r2, 250));
+
+        if (state.tradesNextCursorEnd == null) break;
+      }
+    } catch (_) {
+      // Keep whatever we already loaded.
+    } finally {
+      if (loadId === state.tradesLoadId) {
+        state.tradesLoading = false;
+        renderTrades();
+      }
     }
   }
 
@@ -506,6 +888,45 @@
       if (!tab) return;
       tab.addEventListener("click", () => switchTab(tab));
     });
+  }
+
+  function setHoldingsSortState(key) {
+    if (state.holdingsSortKey === key) {
+      state.holdingsSortDir = state.holdingsSortDir === "asc" ? "desc" : "asc";
+    } else {
+      state.holdingsSortKey = key;
+      state.holdingsSortDir = "desc";
+    }
+
+    ui.holdingsSortableHeaders.forEach((header) => {
+      const headerKey = header.dataset.sort;
+      if (headerKey === state.holdingsSortKey) {
+        header.setAttribute(
+          "aria-sort",
+          state.holdingsSortDir === "asc" ? "ascending" : "descending",
+        );
+      } else {
+        header.removeAttribute("aria-sort");
+      }
+    });
+
+    if (ui.panelHoldings && !ui.panelHoldings.hidden) renderHoldings();
+  }
+
+  function initHoldingsSort() {
+    ui.holdingsSortableHeaders.forEach((header) => {
+      header.addEventListener("click", () => {
+        const key = header.dataset.sort;
+        if (key) setHoldingsSortState(key);
+      });
+    });
+
+    // Show a default direction arrow even before the first click.
+    if (ui.holdingsSortableHeaders.length) {
+      ui.holdingsSortableHeaders.forEach((h) => h.removeAttribute("aria-sort"));
+      const header = ui.holdingsSortableHeaders.find((h) => h.dataset.sort === "usdValue");
+      if (header) header.setAttribute("aria-sort", "descending");
+    }
   }
 
   function getAddressFromPath() {
@@ -543,14 +964,7 @@
     if (ui.tradesRefresh) {
       ui.tradesRefresh.addEventListener("click", () => {
         if (state.address) {
-          state.tradesPage = 1;
-          fetch(`/api/userFills/${encodeURIComponent(state.address)}?days=${TRADES_FETCH_DAYS}&refresh=1`)
-            .then((r) => r.ok ? r.json() : Promise.reject(new Error("Refresh failed")))
-            .then((data) => {
-              state.tradesData = data;
-              renderTrades();
-            })
-            .catch(() => {});
+          loadTrades(state.address, { refresh: true });
         }
       });
     }
@@ -571,9 +985,39 @@
     }
     if (ui.tradesNext) {
       ui.tradesNext.addEventListener("click", () => {
-        const items = state.tradesData?.items ?? [];
+        const fills = state.tradesData?.items ?? [];
+        const twaps = state.tradesData?.twaps ?? [];
         const aggregate = ui.aggregateFills?.checked ?? false;
-        const displayItems = aggregate ? aggregateFillsByCoinAndTime(items) : items;
+        const sortTime = (x) =>
+          toTimeMs(x?.time ?? x?.endTime ?? x?.startTime ?? 0) || 0;
+
+        const displayItems = aggregate
+          ? aggregateFillsByCoinAndTime(fills).concat(
+            twaps.map((t) => {
+              const tTime = sortTime(t);
+              return {
+                startTime: tTime,
+                endTime: tTime,
+                coin: t?.coin ?? "—",
+                dir: twapDirLabel(t),
+                dirClass: twapDirClass(t),
+                isTwap: true,
+                twapId: t?.twapId ?? null,
+                twapStatus: t?.status ?? null,
+                executedSz: Number(t?.executedSz ?? 0),
+                totalSzTarget: Number(t?.totalSz ?? 0),
+                avgPx: Number(t?.avgPx ?? 0),
+                totalSz: Number(t?.executedSz ?? 0),
+                totalNotional: Number(t?.executedNtl ?? 0),
+                totalFee: null,
+                totalPnl: null,
+                fills: [],
+              };
+            }),
+          )
+          : fills
+            .map((f) => ({ kind: "fill", ...f }))
+            .concat(twaps.map((t) => ({ kind: "twap", ...t })));
         const totalPages = Math.max(1, Math.ceil(displayItems.length / TRADES_PER_PAGE));
         if (state.tradesPage < totalPages) {
           state.tradesPage += 1;
@@ -582,6 +1026,7 @@
       });
     }
     initTabs();
+    initHoldingsSort();
     initFromUrl();
   }
 

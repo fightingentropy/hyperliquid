@@ -11,7 +11,8 @@ const positionsTtlMs = DAY_MS;
 const fillsTtlMs = DAY_MS;
 const midsTtlMs = DAY_MS;
 const unstakingTtlMs = 5 * 60 * 1000; // 5 minutes
-const DEFAULT_MAX_USER_FILLS = 2000;
+const FILLS_PAGE_LIMIT = 2000;
+const DEFAULT_MAX_USER_FILLS = 4000;
 
 const cache = new Map();
 
@@ -62,12 +63,28 @@ async function cachedWithBypass(key, ttlMs, fetcher, bypassCache) {
 }
 
 async function fetchJson(url, options) {
-  const response = await fetch(url, options);
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`Request failed (${response.status}): ${text}`);
+  let attempt = 0;
+  // Hyperliquid can rate-limit (429). Retry a few times with backoff.
+  // Keep this conservative so a single request doesn't hang the server.
+  while (true) {
+    const response = await fetch(url, options);
+    if (response.ok) return response.json();
+
+    const status = response.status;
+    const retryAfter = response.headers.get("retry-after");
+    const text = await response.text().catch(() => "");
+
+    if ((status === 429 || status >= 500) && attempt < 5) {
+      const baseDelayMs = 500 * 2 ** attempt;
+      const retryAfterMs = retryAfter ? Math.max(0, Number(retryAfter) * 1000) : 0;
+      const delayMs = Math.min(8000, Math.max(baseDelayMs, retryAfterMs));
+      await new Promise((r) => setTimeout(r, delayMs));
+      attempt += 1;
+      continue;
+    }
+
+    throw new Error(`Request failed (${status}): ${text || "null"}`);
   }
-  return response.json();
 }
 
 async function fetchInfo(payload) {
@@ -131,6 +148,70 @@ function fillSortTimeMs(fill) {
     toTimeMs(fill?.endTime),
     toTimeMs(fill?.startTime),
   );
+}
+
+function computeFillRangeMs(items) {
+  let min = Infinity;
+  let max = -Infinity;
+  for (const it of items ?? []) {
+    const t = fillSortTimeMs(it);
+    if (!Number.isFinite(t) || t <= 0) continue;
+    if (t < min) min = t;
+    if (t > max) max = t;
+  }
+  if (!Number.isFinite(min) || !Number.isFinite(max)) return null;
+  return { startTime: min, endTime: max };
+}
+
+function fillDedupeKey(fill) {
+  return String(
+    fill?.tid ?? `${fill?.time ?? ""}:${fill?.oid ?? ""}:${fill?.hash ?? ""}`,
+  );
+}
+
+async function fetchUserFillsByTimeBackfill({ user, startTime, endTime, maxItems }) {
+  const out = [];
+  const seen = new Set();
+
+  let cursorEnd = endTime;
+  let windowMs = 24 * 60 * 60 * 1000; // start with 24h chunks
+  const minWindowMs = 60 * 1000; // 1 minute
+  const maxWindowMs = 7 * 24 * 60 * 60 * 1000; // 7 days
+  let guard = 0;
+
+  while (cursorEnd > startTime && out.length < maxItems && guard++ < 200) {
+    const windowStart = Math.max(startTime, cursorEnd - windowMs);
+    const batch = await fetchInfo({
+      type: "userFillsByTime",
+      user,
+      startTime: windowStart,
+      endTime: cursorEnd,
+    });
+    const items = Array.isArray(batch) ? batch : [];
+
+    if (items.length >= FILLS_PAGE_LIMIT && windowMs > minWindowMs) {
+      // Too many fills in this window; shrink to avoid truncation.
+      windowMs = Math.max(minWindowMs, Math.floor(windowMs / 2));
+      continue;
+    }
+
+    for (const fill of items) {
+      const key = fillDedupeKey(fill);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(fill);
+      if (out.length >= maxItems) break;
+    }
+
+    // Move backward in time.
+    cursorEnd = windowStart;
+
+    // Adapt window size: grow if sparse, keep/shrink if dense.
+    if (items.length < 250) windowMs = Math.min(maxWindowMs, windowMs * 2);
+    else if (items.length >= FILLS_PAGE_LIMIT) windowMs = Math.max(minWindowMs, Math.floor(windowMs / 2));
+  }
+
+  return out;
 }
 
 async function handleLeaderboard(url) {
@@ -208,33 +289,109 @@ async function handleUserFills(address, url, bypassCache) {
     180,
     Math.max(1, Number(url.searchParams.get("days") ?? "30")),
   );
-  const limitRaw = Number(url.searchParams.get("limit") ?? String(DEFAULT_MAX_USER_FILLS));
-  const limit = Math.min(2000, Math.max(1, Number.isFinite(limitRaw) ? limitRaw : DEFAULT_MAX_USER_FILLS));
   const now = Date.now();
-  const startTime = now - days * 24 * 60 * 60 * 1000;
-  const key = `userFills:${address}:${days}:${limit}`;
+  const queryStartTime = now - days * 24 * 60 * 60 * 1000;
+  const cursorEndRaw = url.searchParams.get("cursorEnd");
+  const cursorEnd = cursorEndRaw != null ? Number(cursorEndRaw) : null;
+  const includeTwaps =
+    cursorEnd == null && (url.searchParams.get("includeTwaps") ?? "1") !== "0";
 
-  const fills = await cachedWithBypass(
-    key,
-    fillsTtlMs,
-    async () => {
-      // `userFillsByTime` is capped and returns fills closest to `startTime`.
-      // For a "Recent trades" UI we want the most recent fills, so use
-      // `userFills` which returns the latest fills directly.
-      return fetchInfo({ type: "userFills", user: address });
-    },
-    bypassCache,
-  );
+  const pageSize = 2000;
+  const key = cursorEnd == null
+    ? `userFillsLatest:${address}:${days}`
+    : `userFillsBackfill:${address}:${days}:${cursorEnd}`;
+  const twapKey = `twapHistory:${address}`;
+
+  const [fills, twapHistory] = await Promise.all([
+    cachedWithBypass(
+      key,
+      fillsTtlMs,
+      async () => {
+        if (cursorEnd == null) {
+          // Latest fills (fast, capped ~2000).
+          return fetchInfo({ type: "userFills", user: address });
+        }
+        // Older fills (page backward) via adaptive backfill, capped to `pageSize`.
+        return fetchUserFillsByTimeBackfill({
+          user: address,
+          startTime: queryStartTime,
+          endTime: cursorEnd,
+          maxItems: pageSize,
+        });
+      },
+      bypassCache,
+    ),
+    includeTwaps
+      ? cachedWithBypass(
+          twapKey,
+          fillsTtlMs,
+          async () => {
+            return fetchInfo({ type: "twapHistory", user: address });
+          },
+          bypassCache,
+        )
+      : Promise.resolve([]),
+  ]);
 
   const items = (Array.isArray(fills) ? fills : [])
-    .filter((fill) => {
-      const t = fillSortTimeMs(fill);
-      return t >= startTime && t <= now;
+    .filter((f) => {
+      const t = fillSortTimeMs(f);
+      return t >= queryStartTime && t <= now;
     })
-    .sort((a, b) => fillSortTimeMs(b) - fillSortTimeMs(a))
-    .slice(0, limit);
+    .sort((a, b) => fillSortTimeMs(b) - fillSortTimeMs(a));
 
-  return jsonResponse({ address, days, startTime, endTime: now, items });
+  const range = computeFillRangeMs(items);
+  const minTime = range?.startTime ?? null;
+  const hasMore =
+    minTime != null &&
+    Number.isFinite(minTime) &&
+    items.length >= pageSize &&
+    minTime > queryStartTime;
+  const nextCursorEnd = hasMore ? minTime - 1 : null;
+
+  const twapsRaw = Array.isArray(twapHistory) ? twapHistory : [];
+  const twaps = twapsRaw
+    .map((t) => {
+      const state = t?.state ?? {};
+      const statusObj = t?.status ?? {};
+      const timeMs =
+        Number(state?.timestamp ?? 0) || Number(t?.time ?? 0) * 1000;
+      const executedSz = Number(state?.executedSz ?? 0);
+      const totalSz = Number(state?.sz ?? 0);
+      const executedNtl = Number(state?.executedNtl ?? 0);
+      const avgPx = executedSz > 0 ? executedNtl / executedSz : 0;
+      return {
+        kind: "twap",
+        time: timeMs,
+        twapId: t?.twapId ?? null,
+        coin: state?.coin ?? "—",
+        side: state?.side ?? null,
+        executedSz,
+        totalSz,
+        executedNtl,
+        avgPx,
+        status: statusObj?.status ?? null,
+      };
+    })
+    .filter((t) => Number.isFinite(t.time) && t.time >= queryStartTime && t.time <= now)
+    .sort((a, b) => b.time - a.time);
+
+  return jsonResponse({
+    address,
+    days,
+    // Query window (what we asked HL for)
+    queryStartTime,
+    queryEndTime: now,
+    // Actual range of returned items in *this page* (caller can accumulate across pages).
+    startTime: range?.startTime ?? null,
+    endTime: range?.endTime ?? null,
+    items,
+    twaps,
+    pageSize,
+    cursorEnd: cursorEnd ?? null,
+    nextCursorEnd,
+    done: !hasMore,
+  });
 }
 
 async function handleSpotState(address, bypassCache) {
@@ -243,7 +400,56 @@ async function handleSpotState(address, bypassCache) {
     key,
     positionsTtlMs,
     async () => {
-      return fetchInfo({ type: "spotClearinghouseState", user: address });
+      const [masterSpot, subs, stakingSummary, stakingDelegations] = await Promise.all([
+        fetchInfo({ type: "spotClearinghouseState", user: address }),
+        fetchInfo({ type: "subAccounts", user: address }).catch(() => []),
+        fetchInfo({ type: "delegatorSummary", user: address }).catch(() => null),
+        fetchInfo({ type: "delegations", user: address }).catch(() => []),
+      ]);
+
+      const aggregate = new Map();
+
+      function addBalances(list) {
+        for (const b of list ?? []) {
+          const coin = String(b?.coin ?? "").trim();
+          if (!coin) continue;
+          const total = Number(b?.total ?? 0);
+          const hold = Number(b?.hold ?? 0);
+          if (!Number.isFinite(total) && !Number.isFinite(hold)) continue;
+          const prev = aggregate.get(coin) ?? { coin, total: 0, hold: 0 };
+          prev.total += Number.isFinite(total) ? total : 0;
+          prev.hold += Number.isFinite(hold) ? hold : 0;
+          aggregate.set(coin, prev);
+        }
+      }
+
+      addBalances(masterSpot?.balances);
+      for (const sub of Array.isArray(subs) ? subs : []) {
+        addBalances(sub?.spotState?.balances);
+      }
+
+      const extras = [];
+      const delegated = Number(stakingSummary?.delegated ?? 0);
+      if (Number.isFinite(delegated) && delegated > 0) {
+        extras.push({
+          coin: "HYPE",
+          total: delegated,
+          hold: 0,
+          kind: "delegated",
+        });
+      }
+
+      return {
+        aggregated: true,
+        master: { balances: masterSpot?.balances ?? [] },
+        subAccountsCount: Array.isArray(subs) ? subs.length : 0,
+        stakingSummary,
+        stakingDelegations,
+        balances: [
+          ...Array.from(aggregate.values()).sort((a, b) => a.coin.localeCompare(b.coin)),
+          ...extras,
+        ],
+      };
     },
     bypassCache,
   );
@@ -440,6 +646,9 @@ const WALLET_PATH_REGEX = /^\/wallets\/(0x[a-fA-F0-9]{40})\/?$/;
 
 Bun.serve({
   port: PORT,
+  // Some endpoints (notably userFills backfill) may take >10s if upstream
+  // rate-limits; keep the connection open longer.
+  idleTimeout: 60,
   async fetch(req) {
     const url = new URL(req.url);
     if (url.pathname.startsWith("/api/")) {

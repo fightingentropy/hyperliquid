@@ -12,6 +12,7 @@ const ui = {
   accountLimit: document.getElementById("account-limit"),
   accountLimitValue: document.getElementById("account-limit-value"),
   resetButton: document.getElementById("settings-reset"),
+  themeToggle: document.getElementById("theme-toggle"),
 };
 
 function loadSettings() {
@@ -59,6 +60,28 @@ function applySettings(settings) {
 function init() {
   let settings = loadSettings();
   applySettings(settings);
+
+  function syncThemeToggle() {
+    const group = ui.themeToggle;
+    if (!group) return;
+    const current = window.hlTheme?.get?.() ?? "dark";
+    for (const btn of group.querySelectorAll("button[data-theme]")) {
+      const t = btn.getAttribute("data-theme");
+      btn.classList.toggle("active", t === current);
+    }
+  }
+
+  ui.themeToggle?.addEventListener("click", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) return;
+    const btn = target.closest("button[data-theme]");
+    if (!btn) return;
+    const theme = btn.getAttribute("data-theme") || "dark";
+    window.hlTheme?.set?.(theme);
+    syncThemeToggle();
+  });
+
+  syncThemeToggle();
 
   ui.showBinSize?.addEventListener("change", () => {
     settings = { ...settings, showBinSize: ui.showBinSize.checked };

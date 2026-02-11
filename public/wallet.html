@@ -4,12 +4,9 @@
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <title>Wallet Lookup · HL Stats</title>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-        <link
-            href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
-            rel="stylesheet"
-        />
+        <meta name="theme-color" content="#09090b" />
+        <script src="/theme.js"></script>
+        <link rel="stylesheet" href="/geist.css" />
         <link rel="stylesheet" href="/styles.css" />
         <link rel="stylesheet" href="/wallet.css" />
         <script src="/wallet.js" defer></script>
@@ -162,7 +159,12 @@
                 <div id="panel-holdings" role="tabpanel" class="wallet-tabpanel" hidden>
                     <div class="detail-section">
                         <div class="section-header">
-                            <h3>Spot balances</h3>
+                            <div>
+                                <h3>Holdings &amp; Staking</h3>
+                                <p class="muted">
+                                    Spot holdings aggregated across wallet + subaccounts, plus staking.
+                                </p>
+                            </div>
                         </div>
                         <div class="table-wrap wallet-table">
                             <table>
@@ -170,6 +172,7 @@
                                     <tr>
                                         <th>Asset</th>
                                         <th>Total</th>
+                                        <th data-sort="usdValue">Value (USD)</th>
                                         <th>Hold</th>
                                         <th>Available</th>
                                     </tr>
@@ -207,7 +210,7 @@
                                         <th>Size</th>
                                         <th>Notional</th>
                                         <th>Fee</th>
-                                        <th>PnL</th>
+                                        <th>PnL/Status</th>
                                     </tr>
                                 </thead>
                                 <tbody id="trades-body"></tbody>

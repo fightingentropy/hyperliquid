@@ -41,6 +41,17 @@ Query params:
 
 Returns current mid prices for all markets.
 
+### `GET /api/fees24h`
+
+Returns Hypurrscan-style 24h trading fees, derived from cumulative fee snapshots.
+
+Response fields include:
+- `fees24h`: latest 24h fee delta in USD.
+- `previousFees24h`: previous 24h fee delta in USD (if available).
+- `fees24hChangePct`: percent change vs previous 24h window.
+- `spotFees24h`: latest 24h spot-fee delta in USD.
+- `spotSharePct24h`: share of spot fees within latest 24h fees.
+
 ## Configuration
 
 Environment variables:
@@ -58,5 +69,5 @@ The server logs the local URL on startup.
 
 ## Notes
 
-- Upstream sources: `https://api.hyperliquid.xyz/info` and `https://stats-data.hyperliquid.xyz`.
+- Upstream sources: `https://api.hyperliquid.xyz/info`, `https://stats-data.hyperliquid.xyz`, and `https://api.hypurrscan.io`.
 - Cache TTLs are 24 hours by default and in-memory only.

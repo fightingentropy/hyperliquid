@@ -8,6 +8,7 @@ const positionsTtlMs = DAY_MS;
 const fillsTtlMs = DAY_MS;
 const midsTtlMs = DAY_MS;
 const unstakingTtlMs = 5 * 60 * 1000; // 5 minutes
+const fees24hTtlMs = 5 * 60 * 1000; // 5 minutes
 const FILLS_PAGE_LIMIT = 2000;
 const DEFAULT_MAX_USER_FILLS = 4000;
 
@@ -564,6 +565,90 @@ async function handleUnstaking(bypassCache: boolean) {
   });
 }
 
+type FeePoint = {
+  time: number;
+  totalFees: number;
+  totalSpotFees: number;
+};
+
+function normalizeFeePoint(point: any): FeePoint | null {
+  const time = Number(point?.time ?? 0);
+  const totalFees = Number(point?.total_fees ?? point?.totalFees ?? NaN);
+  const totalSpotFees = Number(
+    point?.total_spot_fees ?? point?.totalSpotFees ?? 0,
+  );
+  if (!Number.isFinite(time) || time <= 0 || !Number.isFinite(totalFees)) {
+    return null;
+  }
+  return {
+    time,
+    totalFees,
+    totalSpotFees: Number.isFinite(totalSpotFees) ? totalSpotFees : 0,
+  };
+}
+
+async function handleFees24h(bypassCache: boolean) {
+  const key = "fees:24h";
+  const raw = await cachedWithBypass(
+    key,
+    fees24hTtlMs,
+    async () => {
+      return fetchJson(`${HYPURRSCAN_API}/fees`);
+    },
+    bypassCache,
+  );
+
+  const points = (Array.isArray(raw) ? raw : [])
+    .map(normalizeFeePoint)
+    .filter((p): p is FeePoint => p != null)
+    .sort((a, b) => a.time - b.time);
+
+  if (points.length < 2) {
+    throw new Error("Not enough fee snapshots");
+  }
+
+  const last = points[points.length - 1];
+  const prev = points[points.length - 2];
+  const prevPrev = points.length >= 3 ? points[points.length - 3] : null;
+
+  const currentFeesRaw = last.totalFees - prev.totalFees;
+  const previousFeesRaw = prevPrev
+    ? prev.totalFees - prevPrev.totalFees
+    : null;
+
+  const currentSpotFeesRaw = last.totalSpotFees - prev.totalSpotFees;
+  const previousSpotFeesRaw = prevPrev
+    ? prev.totalSpotFees - prevPrev.totalSpotFees
+    : null;
+
+  const fees24hChangePct =
+    previousFeesRaw != null && previousFeesRaw !== 0
+      ? ((currentFeesRaw - previousFeesRaw) / Math.abs(previousFeesRaw)) * 100
+      : null;
+
+  const spotSharePct24h =
+    currentFeesRaw !== 0 ? (currentSpotFeesRaw / currentFeesRaw) * 100 : null;
+
+  return jsonResponse({
+    updatedAt: Date.now(),
+    unit: "USD",
+    intervalHours: 24,
+    source: `${HYPURRSCAN_API}/fees`,
+    snapshots: {
+      latestTime: last.time * 1000,
+      previousTime: prev.time * 1000,
+      previousPreviousTime: prevPrev ? prevPrev.time * 1000 : null,
+    },
+    fees24h: currentFeesRaw / 1e6,
+    previousFees24h: previousFeesRaw == null ? null : previousFeesRaw / 1e6,
+    fees24hChangePct,
+    spotFees24h: currentSpotFeesRaw / 1e6,
+    previousSpotFees24h:
+      previousSpotFeesRaw == null ? null : previousSpotFeesRaw / 1e6,
+    spotSharePct24h,
+  });
+}
+
 async function handleApi(chain: string, req: Request, url: URL) {
   if (req.method !== "GET") {
     return jsonResponse({ error: "Method not allowed" }, 405);
@@ -642,6 +727,14 @@ async function handleApi(chain: string, req: Request, url: URL) {
   if (url.pathname === "/api/unstaking") {
     try {
       return await handleUnstaking(bypassCache);
+    } catch (error) {
+      return jsonResponse({ error: String(error) }, 502);
+    }
+  }
+
+  if (url.pathname === "/api/fees24h") {
+    try {
+      return await handleFees24h(bypassCache);
     } catch (error) {
       return jsonResponse({ error: String(error) }, 502);
     }

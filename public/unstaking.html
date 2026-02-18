@@ -60,22 +60,42 @@
                     </button>
                 </div>
             </div>
-            <div class="hero-metrics">
-                <div class="metric">
-                    <span class="label">7-Day Total</span>
-                    <span id="total-hype" class="value">--</span>
+            <div class="hero-side-cards">
+                <div class="hero-metrics">
+                    <div class="metric">
+                        <span class="label">7-Day Total</span>
+                        <span id="total-hype" class="value">--</span>
+                    </div>
+                    <div class="metric">
+                        <span class="label">Entries</span>
+                        <span id="total-entries" class="value">0</span>
+                    </div>
+                    <div class="metric">
+                        <span class="label">Pending</span>
+                        <span id="pending-hype" class="value">--</span>
+                    </div>
+                    <div class="metric">
+                        <span class="label">Updated</span>
+                        <span id="last-updated" class="value">--</span>
+                    </div>
                 </div>
-                <div class="metric">
-                    <span class="label">Entries</span>
-                    <span id="total-entries" class="value">0</span>
-                </div>
-                <div class="metric">
-                    <span class="label">Pending</span>
-                    <span id="pending-hype" class="value">--</span>
-                </div>
-                <div class="metric">
-                    <span class="label">Updated</span>
-                    <span id="last-updated" class="value">--</span>
+                <div class="hero-metrics">
+                    <div class="metric">
+                        <span class="label">24h Fees</span>
+                        <span id="fees-24h" class="value">--</span>
+                    </div>
+                    <div class="metric">
+                        <span class="label">24h Change</span>
+                        <span id="fees-24h-change" class="value">--</span>
+                    </div>
+                    <div class="metric">
+                        <span class="label">Spot Share</span>
+                        <span id="fees-spot-share" class="value">--</span>
+                    </div>
+                    <div class="metric">
+                        <span class="label">Updated</span>
+                        <span id="fees-updated" class="value">--</span>
+                    </div>
                 </div>
             </div>
         </header>
@@ -176,7 +196,7 @@
         <footer class="footer">
             <p>
                 Data: api.hypurrscan.io/fullUnstakingQueue +
-                api.hyperliquid.xyz
+                api.hypurrscan.io/fees + api.hyperliquid.xyz
             </p>
         </footer>
     </body>

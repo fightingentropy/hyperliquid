@@ -327,6 +327,12 @@ textarea {
     box-shadow: var(--shadow);
 }
 
+.hero-side-cards {
+    display: flex;
+    align-items: stretch;
+    gap: 14px;
+}
+
 .metric {
     display: grid;
     gap: 3px;
@@ -343,6 +349,11 @@ textarea {
 .metric .value {
     font-size: 1.08rem;
     font-weight: 600;
+    font-family: var(--font-mono);
+}
+
+.metric .subvalue {
+    font-size: 0.76rem;
     font-family: var(--font-mono);
 }
 
@@ -1020,6 +1031,11 @@ a.ghost {
     .hero-metrics {
         width: 100%;
         grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .hero-side-cards {
+        width: 100%;
+        flex-direction: column;
     }
 }
 

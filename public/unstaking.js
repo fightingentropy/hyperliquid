@@ -1,5 +1,6 @@
 const state = {
   data: null,
+  feesData: null,
   loading: false,
 };
 
@@ -8,6 +9,10 @@ const ui = {
   totalEntries: document.getElementById("total-entries"),
   pendingHype: document.getElementById("pending-hype"),
   lastUpdated: document.getElementById("last-updated"),
+  fees24h: document.getElementById("fees-24h"),
+  fees24hChange: document.getElementById("fees-24h-change"),
+  feesSpotShare: document.getElementById("fees-spot-share"),
+  feesUpdated: document.getElementById("fees-updated"),
   chartStatus: document.getElementById("chart-status"),
   unstakingBars: document.getElementById("unstaking-bars"),
   chartAxis: document.getElementById("chart-axis"),
@@ -53,6 +58,35 @@ function formatHype(value) {
 function formatFullHype(value) {
   if (value == null || !Number.isFinite(value)) return "--";
   return numberFormatter.format(value) + " HYPE";
+}
+
+function formatUsd(value) {
+  if (value == null || !Number.isFinite(value)) return "--";
+  const sign = value < 0 ? "-" : "";
+  return `${sign}$${formatCompact(Math.abs(value))}`;
+}
+
+function formatPercent(value, decimals = 2) {
+  if (value == null || !Number.isFinite(value)) return "--";
+  const sign = value > 0 ? "+" : "";
+  return `${sign}${value.toFixed(decimals)}%`;
+}
+
+function formatPlainPercent(value, decimals = 2) {
+  if (value == null || !Number.isFinite(value)) return "--";
+  return `${value.toFixed(decimals)}%`;
+}
+
+function classForSign(value) {
+  if (value == null || !Number.isFinite(value) || value === 0) return "";
+  return value > 0 ? "positive" : "negative";
+}
+
+function applySignedClass(element, value) {
+  if (!element) return;
+  element.classList.remove("positive", "negative");
+  const className = classForSign(value);
+  if (className) element.classList.add(className);
 }
 
 function formatAddress(address) {
@@ -247,6 +281,34 @@ function renderStats(data) {
   setText(ui.peakAmount, formatHype(peak.hype));
 }
 
+function clearFeeStats() {
+  setText(ui.fees24h, "--");
+  setText(ui.fees24hChange, "--");
+  setText(ui.feesSpotShare, "--");
+  setText(ui.feesUpdated, "--");
+  applySignedClass(ui.fees24hChange, 0);
+}
+
+function renderFeeStats(data) {
+  if (!data) {
+    clearFeeStats();
+    return;
+  }
+
+  setText(ui.fees24h, formatUsd(Number(data.fees24h)));
+
+  const changePct = Number(data.fees24hChangePct);
+  setText(ui.fees24hChange, formatPercent(changePct));
+  applySignedClass(ui.fees24hChange, changePct);
+
+  const spotShare = Number(data.spotSharePct24h);
+  setText(ui.feesSpotShare, formatPlainPercent(spotShare));
+  setText(
+    ui.feesUpdated,
+    data.updatedAt ? new Date(data.updatedAt).toLocaleTimeString() : "--",
+  );
+}
+
 function render(data) {
   if (!data) return;
 
@@ -265,27 +327,46 @@ function render(data) {
   renderStats(data);
 }
 
+async function fetchJson(url) {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  return response.json();
+}
+
 async function loadData(refresh = false) {
   if (state.loading) return;
   state.loading = true;
   setText(ui.chartStatus, "Loading...");
   setTableMessage(ui.dailyBody, "Loading unstaking data...", 5);
   setTableMessage(ui.topBody, "Loading...", 3);
+  setText(ui.feesUpdated, "Loading...");
 
-  try {
-    const url = refresh ? "/api/unstaking?refresh=1" : "/api/unstaking";
-    const response = await fetch(url);
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const data = await response.json();
-    state.data = data;
-    render(data);
-  } catch (error) {
+  const unstakingUrl = refresh ? "/api/unstaking?refresh=1" : "/api/unstaking";
+  const feesUrl = refresh ? "/api/fees24h?refresh=1" : "/api/fees24h";
+
+  const [unstakingResult, feesResult] = await Promise.allSettled([
+    fetchJson(unstakingUrl),
+    fetchJson(feesUrl),
+  ]);
+
+  if (unstakingResult.status === "fulfilled") {
+    state.data = unstakingResult.value;
+    render(unstakingResult.value);
+  } else {
     setText(ui.chartStatus, "Failed to load data");
     setTableMessage(ui.dailyBody, "Failed to load unstaking data.", 5);
     setTableMessage(ui.topBody, "Failed to load data.", 3);
-  } finally {
-    state.loading = false;
   }
+
+  if (feesResult.status === "fulfilled") {
+    state.feesData = feesResult.value;
+    renderFeeStats(feesResult.value);
+  } else {
+    state.feesData = null;
+    clearFeeStats();
+  }
+
+  state.loading = false;
 }
 
 function init() {

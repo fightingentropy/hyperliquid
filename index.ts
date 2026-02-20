@@ -77,7 +77,9 @@ async function fetchJson(url, options) {
 
     if ((status === 429 || status >= 500) && attempt < 5) {
       const baseDelayMs = 500 * 2 ** attempt;
-      const retryAfterMs = retryAfter ? Math.max(0, Number(retryAfter) * 1000) : 0;
+      const retryAfterMs = retryAfter
+        ? Math.max(0, Number(retryAfter) * 1000)
+        : 0;
       const delayMs = Math.min(8000, Math.max(baseDelayMs, retryAfterMs));
       await new Promise((r) => setTimeout(r, delayMs));
       attempt += 1;
@@ -170,7 +172,12 @@ function fillDedupeKey(fill) {
   );
 }
 
-async function fetchUserFillsByTimeBackfill({ user, startTime, endTime, maxItems }) {
+async function fetchUserFillsByTimeBackfill({
+  user,
+  startTime,
+  endTime,
+  maxItems,
+}) {
   const out = [];
   const seen = new Set();
 
@@ -209,7 +216,8 @@ async function fetchUserFillsByTimeBackfill({ user, startTime, endTime, maxItems
 
     // Adapt window size: grow if sparse, keep/shrink if dense.
     if (items.length < 250) windowMs = Math.min(maxWindowMs, windowMs * 2);
-    else if (items.length >= FILLS_PAGE_LIMIT) windowMs = Math.max(minWindowMs, Math.floor(windowMs / 2));
+    else if (items.length >= FILLS_PAGE_LIMIT)
+      windowMs = Math.max(minWindowMs, Math.floor(windowMs / 2));
   }
 
   return out;
@@ -298,9 +306,10 @@ async function handleUserFills(address, url, bypassCache) {
     cursorEnd == null && (url.searchParams.get("includeTwaps") ?? "1") !== "0";
 
   const pageSize = 2000;
-  const key = cursorEnd == null
-    ? `userFillsLatest:${address}:${days}`
-    : `userFillsBackfill:${address}:${days}:${cursorEnd}`;
+  const key =
+    cursorEnd == null
+      ? `userFillsLatest:${address}:${days}`
+      : `userFillsBackfill:${address}:${days}:${cursorEnd}`;
   const twapKey = `twapHistory:${address}`;
 
   const [fills, twapHistory] = await Promise.all([
@@ -374,7 +383,10 @@ async function handleUserFills(address, url, bypassCache) {
         status: statusObj?.status ?? null,
       };
     })
-    .filter((t) => Number.isFinite(t.time) && t.time >= queryStartTime && t.time <= now)
+    .filter(
+      (t) =>
+        Number.isFinite(t.time) && t.time >= queryStartTime && t.time <= now,
+    )
     .sort((a, b) => b.time - a.time);
 
   return jsonResponse({
@@ -401,12 +413,15 @@ async function handleSpotState(address, bypassCache) {
     key,
     positionsTtlMs,
     async () => {
-      const [masterSpot, subs, stakingSummary, stakingDelegations] = await Promise.all([
-        fetchInfo({ type: "spotClearinghouseState", user: address }),
-        fetchInfo({ type: "subAccounts", user: address }).catch(() => []),
-        fetchInfo({ type: "delegatorSummary", user: address }).catch(() => null),
-        fetchInfo({ type: "delegations", user: address }).catch(() => []),
-      ]);
+      const [masterSpot, subs, stakingSummary, stakingDelegations] =
+        await Promise.all([
+          fetchInfo({ type: "spotClearinghouseState", user: address }),
+          fetchInfo({ type: "subAccounts", user: address }).catch(() => []),
+          fetchInfo({ type: "delegatorSummary", user: address }).catch(
+            () => null,
+          ),
+          fetchInfo({ type: "delegations", user: address }).catch(() => []),
+        ]);
 
       const aggregate = new Map();
 
@@ -447,7 +462,9 @@ async function handleSpotState(address, bypassCache) {
         stakingSummary,
         stakingDelegations,
         balances: [
-          ...Array.from(aggregate.values()).sort((a, b) => a.coin.localeCompare(b.coin)),
+          ...Array.from(aggregate.values()).sort((a, b) =>
+            a.coin.localeCompare(b.coin),
+          ),
           ...extras,
         ],
       };
@@ -585,9 +602,7 @@ async function handleFees24h(bypassCache) {
   const prevPrev = points.length >= 3 ? points[points.length - 3] : null;
 
   const currentFeesRaw = last.totalFees - prev.totalFees;
-  const previousFeesRaw = prevPrev
-    ? prev.totalFees - prevPrev.totalFees
-    : null;
+  const previousFeesRaw = prevPrev ? prev.totalFees - prevPrev.totalFees : null;
 
   const currentSpotFeesRaw = last.totalSpotFees - prev.totalSpotFees;
   const previousSpotFeesRaw = prevPrev

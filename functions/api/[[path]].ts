@@ -87,7 +87,9 @@ async function fetchJson(url: string, options?: RequestInit) {
 
     if ((status === 429 || status >= 500) && attempt < 5) {
       const baseDelayMs = 500 * 2 ** attempt;
-      const retryAfterMs = retryAfter ? Math.max(0, Number(retryAfter) * 1000) : 0;
+      const retryAfterMs = retryAfter
+        ? Math.max(0, Number(retryAfter) * 1000)
+        : 0;
       const delayMs = Math.min(8000, Math.max(baseDelayMs, retryAfterMs));
       await new Promise((r) => setTimeout(r, delayMs));
       attempt += 1;
@@ -196,7 +198,11 @@ async function fetchUserFillsByTimeBackfill(opts: {
   const maxWindowMs = 7 * 24 * 60 * 60 * 1000; // 7 days
   let guard = 0;
 
-  while (cursorEnd > opts.startTime && out.length < opts.maxItems && guard++ < 200) {
+  while (
+    cursorEnd > opts.startTime &&
+    out.length < opts.maxItems &&
+    guard++ < 200
+  ) {
     const windowStart = Math.max(opts.startTime, cursorEnd - windowMs);
     const batch = await fetchInfo({
       type: "userFillsByTime",
@@ -222,7 +228,8 @@ async function fetchUserFillsByTimeBackfill(opts: {
     cursorEnd = windowStart;
 
     if (items.length < 250) windowMs = Math.min(maxWindowMs, windowMs * 2);
-    else if (items.length >= FILLS_PAGE_LIMIT) windowMs = Math.max(minWindowMs, Math.floor(windowMs / 2));
+    else if (items.length >= FILLS_PAGE_LIMIT)
+      windowMs = Math.max(minWindowMs, Math.floor(windowMs / 2));
   }
 
   return out;
@@ -299,7 +306,11 @@ async function handleFills(address: string, url: URL, bypassCache: boolean) {
   return jsonResponse({ address, days, items: liquidations });
 }
 
-async function handleUserFills(address: string, url: URL, bypassCache: boolean) {
+async function handleUserFills(
+  address: string,
+  url: URL,
+  bypassCache: boolean,
+) {
   const days = Math.min(
     180,
     Math.max(1, Number(url.searchParams.get("days") ?? "30")),
@@ -352,9 +363,7 @@ async function handleUserFills(address: string, url: URL, bypassCache: boolean) 
       const t = fillSortTimeMs(f);
       return t >= queryStartTime && t <= now;
     })
-    .sort(
-    (a: any, b: any) => fillSortTimeMs(b) - fillSortTimeMs(a),
-  );
+    .sort((a: any, b: any) => fillSortTimeMs(b) - fillSortTimeMs(a));
   const range = computeFillRangeMs(items);
   const minTime = range?.startTime ?? null;
   const hasMore =
@@ -388,7 +397,10 @@ async function handleUserFills(address: string, url: URL, bypassCache: boolean) 
         status: statusObj?.status ?? null,
       };
     })
-    .filter((t: any) => Number.isFinite(t.time) && t.time >= queryStartTime && t.time <= now)
+    .filter(
+      (t: any) =>
+        Number.isFinite(t.time) && t.time >= queryStartTime && t.time <= now,
+    )
     .sort((a: any, b: any) => b.time - a.time);
 
   return jsonResponse({
@@ -415,14 +427,20 @@ async function handleSpotState(address: string, bypassCache: boolean) {
     key,
     positionsTtlMs,
     async () => {
-      const [masterSpot, subs, stakingSummary, stakingDelegations] = await Promise.all([
-        fetchInfo({ type: "spotClearinghouseState", user: address }),
-        fetchInfo({ type: "subAccounts", user: address }).catch(() => []),
-        fetchInfo({ type: "delegatorSummary", user: address }).catch(() => null),
-        fetchInfo({ type: "delegations", user: address }).catch(() => []),
-      ]);
+      const [masterSpot, subs, stakingSummary, stakingDelegations] =
+        await Promise.all([
+          fetchInfo({ type: "spotClearinghouseState", user: address }),
+          fetchInfo({ type: "subAccounts", user: address }).catch(() => []),
+          fetchInfo({ type: "delegatorSummary", user: address }).catch(
+            () => null,
+          ),
+          fetchInfo({ type: "delegations", user: address }).catch(() => []),
+        ]);
 
-      const aggregate = new Map<string, { coin: string; total: number; hold: number }>();
+      const aggregate = new Map<
+        string,
+        { coin: string; total: number; hold: number }
+      >();
 
       function addBalances(list: any[]) {
         for (const b of list ?? []) {
@@ -443,7 +461,12 @@ async function handleSpotState(address: string, bypassCache: boolean) {
         addBalances(sub?.spotState?.balances);
       }
 
-      const extras: Array<{ coin: string; total: number; hold: number; kind: string }> = [];
+      const extras: Array<{
+        coin: string;
+        total: number;
+        hold: number;
+        kind: string;
+      }> = [];
       const delegated = Number((stakingSummary as any)?.delegated ?? 0);
       if (Number.isFinite(delegated) && delegated > 0) {
         extras.push({
@@ -461,7 +484,9 @@ async function handleSpotState(address: string, bypassCache: boolean) {
         stakingSummary,
         stakingDelegations,
         balances: [
-          ...Array.from(aggregate.values()).sort((a, b) => a.coin.localeCompare(b.coin)),
+          ...Array.from(aggregate.values()).sort((a, b) =>
+            a.coin.localeCompare(b.coin),
+          ),
           ...extras,
         ],
       };
@@ -612,9 +637,7 @@ async function handleFees24h(bypassCache: boolean) {
   const prevPrev = points.length >= 3 ? points[points.length - 3] : null;
 
   const currentFeesRaw = last.totalFees - prev.totalFees;
-  const previousFeesRaw = prevPrev
-    ? prev.totalFees - prevPrev.totalFees
-    : null;
+  const previousFeesRaw = prevPrev ? prev.totalFees - prevPrev.totalFees : null;
 
   const currentSpotFeesRaw = last.totalSpotFees - prev.totalSpotFees;
   const previousSpotFeesRaw = prevPrev

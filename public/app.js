@@ -25,6 +25,9 @@ const LEADERBOARD_LIMIT = 5000;
 const TOP_POSITIONS_LIMIT = 30;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const TOP_POSITIONS_CACHE_KEY = "hl-top-positions:v2";
+const SHARED_TOP_WALLETS_CACHE_KEY = "hl-top-wallets:v1";
+const SHARED_POSITIONS_CACHE_KEY = "hl-top-wallet-positions:v1";
+const SHARED_CACHE_TTL_MS = DAY_MS;
 const TOP_POSITIONS_CACHE_TTL_MS = DAY_MS;
 const POSITION_CACHE_TTL_MS = DAY_MS;
 
@@ -62,6 +65,9 @@ const compactFormatter = new Intl.NumberFormat("en-US", {
   compactDisplay: "short",
   maximumFractionDigits: 2,
 });
+
+let sharedPositionsCache = null;
+let sharedPositionsFlushTimer = null;
 
 function setText(element, value) {
   if (!element) return;
@@ -321,6 +327,110 @@ function clearTopPositionsCache() {
   }
 }
 
+function readSharedTopWalletsCache() {
+  try {
+    const raw = localStorage.getItem(SHARED_TOP_WALLETS_CACHE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch (error) {
+    return null;
+  }
+}
+
+function writeSharedTopWalletsCache(cache) {
+  try {
+    localStorage.setItem(SHARED_TOP_WALLETS_CACHE_KEY, JSON.stringify(cache));
+  } catch (error) {
+    // Ignore storage failures.
+  }
+}
+
+function getCachedTopWallets(limit) {
+  const cache = readSharedTopWalletsCache();
+  if (!cache?.updatedAt) return null;
+  if (Date.now() - cache.updatedAt > SHARED_CACHE_TTL_MS) return null;
+  if (cache.limit !== limit) return null;
+  return Array.isArray(cache.rows) ? cache : null;
+}
+
+function setCachedTopWallets(limit, rows) {
+  writeSharedTopWalletsCache({
+    version: 1,
+    updatedAt: Date.now(),
+    limit,
+    rows,
+  });
+}
+
+function readSharedPositionsCache() {
+  try {
+    const raw = localStorage.getItem(SHARED_POSITIONS_CACHE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch (error) {
+    return null;
+  }
+}
+
+function getSharedPositionsCache() {
+  if (sharedPositionsCache) return sharedPositionsCache;
+  const cache = readSharedPositionsCache();
+  sharedPositionsCache =
+    cache && typeof cache === "object" && cache.entries
+      ? cache
+      : { version: 1, entries: {} };
+  sharedPositionsCache.entries = sharedPositionsCache.entries ?? {};
+  return sharedPositionsCache;
+}
+
+function scheduleSharedPositionsFlush() {
+  if (sharedPositionsFlushTimer) return;
+  sharedPositionsFlushTimer = setTimeout(() => {
+    sharedPositionsFlushTimer = null;
+    try {
+      const cache = getSharedPositionsCache();
+      const now = Date.now();
+      const topWallets = new Set(
+        state.rows
+          .slice(0, LEADERBOARD_LIMIT)
+          .map((row) => row?.ethAddress)
+          .filter(Boolean),
+      );
+      Object.keys(cache.entries).forEach((address) => {
+        const entry = cache.entries[address];
+        const isExpired =
+          !entry?.updatedAt || now - entry.updatedAt > SHARED_CACHE_TTL_MS;
+        const isOutsideTop =
+          topWallets.size > 0 && !topWallets.has(String(address));
+        if (isExpired || isOutsideTop) {
+          delete cache.entries[address];
+        }
+      });
+      localStorage.setItem(SHARED_POSITIONS_CACHE_KEY, JSON.stringify(cache));
+    } catch (error) {
+      // Ignore storage failures.
+    }
+  }, 250);
+}
+
+function getSharedCachedPosition(address) {
+  const cache = getSharedPositionsCache();
+  const entry = cache.entries[address];
+  if (!entry) return null;
+  if (Date.now() - entry.updatedAt > SHARED_CACHE_TTL_MS) {
+    delete cache.entries[address];
+    scheduleSharedPositionsFlush();
+    return null;
+  }
+  return entry.data ?? null;
+}
+
+function setSharedCachedPosition(address, data) {
+  const cache = getSharedPositionsCache();
+  cache.entries[address] = { updatedAt: Date.now(), data };
+  scheduleSharedPositionsFlush();
+}
+
 function getCachedPositions(address) {
   const entry = state.positionsCache.get(address);
   if (!entry) return null;
@@ -333,6 +443,7 @@ function getCachedPositions(address) {
 
 function setCachedPositions(address, data) {
   state.positionsCache.set(address, { data, updatedAt: Date.now() });
+  setSharedCachedPosition(address, data);
 }
 
 function getCachedTopPositions(asset) {
@@ -534,13 +645,19 @@ async function getPositions(address, options = {}) {
   if (!refresh) {
     const cached = getCachedPositions(address);
     if (cached) return cached;
+    const shared = getSharedCachedPosition(address);
+    if (shared) {
+      state.positionsCache.set(address, { data: shared, updatedAt: Date.now() });
+      return shared;
+    }
   }
   const data = await fetchJson(`/api/positions/${address}`, { refresh });
   setCachedPositions(address, data);
   return data;
 }
 
-function collectCachedPositions(rows, asset) {
+function collectCachedPositions(rows, asset, options = {}) {
+  const allowShared = options.allowShared === true;
   const entries = [];
   const pending = [];
   let checked = 0;
@@ -549,8 +666,16 @@ function collectCachedPositions(rows, asset) {
     const address = row.ethAddress;
     if (!address) return;
     const data = getCachedPositions(address);
-    if (data) {
-      getAssetPositions(data, asset).forEach((position) => {
+    const sharedData = !data && allowShared ? getSharedCachedPosition(address) : null;
+    const resolved = data ?? sharedData;
+    if (sharedData) {
+      state.positionsCache.set(address, {
+        data: sharedData,
+        updatedAt: Date.now(),
+      });
+    }
+    if (resolved) {
+      getAssetPositions(resolved, asset).forEach((position) => {
         entries.push(createPositionEntry(row, position));
       });
       checked += 1;
@@ -583,6 +708,7 @@ async function scanTopPositions(options = {}) {
   const { entries, checked, pending } = collectCachedPositions(
     state.rows,
     asset,
+    { allowShared: !refresh },
   );
   state.topPositions = entries;
   state.assetScanChecked = checked;
@@ -627,20 +753,38 @@ async function scanTopPositions(options = {}) {
   state.assetScanLoading = false;
   state.topPositions = entries.slice();
   setCachedTopPositions(asset, state.topPositions);
+  scheduleSharedPositionsFlush();
   updateAssetStatus();
   renderTopPositions();
 }
 
 async function loadLeaderboard(options = {}) {
   setTableMessage(ui.leaderboardBody, "Loading accounts...", 7);
+  const refresh = options.refresh === true;
+  if (!refresh) {
+    const cached = getCachedTopWallets(LEADERBOARD_LIMIT);
+    if (cached) {
+      state.rows = Array.isArray(cached.rows) ? cached.rows : [];
+      state.updatedAt = cached.updatedAt ?? Date.now();
+      setText(
+        ui.leaderboardUpdated,
+        new Date(state.updatedAt).toLocaleTimeString(),
+      );
+      if (!applyCachedTopPositions(state.asset)) {
+        scanTopPositions();
+      }
+      return;
+    }
+  }
+
   try {
-    const refresh = options.refresh === true;
     const data = await fetchJson(
       `/api/leaderboard?limit=${LEADERBOARD_LIMIT}`,
       { refresh },
     );
     state.rows = Array.isArray(data.rows) ? data.rows : [];
     state.updatedAt = data.updatedAt ?? Date.now();
+    setCachedTopWallets(LEADERBOARD_LIMIT, state.rows);
     setText(
       ui.leaderboardUpdated,
       new Date(state.updatedAt).toLocaleTimeString(),

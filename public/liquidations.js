@@ -23,8 +23,9 @@ const CLUSTER_PRICE_MAX = 100;
 const POSITION_SCAN_CONCURRENCY = 8;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const POSITION_CACHE_TTL_MS = DAY_MS;
-const LEADERBOARD_CACHE_KEY = "hl-liquidations-leaderboard:v1";
-const LEADERBOARD_CACHE_TTL_MS = DAY_MS;
+const SHARED_TOP_WALLETS_CACHE_KEY = "hl-top-wallets:v1";
+const SHARED_POSITIONS_CACHE_KEY = "hl-top-wallet-positions:v1";
+const SHARED_CACHE_TTL_MS = DAY_MS;
 const LIQUIDATION_POINTS_CACHE_KEY = "hl-liquidations-points:v1";
 const LIQUIDATION_POINTS_CACHE_TTL_MS = DAY_MS;
 const SETTINGS_KEY = "hl-settings:v1";
@@ -71,6 +72,9 @@ const SHORT_COLOR = { r: 229, g: 107, b: 59 };
 const LONG_COLOR = { r: 31, g: 127, b: 109 };
 const LIGHT_COLOR = { r: 255, g: 255, b: 255 };
 const DARK_COLOR = { r: 0, g: 0, b: 0 };
+
+let sharedPositionsCache = null;
+let sharedPositionsFlushTimer = null;
 
 function setText(element, value) {
   if (!element) return;
@@ -153,7 +157,7 @@ function setTableMessage(tbody, message, colSpan) {
 
 function readLeaderboardCache() {
   try {
-    const raw = localStorage.getItem(LEADERBOARD_CACHE_KEY);
+    const raw = localStorage.getItem(SHARED_TOP_WALLETS_CACHE_KEY);
     if (!raw) return null;
     return JSON.parse(raw);
   } catch (error) {
@@ -163,7 +167,7 @@ function readLeaderboardCache() {
 
 function writeLeaderboardCache(cache) {
   try {
-    localStorage.setItem(LEADERBOARD_CACHE_KEY, JSON.stringify(cache));
+    localStorage.setItem(SHARED_TOP_WALLETS_CACHE_KEY, JSON.stringify(cache));
   } catch (error) {
     // Ignore storage failures (private mode, quota, etc).
   }
@@ -172,7 +176,7 @@ function writeLeaderboardCache(cache) {
 function getCachedLeaderboard(limit) {
   const cache = readLeaderboardCache();
   if (!cache?.updatedAt) return null;
-  if (Date.now() - cache.updatedAt > LEADERBOARD_CACHE_TTL_MS) return null;
+  if (Date.now() - cache.updatedAt > SHARED_CACHE_TTL_MS) return null;
   if (cache.limit !== limit) return null;
   return Array.isArray(cache.rows) ? cache.rows : null;
 }
@@ -184,6 +188,75 @@ function setCachedLeaderboard(limit, rows) {
     limit,
     rows,
   });
+}
+
+function readSharedPositionsCache() {
+  try {
+    const raw = localStorage.getItem(SHARED_POSITIONS_CACHE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch (error) {
+    return null;
+  }
+}
+
+function getSharedPositionsCache() {
+  if (sharedPositionsCache) return sharedPositionsCache;
+  const cache = readSharedPositionsCache();
+  sharedPositionsCache =
+    cache && typeof cache === "object" && cache.entries
+      ? cache
+      : { version: 1, entries: {} };
+  sharedPositionsCache.entries = sharedPositionsCache.entries ?? {};
+  return sharedPositionsCache;
+}
+
+function scheduleSharedPositionsFlush() {
+  if (sharedPositionsFlushTimer) return;
+  sharedPositionsFlushTimer = setTimeout(() => {
+    sharedPositionsFlushTimer = null;
+    try {
+      const cache = getSharedPositionsCache();
+      const now = Date.now();
+      const topWallets = new Set(
+        state.rows
+          .slice(0, state.leaderboardLimit)
+          .map((row) => row?.ethAddress)
+          .filter(Boolean),
+      );
+      Object.keys(cache.entries).forEach((address) => {
+        const entry = cache.entries[address];
+        const isExpired =
+          !entry?.updatedAt || now - entry.updatedAt > SHARED_CACHE_TTL_MS;
+        const isOutsideTop =
+          topWallets.size > 0 && !topWallets.has(String(address));
+        if (isExpired || isOutsideTop) {
+          delete cache.entries[address];
+        }
+      });
+      localStorage.setItem(SHARED_POSITIONS_CACHE_KEY, JSON.stringify(cache));
+    } catch (error) {
+      // Ignore storage failures.
+    }
+  }, 250);
+}
+
+function getSharedCachedPosition(address) {
+  const cache = getSharedPositionsCache();
+  const entry = cache.entries[address];
+  if (!entry) return null;
+  if (Date.now() - entry.updatedAt > SHARED_CACHE_TTL_MS) {
+    delete cache.entries[address];
+    scheduleSharedPositionsFlush();
+    return null;
+  }
+  return entry.data ?? null;
+}
+
+function setSharedCachedPosition(address, data) {
+  const cache = getSharedPositionsCache();
+  cache.entries[address] = { updatedAt: Date.now(), data };
+  scheduleSharedPositionsFlush();
 }
 
 function readPointsCache() {
@@ -653,6 +726,7 @@ function getCachedPositions(address) {
 
 function setCachedPositions(address, data) {
   state.positionsCache.set(address, { data, updatedAt: Date.now() });
+  setSharedCachedPosition(address, data);
 }
 
 async function getPositions(address, options = {}) {
@@ -660,6 +734,11 @@ async function getPositions(address, options = {}) {
   if (!refresh) {
     const cached = getCachedPositions(address);
     if (cached) return cached;
+    const shared = getSharedCachedPosition(address);
+    if (shared) {
+      state.positionsCache.set(address, { data: shared, updatedAt: Date.now() });
+      return shared;
+    }
   }
   const data = await fetchJson(`/api/positions/${address}`, { refresh });
   setCachedPositions(address, data);
@@ -761,8 +840,16 @@ async function scanPositions(options = {}) {
     const address = row.ethAddress;
     if (!address) return;
     const data = getCachedPositions(address);
-    if (data) {
-      points.push(...extractPoints(data));
+    const sharedData = !data && !force ? getSharedCachedPosition(address) : null;
+    const resolved = data ?? sharedData;
+    if (sharedData) {
+      state.positionsCache.set(address, {
+        data: sharedData,
+        updatedAt: Date.now(),
+      });
+    }
+    if (resolved) {
+      points.push(...extractPoints(resolved));
       state.scanChecked += 1;
     } else {
       pending.push(address);
@@ -815,6 +902,7 @@ async function scanPositions(options = {}) {
   state.points = points.slice();
   state.lastUpdated = Date.now();
   setCachedPoints(limit, state.points, state.scanTotal);
+  scheduleSharedPositionsFlush();
   updateScanStatus();
   renderAll();
 }

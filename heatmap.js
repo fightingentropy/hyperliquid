@@ -71,35 +71,36 @@ function layoutTreemapRow(row, rect, out) {
   const totalArea = row.reduce((sum, node) => sum + node.area, 0);
   if (!row.length || totalArea <= 0) return rect;
 
+  // Strip orientation must follow the shorter side.
+  // For wide canvases, place a vertical column first (not a full-width row).
   if (rect.w >= rect.h) {
-    const rowHeight = rect.w > 0 ? totalArea / rect.w : 0;
-    let cursorX = rect.x;
+    const colWidth = rect.h > 0 ? totalArea / rect.h : 0;
+    let cursorY = rect.y;
     for (const node of row) {
-      const itemWidth = rowHeight > 0 ? node.area / rowHeight : 0;
-      out.push({ row: node.row, x: cursorX, y: rect.y, w: itemWidth, h: rowHeight });
-      cursorX += itemWidth;
+      const itemHeight = colWidth > 0 ? node.area / colWidth : 0;
+      out.push({ row: node.row, x: rect.x, y: cursorY, w: colWidth, h: itemHeight });
+      cursorY += itemHeight;
     }
     return {
-      x: rect.x,
-      y: rect.y + rowHeight,
-      w: rect.w,
-      h: Math.max(0, rect.h - rowHeight),
+      x: rect.x + colWidth,
+      y: rect.y,
+      w: Math.max(0, rect.w - colWidth),
+      h: rect.h,
     };
   }
 
-  const colWidth = rect.h > 0 ? totalArea / rect.h : 0;
-  let cursorY = rect.y;
+  const rowHeight = rect.w > 0 ? totalArea / rect.w : 0;
+  let cursorX = rect.x;
   for (const node of row) {
-    const itemHeight = colWidth > 0 ? node.area / colWidth : 0;
-    out.push({ row: node.row, x: rect.x, y: cursorY, w: colWidth, h: itemHeight });
-    cursorY += itemHeight;
+    const itemWidth = rowHeight > 0 ? node.area / rowHeight : 0;
+    out.push({ row: node.row, x: cursorX, y: rect.y, w: itemWidth, h: rowHeight });
+    cursorX += itemWidth;
   }
-
   return {
-    x: rect.x + colWidth,
-    y: rect.y,
-    w: Math.max(0, rect.w - colWidth),
-    h: rect.h,
+    x: rect.x,
+    y: rect.y + rowHeight,
+    w: rect.w,
+    h: Math.max(0, rect.h - rowHeight),
   };
 }
 
@@ -172,7 +173,8 @@ function renderHeatmap() {
 
   rows = rows
     .slice()
-    .sort((a, b) => (b.openInterestUsd ?? -Infinity) - (a.openInterestUsd ?? -Infinity));
+    .sort((a, b) => (b.openInterestUsd ?? -Infinity) - (a.openInterestUsd ?? -Infinity))
+    .slice(0, 80);
 
   if (!rows.length) {
     heatmapUi.grid.innerHTML = '<div class="muted">No matching markets</div>';
@@ -204,10 +206,12 @@ function renderHeatmap() {
 
       const compact = tileWidth < 130 || tileHeight < 100;
       const tiny = tileWidth < 95 || tileHeight < 72;
+      const micro = tileWidth < 62 || tileHeight < 44;
 
       const classes = ["heatmap-tile"];
       if (compact) classes.push("compact");
       if (tiny) classes.push("tiny");
+      if (micro) classes.push("micro");
 
       return `<a class="${classes.join(" ")}" href="${href}" style="left:${x + HEATMAP_TILE_GAP / 2}px;top:${y + HEATMAP_TILE_GAP / 2}px;width:${tileWidth}px;height:${tileHeight}px;background:${color}">
         <div class="heatmap-symbol">${row.base}</div>

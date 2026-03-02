@@ -1652,6 +1652,19 @@ a.ghost {
     display: none;
 }
 
+.heatmap-tile.tiny .heatmap-value {
+    font-size: 0.84rem;
+}
+
+.heatmap-tile.micro .heatmap-value,
+.heatmap-tile.micro .heatmap-meta {
+    display: none;
+}
+
+.heatmap-tile.micro .heatmap-symbol {
+    font-size: 0.72rem;
+}
+
 .heatmap-grid > .muted {
     position: absolute;
     inset: 0;

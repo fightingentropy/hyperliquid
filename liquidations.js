@@ -29,6 +29,7 @@ const SHARED_CACHE_TTL_MS = DAY_MS;
 const LIQUIDATION_POINTS_CACHE_KEY = "hl-liquidations-points:v1";
 const LIQUIDATION_POINTS_CACHE_TTL_MS = DAY_MS;
 const SETTINGS_KEY = "hl-settings:v1";
+const AXIS_TICK_STEP = 10;
 const DEFAULT_SETTINGS = {
   showBinSize: false,
   binPercent: 0.005,
@@ -588,13 +589,30 @@ function renderAxisTicks(min, max, tickCount = 5) {
     return;
   }
   const range = max - min;
-  for (let index = 0; index < tickCount; index += 1) {
-    const fraction = tickCount === 1 ? 0 : index / (tickCount - 1);
-    const value = min + range * fraction;
+  const tickValues = [];
+  if (range > AXIS_TICK_STEP) {
+    tickValues.push(min);
+    let value = Math.ceil(min / AXIS_TICK_STEP) * AXIS_TICK_STEP;
+    while (value < max) {
+      const rounded = Number(value.toFixed(6));
+      if (rounded > min && rounded < max) {
+        tickValues.push(rounded);
+      }
+      value += AXIS_TICK_STEP;
+    }
+    tickValues.push(max);
+  } else {
+    for (let index = 0; index < tickCount; index += 1) {
+      const fraction = tickCount === 1 ? 0 : index / (tickCount - 1);
+      const value = min + range * fraction;
+      tickValues.push(value);
+    }
+  }
+  tickValues.forEach((value) => {
     const tick = document.createElement("span");
     tick.textContent = formatAxisPrice(value);
     ui.axis.appendChild(tick);
-  }
+  });
 }
 
 function renderClusters(clusterData) {

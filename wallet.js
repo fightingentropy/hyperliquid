@@ -10,6 +10,9 @@
   const FOLLOWED_WALLETS_KEY = "hl-followed-wallets-v1";
   const DEFAULT_FOLLOWED_WALLETS = [
     "0xaf0fdd39e5d92499b0ed9f68693da99c0ec1e92e",
+    "0x8def9f50456c6c4e37fa5d3d57f108ed23992dae",
+    "0xcb58b8f5ec6d47985f0728465c25a08ef9ad2c7b",
+    "0xadd12adbbd5db87674b38af99b6dd34dd2a45e0d",
   ];
 
   const ui = {
@@ -156,23 +159,34 @@
     }
   }
 
+  function normalizeWalletList(candidates) {
+    const seen = new Set();
+    const wallets = [];
+    for (const candidate of candidates ?? []) {
+      const normalized = normalizeAddress(candidate);
+      if (!normalized || seen.has(normalized)) continue;
+      seen.add(normalized);
+      wallets.push(normalized);
+    }
+    return wallets;
+  }
+
   function loadFollowedWallets() {
+    const defaults = normalizeWalletList(DEFAULT_FOLLOWED_WALLETS);
     try {
       const raw = localStorage.getItem(FOLLOWED_WALLETS_KEY);
-      if (!raw) return DEFAULT_FOLLOWED_WALLETS.slice();
+      if (!raw) return defaults.slice();
       const parsed = JSON.parse(raw);
-      if (!Array.isArray(parsed)) return DEFAULT_FOLLOWED_WALLETS.slice();
-      const seen = new Set();
-      const wallets = [];
-      for (const candidate of parsed) {
-        const normalized = normalizeAddress(candidate);
-        if (!normalized || seen.has(normalized)) continue;
-        seen.add(normalized);
-        wallets.push(normalized);
+      if (!Array.isArray(parsed)) return defaults.slice();
+      const wallets = normalizeWalletList(parsed);
+      if (!wallets.length) return defaults.slice();
+
+      for (const wallet of defaults) {
+        if (!wallets.includes(wallet)) wallets.push(wallet);
       }
-      return wallets.length ? wallets : DEFAULT_FOLLOWED_WALLETS.slice();
+      return wallets;
     } catch {
-      return DEFAULT_FOLLOWED_WALLETS.slice();
+      return defaults.slice();
     }
   }
 

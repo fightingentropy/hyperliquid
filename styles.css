@@ -1014,6 +1014,212 @@ a.ghost {
     border-top: 1px solid var(--panel-border);
 }
 
+/* Shared blue shell used by Liquidations + static analytics pages. */
+.app-shell-page {
+    background:
+        radial-gradient(
+            circle at 18% -10%,
+            rgba(33, 112, 181, 0.22),
+            transparent 40%
+        ),
+        radial-gradient(
+            circle at 86% -12%,
+            rgba(46, 207, 208, 0.1),
+            transparent 34%
+        ),
+        #070c14;
+}
+
+.app-shell-page .top-nav {
+    padding: 12px 24px;
+    border-bottom: 1px solid #1b2635;
+    background: #0b111af0;
+}
+
+.app-shell-page .brand {
+    border-color: #24354a;
+    background: #0d1521;
+    color: #d5ebff;
+    letter-spacing: 0.02em;
+    text-transform: none;
+}
+
+.app-shell-page .nav-links {
+    background: #0d1521;
+    border-color: #24354a;
+}
+
+.app-shell-page .nav-link {
+    color: #90a5c3;
+}
+
+.app-shell-page .nav-link:hover {
+    border-color: #33506f;
+    color: #c7d8ed;
+    background: #162231;
+}
+
+.app-shell-page .nav-link.active {
+    border-color: #365877;
+    background: #1c2d41;
+    color: #e6edf7;
+    box-shadow: inset 0 0 0 1px rgba(19, 130, 201, 0.35);
+}
+
+.app-shell-page .hero {
+    margin: 12px 24px 10px;
+    padding: 22px 26px;
+    border: 1px solid #1b2635;
+    border-radius: 10px;
+    background:
+        linear-gradient(120deg, rgba(10, 45, 83, 0.46), rgba(2, 12, 34, 0.7)),
+        #070c14;
+    align-items: stretch;
+}
+
+.app-shell-page .hero-content {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.app-shell-page .eyebrow {
+    color: #7086a5;
+    margin-bottom: 8px;
+}
+
+.app-shell-page h1 {
+    color: #e6edf7;
+    font-size: clamp(1.5rem, 2.2vw, 2.05rem);
+}
+
+.app-shell-page .hero-actions {
+    margin-top: 16px;
+}
+
+.app-shell-page .hero-metrics {
+    min-width: 220px;
+    padding: 14px;
+    gap: 10px;
+    border: 1px solid #1b2635;
+    border-radius: 10px;
+    background: #0b121cd6;
+    box-shadow: none;
+}
+
+.app-shell-page .metric .label {
+    color: #7086a5;
+}
+
+.app-shell-page .metric .value {
+    color: #e6edf7;
+}
+
+.app-shell-page .layout {
+    gap: 10px;
+    padding: 0 24px 20px;
+}
+
+.app-shell-page .panel {
+    padding: 0;
+    gap: 0;
+    border: 1px solid #1b2635;
+    border-radius: 10px;
+    background: #070c14;
+    box-shadow: none;
+    overflow: hidden;
+}
+
+.app-shell-page .panel-header {
+    padding: 14px 16px;
+    align-items: center;
+    border-bottom: 1px solid #1b2635;
+}
+
+.app-shell-page .panel h2,
+.app-shell-page .panel h3 {
+    color: #e6edf7;
+}
+
+.app-shell-page .chart-shell,
+.app-shell-page .detail-section {
+    margin: 0 16px 12px;
+}
+
+.app-shell-page .chart-shell {
+    background: #0b121c;
+    border-color: #1b2635;
+    padding: 12px;
+}
+
+.app-shell-page .chart-axis,
+.app-shell-page .chart-legend,
+.app-shell-page .muted {
+    color: #90a5c3;
+}
+
+.app-shell-page .segmented button {
+    color: #90a5c3;
+}
+
+.app-shell-page .segmented {
+    background: #0b121c;
+    border-color: #1b2635;
+}
+
+.app-shell-page .segmented button:hover {
+    color: #e6edf7;
+    background: #1c2d41;
+}
+
+.app-shell-page .segmented button.active {
+    border-color: #3d5f82;
+    background: #1c2d41;
+    color: #d7e3f2;
+}
+
+.app-shell-page .primary {
+    background: #1c2d41;
+    border-color: #3d5f82;
+    color: #e6edf7;
+    letter-spacing: 0.08em;
+}
+
+.app-shell-page .primary:hover {
+    background: #2a415a;
+}
+
+.app-shell-page .table-wrap,
+.app-shell-page .stat {
+    background: #0b121c;
+    border-color: #1b2635;
+}
+
+.app-shell-page th {
+    background: #111a27;
+    color: #7b8ea9;
+}
+
+.app-shell-page td {
+    color: #d5e1f0;
+}
+
+.app-shell-page .pill {
+    border-color: rgba(255, 96, 106, 0.45);
+    background: rgba(255, 96, 106, 0.14);
+    color: #f0c9d0;
+}
+
+.app-shell-page .range-control input {
+    accent-color: #2ecfd0;
+}
+
+.app-shell-page .footer {
+    border-top-color: #1b2635;
+    color: #7b8ea9;
+    padding: 12px 24px 18px;
+}
+
 /* Liquidations page: align with blue dashboard style */
 .liquidations-page {
     background:
@@ -1518,6 +1724,19 @@ a.ghost {
 
     .hero {
         padding: 28px 6vw 22px;
+    }
+
+    .app-shell-page .top-nav {
+        padding: 10px 12px;
+    }
+
+    .app-shell-page .hero {
+        margin: 10px 12px;
+        padding: 16px;
+    }
+
+    .app-shell-page .layout {
+        padding: 0 12px 14px;
     }
 
     .liquidations-page .hero {

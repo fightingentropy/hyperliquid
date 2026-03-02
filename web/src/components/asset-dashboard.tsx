@@ -404,7 +404,7 @@ function CandlestickView({ candles }: { candles: Candle[] }) {
       layout: {
         background: {
           type: ColorType.Solid,
-          color: "#10141b",
+          color: "rgba(16, 19, 24, 0)",
         },
         textColor: "#95a2b2",
       },
@@ -413,10 +413,10 @@ function CandlestickView({ candles }: { candles: Candle[] }) {
         horzLines: { color: "rgba(60, 68, 79, 0.45)" },
       },
       rightPriceScale: {
-        borderColor: "#323b47",
+        borderColor: "rgba(0, 0, 0, 0)",
       },
       timeScale: {
-        borderColor: "#323b47",
+        borderColor: "rgba(0, 0, 0, 0)",
         rightOffset: RIGHT_LOGICAL_PADDING,
       },
       crosshair: {
@@ -830,7 +830,7 @@ export function AssetDashboardPage() {
       <div className="asset-page-content">
         <div className="asset-grid grid h-full min-h-0 gap-2">
         <Card className="asset-panel flex min-h-0 flex-col overflow-hidden">
-          <CardHeader className="border-b border-[#2c333d] p-2.5">
+          <CardHeader className="px-2.5 pb-2 pt-2.5">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex min-w-0 items-center gap-3">
                 <a
@@ -917,7 +917,7 @@ export function AssetDashboardPage() {
         </Card>
 
         <Card className="asset-panel flex min-h-0 flex-col overflow-hidden">
-          <CardHeader className="border-b border-[#2c333d] p-2.5">
+          <CardHeader className="px-2.5 pb-2 pt-2.5">
             <CardTitle className="flex items-center justify-between text-sm uppercase tracking-[0.14em] text-[#a1afbe]">
               <span>Orderbook Depth</span>
               <Badge variant={bullish ? "positive" : "negative"}>
@@ -1005,7 +1005,7 @@ export function AssetDashboardPage() {
         </Card>
 
         <Card className="asset-panel flex min-h-0 flex-col overflow-hidden">
-          <CardHeader className="border-b border-[#2c333d] p-2.5">
+          <CardHeader className="px-2.5 pb-2 pt-2.5">
             <CardTitle className="flex items-center gap-2 text-sm uppercase tracking-[0.14em] text-[#a1afbe]">
               <Activity className="h-3.5 w-3.5 text-[#2ecfd0]" />
               Relative Strength
@@ -1129,7 +1129,7 @@ export function AssetDashboardPage() {
         </Card>
 
         <Card className="asset-panel flex min-h-0 flex-col overflow-hidden">
-          <CardHeader className="border-b border-[#2c333d] p-2.5">
+          <CardHeader className="px-2.5 pb-2 pt-2.5">
             <div className="flex items-center justify-between">
               <CardTitle className="text-sm uppercase tracking-[0.14em] text-[#a1afbe]">
                 Breakout Stats

@@ -2014,6 +2014,26 @@ a.ghost {
     border-color: rgba(76, 87, 102, 0.78);
 }
 
+/* Perpetuals should sit directly on the dotted canvas (no boxed shell). */
+.perpetuals-page .perpetuals-panel {
+    border: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+}
+
+.perpetuals-page .perpetuals-toolbar {
+    border-bottom: 0 !important;
+    background: transparent !important;
+    padding: 8px 0 10px;
+}
+
+.perpetuals-page .perpetuals-table-wrap {
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+}
+
 .heatmap-tile:hover {
     border-color: rgba(108, 121, 140, 0.94);
 }

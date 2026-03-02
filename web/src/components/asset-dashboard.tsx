@@ -18,7 +18,7 @@ import {
   type IChartApi,
   type UTCTimestamp,
 } from "lightweight-charts";
-import { Activity, ArrowLeft } from "lucide-react";
+import { Activity } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -861,35 +861,27 @@ export function AssetDashboardPage() {
         <Card className="asset-panel flex min-h-0 flex-col overflow-hidden">
           <CardHeader className="px-2.5 pb-2 pt-2.5">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex min-w-0 items-center gap-3">
-                <a
-                  href="/perpetuals"
-                  className="inline-flex h-7 w-7 items-center justify-center rounded-sm border border-[#3a4554] bg-[#1a212b] text-[#b0bccb] transition-colors hover:bg-[#27313d] hover:text-[#eef4fa]"
-                  aria-label="Go to Perpetuals Analytics"
-                  title="Perpetuals Analytics"
-                >
-                  <ArrowLeft className="h-3.5 w-3.5" />
-                </a>
+              <div className="asset-header-controls flex min-w-0 items-center gap-3">
                 <Tabs
                   value={timeframe}
                   onValueChange={(value: string) => setTimeframe(value as Timeframe)}
                 >
                   <div className="group relative">
-                    <TabsList className="h-7 w-[56px] gap-0.5 p-0.5">
-                      <TabsTrigger value={timeframe} className="px-2 py-0.5 text-[11px]">
+                    <TabsList className="asset-timeframe-tabs">
+                      <TabsTrigger value={timeframe} className="asset-timeframe-trigger">
                         {TIMEFRAMES.find((item) => item.key === timeframe)?.label}
                       </TabsTrigger>
                     </TabsList>
 
                     <div className="pointer-events-none absolute left-0 top-[calc(100%+4px)] z-40 opacity-0 transition-opacity duration-150 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
-                      <TabsList className="h-auto w-[56px] flex-col gap-0.5 p-0.5">
+                      <TabsList className="asset-timeframe-menu">
                         {orderedTimeframes
                           .filter((item) => item.key !== timeframe)
                           .map((item) => (
                             <TabsTrigger
                               key={item.key}
                               value={item.key}
-                              className="w-full px-2 py-0.5 text-[11px]"
+                              className="asset-timeframe-trigger asset-timeframe-menu-trigger"
                             >
                               {item.label}
                             </TabsTrigger>
@@ -907,7 +899,7 @@ export function AssetDashboardPage() {
                     id="asset-pair-select"
                     value={asset.pair}
                     onChange={(event) => handleAssetPairChange(event.target.value)}
-                    className="h-7 min-w-[92px] rounded-sm border border-[#3a4554] bg-[#1a212b] px-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#dbe5f1] outline-none transition-colors hover:bg-[#27313d] focus:border-[#5a687b]"
+                    className="asset-pair-select"
                   >
                     {assetPairOptions.map((pair) => (
                       <option key={pair} value={pair}>

@@ -210,10 +210,11 @@ textarea {
     text-transform: none;
     font-size: 0.78rem;
     color: var(--ink);
-    padding: 0.45rem 0.75rem;
-    border-radius: 10px;
-    border: 1px solid var(--panel-border);
-    background: var(--bg-elevated);
+    padding: 0.45rem 0;
+    border-radius: 0;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
     line-height: 1;
     white-space: nowrap;
 }
@@ -1843,8 +1844,9 @@ a.ghost {
 .app-shell-page .brand,
 .liquidations-page .brand,
 .perpetuals-page .brand {
-    border-color: #343d49;
-    background: rgba(18, 23, 29, 0.56);
+    border: 0;
+    background: transparent;
+    box-shadow: none;
     color: #edf1f7;
 }
 

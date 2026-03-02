@@ -18,11 +18,10 @@ import {
   type IChartApi,
   type UTCTimestamp,
 } from "lightweight-charts";
-import { Activity } from "lucide-react";
+import { Activity, ChevronDown, Search } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 
 type Timeframe = "1m" | "5m" | "15m" | "30m" | "1h" | "4h" | "1d" | "1w";
@@ -542,6 +541,11 @@ export function AssetDashboardPage() {
     typeof document !== "undefined" && document.visibilityState === "hidden";
 
   const [error, setError] = useState<string | null>(null);
+  const [symbolMenuOpen, setSymbolMenuOpen] = useState(false);
+  const [timeframeMenuOpen, setTimeframeMenuOpen] = useState(false);
+  const [symbolSearch, setSymbolSearch] = useState("");
+  const symbolDropdownRef = useRef<HTMLDivElement | null>(null);
+  const timeframeDropdownRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -553,6 +557,8 @@ export function AssetDashboardPage() {
     const normalized = toAssetContext(nextPair).pair;
     setAssetPair((prev) => (prev === normalized ? prev : normalized));
     setHoveredRelativeRow(null);
+    setSymbolSearch("");
+    setSymbolMenuOpen(false);
     setError(null);
   };
 
@@ -561,6 +567,38 @@ export function AssetDashboardPage() {
     if (!active) return TIMEFRAMES;
     return [active, ...TIMEFRAMES.filter((item) => item.key !== timeframe)];
   }, [timeframe]);
+
+  const timeframeLabel =
+    TIMEFRAMES.find((item) => item.key === timeframe)?.label ?? timeframe.toUpperCase();
+
+  useEffect(() => {
+    if (!symbolMenuOpen) {
+      setSymbolSearch("");
+    }
+  }, [symbolMenuOpen]);
+
+  useEffect(() => {
+    const onPointerDown = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (
+        symbolDropdownRef.current &&
+        !symbolDropdownRef.current.contains(target)
+      ) {
+        setSymbolMenuOpen(false);
+      }
+      if (
+        timeframeDropdownRef.current &&
+        !timeframeDropdownRef.current.contains(target)
+      ) {
+        setTimeframeMenuOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", onPointerDown);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -752,6 +790,16 @@ export function AssetDashboardPage() {
     const sorted = Array.from(options).sort((a, b) => a.localeCompare(b));
     return [asset.pair, ...sorted.filter((pair) => pair !== asset.pair)];
   }, [asset.pair, relative.symbols]);
+  const filteredAssetPairOptions = useMemo(() => {
+    const query = symbolSearch.trim().toUpperCase().replace(/\s+/g, "");
+    if (!query) return assetPairOptions.slice(0, 50);
+    return assetPairOptions
+      .filter((pair) => {
+        const symbol = pair.toUpperCase();
+        return symbol.includes(query) || symbol.replace("/", "").includes(query);
+      })
+      .slice(0, 50);
+  }, [assetPairOptions, symbolSearch]);
 
   const selectedStrengthKey = relative.symbols.includes(asset.relativeStrengthKey)
     ? asset.relativeStrengthKey
@@ -862,55 +910,111 @@ export function AssetDashboardPage() {
           <CardHeader className="px-2.5 pb-2 pt-2.5">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="asset-header-controls flex min-w-0 items-center gap-3">
-                <Tabs
-                  value={timeframe}
-                  onValueChange={(value: string) => setTimeframe(value as Timeframe)}
-                >
-                  <div className="group relative">
-                    <TabsList className="asset-timeframe-tabs">
-                      <TabsTrigger value={timeframe} className="asset-timeframe-trigger">
-                        {TIMEFRAMES.find((item) => item.key === timeframe)?.label}
-                      </TabsTrigger>
-                    </TabsList>
-
-                    <div className="pointer-events-none absolute left-0 top-[calc(100%+4px)] z-40 opacity-0 transition-opacity duration-150 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
-                      <TabsList className="asset-timeframe-menu">
-                        {orderedTimeframes
-                          .filter((item) => item.key !== timeframe)
-                          .map((item) => (
-                            <TabsTrigger
-                              key={item.key}
-                              value={item.key}
-                              className="asset-timeframe-trigger asset-timeframe-menu-trigger"
-                            >
-                              {item.label}
-                            </TabsTrigger>
-                          ))}
-                      </TabsList>
-                    </div>
-                  </div>
-                </Tabs>
-
-                <div className="flex min-w-0 items-center gap-2 overflow-hidden leading-none text-[#b2becc]">
-                  <label className="sr-only" htmlFor="asset-pair-select">
-                    Asset pair
-                  </label>
-                  <select
-                    id="asset-pair-select"
-                    value={asset.pair}
-                    onChange={(event) => handleAssetPairChange(event.target.value)}
-                    className="asset-pair-select"
+                <div ref={symbolDropdownRef} className="asset-inline-dropdown asset-inline-symbol">
+                  <button
+                    type="button"
+                    className="asset-inline-trigger asset-inline-trigger-symbol"
+                    onClick={() => {
+                      setSymbolMenuOpen((prev) => {
+                        const next = !prev;
+                        if (next) setTimeframeMenuOpen(false);
+                        return next;
+                      });
+                    }}
+                    aria-haspopup="listbox"
+                    aria-expanded={symbolMenuOpen}
                   >
-                    {assetPairOptions.map((pair) => (
-                      <option key={pair} value={pair}>
-                        {pair.replace("/USD", "")}
-                      </option>
-                    ))}
-                  </select>
-                  <span className="shrink-0 text-[22px] sm:text-[26px]">{asset.pair}</span>
-                  <span className="truncate text-[10px] uppercase tracking-[0.16em] text-[#8e9ba9]">
-                    Perpetual · {TIMEFRAMES.find((item) => item.key === timeframe)?.label}
-                  </span>
+                    <span className="asset-inline-text-main">{asset.pair}</span>
+                    <ChevronDown
+                      className={cn(
+                        "h-4 w-4 text-[#9ab0c7] transition-transform",
+                        symbolMenuOpen ? "rotate-180" : "",
+                      )}
+                    />
+                  </button>
+
+                  {symbolMenuOpen ? (
+                    <div className="asset-inline-menu asset-symbol-menu">
+                      <div className="asset-symbol-search-wrap">
+                        <Search className="asset-symbol-search-icon h-3.5 w-3.5" />
+                        <input
+                          type="search"
+                          value={symbolSearch}
+                          autoFocus
+                          onChange={(event) => setSymbolSearch(event.target.value)}
+                          placeholder="Search symbol"
+                          className="asset-symbol-search"
+                        />
+                      </div>
+                      <div className="asset-symbol-list" role="listbox" aria-label="Asset symbol">
+                        {filteredAssetPairOptions.length ? (
+                          filteredAssetPairOptions.map((pair) => (
+                            <button
+                              key={pair}
+                              type="button"
+                              className={cn(
+                                "asset-symbol-option",
+                                pair === asset.pair ? "active" : undefined,
+                              )}
+                              onClick={() => handleAssetPairChange(pair)}
+                            >
+                              {pair}
+                            </button>
+                          ))
+                        ) : (
+                          <div className="asset-symbol-empty">No symbols found</div>
+                        )}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+
+                <div
+                  ref={timeframeDropdownRef}
+                  className="asset-inline-dropdown asset-inline-market"
+                >
+                  <button
+                    type="button"
+                    className="asset-inline-trigger asset-inline-trigger-market"
+                    onClick={() => {
+                      setTimeframeMenuOpen((prev) => {
+                        const next = !prev;
+                        if (next) setSymbolMenuOpen(false);
+                        return next;
+                      });
+                    }}
+                    aria-haspopup="listbox"
+                    aria-expanded={timeframeMenuOpen}
+                  >
+                    <span className="asset-inline-text-sub">Perpetual · {timeframeLabel}</span>
+                    <ChevronDown
+                      className={cn(
+                        "h-4 w-4 text-[#9ab0c7] transition-transform",
+                        timeframeMenuOpen ? "rotate-180" : "",
+                      )}
+                    />
+                  </button>
+
+                  {timeframeMenuOpen ? (
+                    <div className="asset-inline-menu asset-market-menu">
+                      {orderedTimeframes.map((item) => (
+                        <button
+                          key={item.key}
+                          type="button"
+                          className={cn(
+                            "asset-market-option",
+                            item.key === timeframe ? "active" : undefined,
+                          )}
+                          onClick={() => {
+                            setTimeframe(item.key);
+                            setTimeframeMenuOpen(false);
+                          }}
+                        >
+                          Perpetual · {item.label}
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
               </div>
 

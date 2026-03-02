@@ -1,24 +1,9 @@
 / /asset/HYPE%2FUSD 302
 /favicon.ico /favicon.svg 200
 
-/about /about.html 200
-/about/ /about.html 200
-/heatmap /heatmap.html 200
-/heatmap/ /heatmap.html 200
-/liquidations /liquidations.html 200
-/liquidations/ /liquidations.html 200
-/perpetuals /perpetuals.html 200
-/perpetuals/ /perpetuals.html 200
-/settings /settings.html 200
-/settings/ /settings.html 200
-/unstaking /unstaking.html 200
-/unstaking/ /unstaking.html 200
-/wallet /wallet.html 200
-/wallet/ /wallet.html 200
-
-/asset /asset-app.html 200
-/asset/* /asset-app.html 200
+/asset /asset-app 200
+/asset/* /asset-app 200
 
 /trade / 302
 /trade/* / 302
-/wallets/* /wallet.html 200
+/wallets/* /wallet 200

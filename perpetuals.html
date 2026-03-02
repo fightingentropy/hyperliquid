@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Perpetuals Analytics · HL Stats</title>
+        <meta name="theme-color" content="#09090b" />
+        <script src="/theme.js"></script>
+        <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+        <link rel="stylesheet" href="/geist.css" />
+        <link rel="stylesheet" href="/styles.css" />
+        <script src="/perpetuals.js" defer></script>
+    </head>
+    <body class="perpetuals-page">
+        <nav class="top-nav">
+            <a class="brand" href="/">HL Stats</a>
+            <div class="nav-links">
+                <a class="nav-link active" href="/perpetuals">Perpetuals Analytics</a>
+                <a class="nav-link" href="/heatmap">Heatmap</a>
+                <a class="nav-link" href="/liquidations">Liquidations</a>
+                <a class="nav-link" href="/unstaking">Unstaking</a>
+                <a class="nav-link" href="/wallet">Wallet</a>
+                <a class="nav-link" href="/settings">Settings</a>
+                <a class="nav-link" href="/about">About</a>
+            </div>
+        </nav>
+
+        <main class="layout perpetuals-layout">
+            <section class="panel perpetuals-panel">
+                <div class="perpetuals-toolbar">
+                    <div class="search">
+                        <input id="market-search" type="text" placeholder="Search..." />
+                    </div>
+                    <div class="segmented" id="metric-toggle">
+                        <button data-sort="screener" class="active">Screener</button>
+                        <button data-sort="funding">Funding</button>
+                        <button data-sort="volume">Volume</button>
+                        <button data-sort="openInterest">Open Interest</button>
+                    </div>
+                </div>
+
+                <div class="table-wrap perpetuals-table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Market</th>
+                                <th>Price</th>
+                                <th>24H Trend</th>
+                                <th>Chg % (1D)</th>
+                                <th>Chg % (1H)</th>
+                                <th>OI $</th>
+                                <th>OI Chg (1D)</th>
+                                <th>OI Chg (1H)</th>
+                                <th>Vol (1D)</th>
+                                <th>L/S</th>
+                            </tr>
+                        </thead>
+                        <tbody id="market-body"></tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
+    </body>
+</html>

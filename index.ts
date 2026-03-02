@@ -1,9 +1,12 @@
-const PORT = Number(process.env.PORT ?? 3000);
+const PORT = Number(process.env.PORT ?? 4173);
 const CHAIN = process.env.HL_CHAIN ?? "Mainnet";
 
 const INFO_ENDPOINT = "https://api.hyperliquid.xyz/info";
 const STATS_BASE = "https://stats-data.hyperliquid.xyz";
 const HYPURRSCAN_API = "https://api.hypurrscan.io";
+const BREAKOUTPROP_API = "https://tools.breakoutprop.com/api";
+const REMOTE_ORIGIN = "https://tools.breakoutprop.com";
+const BINANCE_FAPI = "https://fapi.binance.com";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const leaderboardTtlMs = DAY_MS;
@@ -12,12 +15,99 @@ const fillsTtlMs = DAY_MS;
 const midsTtlMs = DAY_MS;
 const unstakingTtlMs = 5 * 60 * 1000; // 5 minutes
 const fees24hTtlMs = 5 * 60 * 1000; // 5 minutes
+const breakoutpropTtlMs = 30 * 1000; // 30 seconds
+const depthTtlMs = 1000; // 1 second
+const klineTtlMs = 5 * 1000; // 5 seconds
+const assetHeaderTtlMs = 1000; // 1 second
+const relativeStrengthTtlMs = 60 * 1000; // 60 seconds
+const imageProxyTtlSeconds = 300;
+
+const RELATIVE_STRENGTH_BASES = [
+  "HYPE",
+  "GRASS",
+  "AIXBT",
+  "NEAR",
+  "AAVE",
+  "JUP",
+  "JTO",
+  "UNI",
+  "BONK",
+  "PUMP",
+  "FIL",
+  "TRX",
+  "ARB",
+  "TIA",
+  "ORDI",
+  "OP",
+  "BTC",
+  "FLOKI",
+  "LDO",
+  "PENGU",
+  "VIRTUAL",
+  "S",
+  "ETC",
+  "LTC",
+  "ALGO",
+  "WLD",
+  "POPCAT",
+  "LIT",
+  "WIF",
+  "PNUT",
+  "TRUMP",
+  "SUI",
+  "BCH",
+  "RENDER",
+  "ETH",
+  "TAO",
+  "ATOM",
+  "DOGE",
+  "XRP",
+  "CRV",
+  "XPL",
+  "AVAX",
+  "SOL",
+  "INJ",
+  "APT",
+  "HBAR",
+  "TON",
+  "ONDO",
+  "ADA",
+  "LINK",
+  "STX",
+  "POL",
+  "ASTER",
+  "MOODENG",
+  "SHIB",
+  "KAITO",
+  "PEPE",
+  "FARTCOIN",
+  "ZEC",
+  "DOT",
+  "IP",
+];
+const RELATIVE_STRENGTH_BASE_SET = new Set(RELATIVE_STRENGTH_BASES);
 const FILLS_PAGE_LIMIT = 2000;
 const DEFAULT_MAX_USER_FILLS = 4000;
 
 const cache = new Map();
+const inFlight = new Map();
 
 const windowKeys = ["day", "week", "month", "allTime"];
+const IMAGE_PROXY_HOST_ALLOWLIST = new Set([
+  "twproxy.twproxy.workers.dev",
+  "pbs.twimg.com",
+  "abs.twimg.com",
+]);
+const BINANCE_KLINE_INTERVALS = new Set([
+  "1m",
+  "5m",
+  "15m",
+  "30m",
+  "1h",
+  "4h",
+  "1d",
+  "1w",
+]);
 
 function jsonResponse(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -27,6 +117,24 @@ function jsonResponse(data, status = 200) {
       "Cache-Control": "no-store",
     },
   });
+}
+
+function withUnloadAllowedPermissionsPolicy(headers) {
+  const existing = headers.get("permissions-policy");
+  if (!existing) {
+    headers.set("Permissions-Policy", "unload=(self)");
+    return;
+  }
+
+  if (/\bunload\s*=/.test(existing)) {
+    headers.set(
+      "Permissions-Policy",
+      existing.replace(/\bunload\s*=\s*([^,;]+)/, "unload=(self)"),
+    );
+    return;
+  }
+
+  headers.set("Permissions-Policy", `${existing}, unload=(self)`);
 }
 
 function notFound() {
@@ -61,6 +169,39 @@ async function cachedWithBypass(key, ttlMs, fetcher, bypassCache) {
     return setCached(key, value, ttlMs);
   }
   return cached(key, ttlMs, fetcher);
+}
+
+async function cachedWithStaleRevalidate(key, ttlMs, maxStaleMs, fetcher) {
+  const now = Date.now();
+  const entry = cache.get(key);
+
+  if (entry && now <= entry.expiresAt) {
+    return entry.value;
+  }
+
+  // Return slightly stale data immediately and refresh in background.
+  if (entry && now - entry.expiresAt <= maxStaleMs) {
+    if (!inFlight.has(key)) {
+      const refreshPromise = Promise.resolve()
+        .then(fetcher)
+        .then((value) => setCached(key, value, ttlMs))
+        .catch(() => entry.value)
+        .finally(() => inFlight.delete(key));
+      inFlight.set(key, refreshPromise);
+    }
+    return entry.value;
+  }
+
+  if (inFlight.has(key)) {
+    return inFlight.get(key);
+  }
+
+  const fetchPromise = Promise.resolve()
+    .then(fetcher)
+    .then((value) => setCached(key, value, ttlMs))
+    .finally(() => inFlight.delete(key));
+  inFlight.set(key, fetchPromise);
+  return fetchPromise;
 }
 
 async function fetchJson(url, options) {
@@ -110,6 +251,35 @@ function normalizeWindowPerformances(list) {
     };
   }
   return windows;
+}
+
+function toImageProxyPath(rawUrl) {
+  if (typeof rawUrl !== "string") return rawUrl;
+  const trimmed = rawUrl.trim();
+  if (!trimmed) return rawUrl;
+  if (/^\/api\/image-proxy\?url=/.test(trimmed)) return trimmed;
+  if (!/^https?:\/\//i.test(trimmed)) return rawUrl;
+  return `/api/image-proxy?url=${encodeURIComponent(trimmed)}`;
+}
+
+function rewriteNewsImageUrls(payload) {
+  if (!payload || typeof payload !== "object") return payload;
+  if (!Array.isArray(payload.items)) return payload;
+
+  const keys = ["icon", "avatar", "image", "profileImage", "profile_image"];
+  return {
+    ...payload,
+    items: payload.items.map((item) => {
+      if (!item || typeof item !== "object") return item;
+      const next = { ...item };
+      for (const key of keys) {
+        if (typeof next[key] === "string") {
+          next[key] = toImageProxyPath(next[key]);
+        }
+      }
+      return next;
+    }),
+  };
 }
 
 function normalizeLeaderboardRow(row) {
@@ -637,12 +807,631 @@ async function handleFees24h(bypassCache) {
   });
 }
 
+async function handleBreakoutRatios(symbol, bypassCache) {
+  const normalized = String(symbol ?? "").trim().toUpperCase();
+  if (!normalized) {
+    throw new Error("Missing symbol");
+  }
+  const key = `market:ratios:${normalized}`;
+  const data = await cachedWithBypass(
+    key,
+    breakoutpropTtlMs,
+    async () => {
+      return fetchJson(`${BREAKOUTPROP_API}/ratios/${encodeURIComponent(normalized)}`);
+    },
+    bypassCache,
+  );
+  return jsonResponse(data);
+}
+
+async function handleBreakoutOpenInterest(symbol, bypassCache) {
+  const normalized = String(symbol ?? "").trim().toUpperCase();
+  if (!normalized) {
+    throw new Error("Missing symbol");
+  }
+  const key = `market:open-interest:${normalized}`;
+  const data = await cachedWithBypass(
+    key,
+    breakoutpropTtlMs,
+    async () => {
+      return fetchJson(
+        `${BREAKOUTPROP_API}/open-interest/${encodeURIComponent(normalized)}`,
+      );
+    },
+    bypassCache,
+  );
+  return jsonResponse(data);
+}
+
+async function handleBreakoutSnapshot(bypassCache) {
+  const key = "market:snapshot";
+  const data = await cachedWithBypass(
+    key,
+    breakoutpropTtlMs,
+    async () => {
+      return fetchJson(`${BREAKOUTPROP_API}/snapshot`);
+    },
+    bypassCache,
+  );
+  return jsonResponse(data);
+}
+
+async function handleBreakoutNews(url, bypassCache) {
+  const query = url.search || "";
+  const key = `market:news:${query}`;
+  const data = await cachedWithBypass(
+    key,
+    breakoutpropTtlMs,
+    async () => {
+      return fetchJson(`${BREAKOUTPROP_API}/news${query}`);
+    },
+    bypassCache,
+  );
+  return jsonResponse(rewriteNewsImageUrls(data));
+}
+
+async function handleImageProxy(url) {
+  const target = url.searchParams.get("url");
+  if (!target) {
+    return jsonResponse({ error: "Missing url" }, 400);
+  }
+
+  let parsed;
+  try {
+    parsed = new URL(target);
+  } catch {
+    return jsonResponse({ error: "Invalid url" }, 400);
+  }
+
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    return jsonResponse({ error: "Unsupported protocol" }, 400);
+  }
+
+  if (!IMAGE_PROXY_HOST_ALLOWLIST.has(parsed.hostname)) {
+    return jsonResponse({ error: "Host not allowed" }, 403);
+  }
+
+  try {
+    const upstream = await fetch(parsed.toString(), {
+      redirect: "follow",
+      headers: {
+        "user-agent": "Mozilla/5.0",
+      },
+    });
+    if (!upstream.ok) {
+      return jsonResponse(
+        { error: `Upstream image request failed (${upstream.status})` },
+        502,
+      );
+    }
+
+    const headers = new Headers();
+    const upstreamType = upstream.headers.get("content-type");
+    headers.set("Content-Type", upstreamType || "image/jpeg");
+    headers.set("Cache-Control", `public, max-age=${imageProxyTtlSeconds}`);
+    headers.set("X-Proxy-Origin", parsed.origin);
+    return new Response(upstream.body, {
+      status: upstream.status,
+      headers,
+    });
+  } catch (error) {
+    return jsonResponse({ error: `Image proxy failed: ${String(error)}` }, 502);
+  }
+}
+
+async function handleMarketRatios(bypassCache) {
+  return handleBreakoutRatios("HYPEUSD", bypassCache);
+}
+
+async function handleMarketOpenInterest(bypassCache) {
+  return handleBreakoutOpenInterest("HYPEUSD", bypassCache);
+}
+
+async function handleMarketSnapshot(bypassCache) {
+  return handleBreakoutSnapshot(bypassCache);
+}
+
+async function fetchMarketBinance24h() {
+  const rows = await fetchJson(`${BINANCE_FAPI}/fapi/v1/ticker/24hr`);
+  const symbols = {};
+  for (const row of Array.isArray(rows) ? rows : []) {
+    const symbol = String(row?.symbol ?? "").toUpperCase();
+    if (!symbol.endsWith("USDT")) continue;
+    const base = symbol.slice(0, -4);
+    if (!base || !RELATIVE_STRENGTH_BASE_SET.has(base)) continue;
+    const key = `${base}/USD`;
+    symbols[key] = {
+      symbol,
+      lastPrice: Number(row?.lastPrice ?? 0),
+      priceChangePercent: Number(row?.priceChangePercent ?? 0),
+      quoteVolume: Number(row?.quoteVolume ?? 0),
+      volume: Number(row?.volume ?? 0),
+    };
+  }
+  return {
+    source: "binance",
+    updatedAt: Date.now(),
+    symbols,
+  };
+}
+
+async function handleMarketBinance24h(bypassCache) {
+  const key = "market:binance-24h";
+  const data = await cachedWithBypass(
+    key,
+    5 * 1000,
+    async () => fetchMarketBinance24h(),
+    bypassCache,
+  );
+  return jsonResponse(data);
+}
+
+function normalizeMarketSymbol(rawSymbol) {
+  const raw = String(rawSymbol ?? "").trim().toUpperCase();
+  if (!raw) {
+    throw new Error("Missing symbol");
+  }
+
+  const cleaned = raw.replace(/\s+/g, "");
+  const plain = cleaned.replace(/[^A-Z0-9]/g, "");
+  if (!plain) {
+    throw new Error("Invalid symbol");
+  }
+
+  if (plain.endsWith("USDT")) {
+    const base = plain.slice(0, -4);
+    return {
+      base,
+      breakout: `${base}USD`,
+      binance: `${base}USDT`,
+      pair: `${base}/USD`,
+    };
+  }
+
+  if (plain.endsWith("USD")) {
+    const base = plain.slice(0, -3);
+    return {
+      base,
+      breakout: `${base}USD`,
+      binance: `${base}USDT`,
+      pair: `${base}/USD`,
+    };
+  }
+
+  const base = plain;
+  return {
+    base,
+    breakout: `${base}USD`,
+    binance: `${base}USDT`,
+    pair: `${base}/USD`,
+  };
+}
+
+function normalizeKlineInterval(rawInterval) {
+  const interval = String(rawInterval ?? "1h").trim();
+  if (BINANCE_KLINE_INTERVALS.has(interval)) {
+    return interval;
+  }
+  return "1h";
+}
+
+function normalizePositiveInt(rawValue, fallback, min, max) {
+  const parsed = Number(rawValue);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.min(max, Math.max(min, Math.floor(parsed)));
+}
+
+async function handleSymbolKlines(symbol, url, bypassCache) {
+  const normalized = normalizeMarketSymbol(symbol);
+  const interval = normalizeKlineInterval(url.searchParams.get("interval"));
+  const limit = normalizePositiveInt(url.searchParams.get("limit"), 220, 50, 1000);
+  const key = `market:klines:${normalized.binance}:${interval}:${limit}`;
+
+  const data = await cachedWithBypass(
+    key,
+    klineTtlMs,
+    async () => {
+      const raw = await fetchJson(
+        `${BINANCE_FAPI}/fapi/v1/klines?symbol=${normalized.binance}&interval=${interval}&limit=${limit}`,
+      );
+      const candles = (Array.isArray(raw) ? raw : [])
+        .map((row) => ({
+          time: Number(row?.[6]),
+          open: Number(row?.[1]),
+          high: Number(row?.[2]),
+          low: Number(row?.[3]),
+          close: Number(row?.[4]),
+          volume: Number(row?.[5]),
+        }))
+        .filter(
+          (row) =>
+            Number.isFinite(row.time) &&
+            Number.isFinite(row.open) &&
+            Number.isFinite(row.high) &&
+            Number.isFinite(row.low) &&
+            Number.isFinite(row.close) &&
+            Number.isFinite(row.volume),
+        );
+      if (!candles.length) {
+        throw new Error("No candle data");
+      }
+      return {
+        source: "binance",
+        symbol: normalized.breakout,
+        binanceSymbol: normalized.binance,
+        pair: normalized.pair,
+        interval,
+        updatedAt: Date.now(),
+        candles,
+      };
+    },
+    bypassCache,
+  );
+
+  return jsonResponse(data);
+}
+
+async function handleAssetHeader(symbol, bypassCache) {
+  const normalized = normalizeMarketSymbol(symbol);
+  const key = `asset:header:binance:${normalized.binance}`;
+  const data = await cachedWithBypass(
+    key,
+    assetHeaderTtlMs,
+    async () => {
+      const [ticker24h, openInterestPayload] = await Promise.all([
+        fetchJson(
+          `${BINANCE_FAPI}/fapi/v1/ticker/24hr?symbol=${encodeURIComponent(normalized.binance)}`,
+        ),
+        fetchJson(
+          `${BINANCE_FAPI}/fapi/v1/openInterest?symbol=${encodeURIComponent(normalized.binance)}`,
+        ),
+      ]);
+
+      const lastPrice = Number(ticker24h?.lastPrice ?? NaN);
+      const changePctRaw = Number(ticker24h?.priceChangePercent ?? NaN);
+      const quoteVolume24h = Number(ticker24h?.quoteVolume ?? NaN);
+      const openInterest = Number(openInterestPayload?.openInterest ?? NaN);
+
+      const safeLastPrice = Number.isFinite(lastPrice) ? lastPrice : null;
+      const safeChangePct = Number.isFinite(changePctRaw) ? changePctRaw : null;
+      const openInterestRaw = Number.isFinite(openInterest) ? openInterest : null;
+      const openInterestUsd =
+        openInterestRaw != null && safeLastPrice != null
+          ? openInterestRaw * safeLastPrice
+          : null;
+
+      return {
+        source: "binance",
+        symbol: normalized.breakout,
+        pair: normalized.pair,
+        updatedAt: Date.now(),
+        last: safeLastPrice,
+        changePct: safeChangePct,
+        volume24h: Number.isFinite(quoteVolume24h) ? quoteVolume24h : null,
+        openInterest: openInterestRaw,
+        openInterestUsd,
+      };
+    },
+    bypassCache,
+  );
+  return jsonResponse(data);
+}
+
+function normalizeDepthLevels(levels, bidSide) {
+  const out = (Array.isArray(levels) ? levels : [])
+    .map((row) => {
+      const price = Number(row?.price ?? row?.px ?? row?.[0]);
+      const size = Number(row?.size ?? row?.sz ?? row?.[1]);
+      if (!Number.isFinite(price) || !Number.isFinite(size)) return null;
+      return { price, size: Math.max(0, size) };
+    })
+    .filter(Boolean);
+
+  out.sort((a, b) => (bidSide ? b.price - a.price : a.price - b.price));
+  return out;
+}
+
+async function fetchDepthBinance(symbol = "HYPEUSDT") {
+  const raw = await fetchJson(
+    `${BINANCE_FAPI}/fapi/v1/depth?symbol=${encodeURIComponent(symbol)}&limit=100`,
+  );
+  const bids = normalizeDepthLevels(raw?.bids, true);
+  const asks = normalizeDepthLevels(raw?.asks, false);
+  if (!bids.length || !asks.length) {
+    throw new Error("Binance depth empty");
+  }
+  return {
+    source: "binance",
+    symbol,
+    updatedAt: Date.now(),
+    bids,
+    asks,
+  };
+}
+
+async function handleSymbolDepth(symbol, bypassCache) {
+  const normalized = normalizeMarketSymbol(symbol);
+  const key = `market:depth:${normalized.binance}`;
+  const data = await cachedWithBypass(
+    key,
+    depthTtlMs,
+    async () => {
+      const depth = await fetchDepthBinance(normalized.binance);
+      return {
+        ...depth,
+        symbol: normalized.breakout,
+        binanceSymbol: normalized.binance,
+        pair: normalized.pair,
+      };
+    },
+    bypassCache,
+  );
+  return jsonResponse(data);
+}
+
+async function handleMarketDepth(bypassCache) {
+  const key = "market:depth:hype";
+  const data = await cachedWithBypass(
+    key,
+    depthTtlMs,
+    async () => {
+      return fetchDepthBinance("HYPEUSDT");
+    },
+    bypassCache,
+  );
+  return jsonResponse(data);
+}
+
+async function fetchRelativeStrengthBinance() {
+  const tickers = await fetchJson(`${BINANCE_FAPI}/fapi/v1/ticker/24hr`);
+  const list = Array.isArray(tickers) ? tickers : [];
+
+  const tickerMap = new Map(
+    list
+      .filter((t) => String(t?.symbol ?? "").endsWith("USDT"))
+      .map((t) => [String(t.symbol), t]),
+  );
+
+  const symbols = [];
+  const missing = [];
+  for (const base of RELATIVE_STRENGTH_BASES) {
+    const sym = `${base}USDT`;
+    if (tickerMap.has(sym)) symbols.push(sym);
+    else missing.push(base);
+  }
+
+  const eligible = list
+    .filter((t) => String(t?.symbol ?? "").endsWith("USDT"))
+    .map((t) => ({
+      symbol: String(t.symbol),
+      quoteVolume: Number(t.quoteVolume ?? 0),
+      changePct: Number(t.priceChangePercent ?? 0),
+      lastPrice: Number(t.lastPrice ?? 0),
+    }))
+    .filter((t) => Number.isFinite(t.quoteVolume))
+    .sort((a, b) => b.quoteVolume - a.quoteVolume);
+
+  const eligibleMap = new Map(eligible.map((t) => [t.symbol, t]));
+
+  const concurrency = 16;
+  const results = new Map();
+  let cursor = 0;
+
+  async function worker() {
+    while (cursor < symbols.length) {
+      const idx = cursor++;
+      const symbol = symbols[idx];
+      try {
+        const klines = await fetchJson(
+          `${BINANCE_FAPI}/fapi/v1/klines?symbol=${symbol}&interval=15m&limit=96`,
+        );
+        const rows = (Array.isArray(klines) ? klines : [])
+          .map((k) => ({
+            close: Number(k?.[4]),
+            // close time in ms (binance kline index 6)
+            time: Number(k?.[6]),
+          }))
+          .filter((r) => Number.isFinite(r.close) && Number.isFinite(r.time));
+        if (rows.length < 2) continue;
+
+        const base = symbol.endsWith("USDT")
+          ? symbol.slice(0, -4)
+          : symbol;
+        const key = `${base}/USD`;
+        const t = eligibleMap.get(symbol);
+        results.set(key, {
+          sparkline: rows.map((r) => r.close),
+          times: rows.map((r) => r.time),
+          change_pct: Number.isFinite(t?.changePct) ? t.changePct : null,
+          last_price: Number.isFinite(t?.lastPrice) ? t.lastPrice : null,
+        });
+      } catch {
+        // Ignore per-symbol errors; keep best-effort dataset.
+      }
+    }
+  }
+
+  await Promise.all(
+    Array.from({ length: Math.min(concurrency, symbols.length) }, () =>
+      worker(),
+    ),
+  );
+
+  if (!results.size) {
+    throw new Error("No relative-strength symbols available");
+  }
+
+  return {
+    source: "binance",
+    updatedAt: Date.now(),
+    interval: "15m",
+    count: 96,
+    requestedBases: RELATIVE_STRENGTH_BASES,
+    missingBases: missing,
+    symbols: Object.fromEntries(results.entries()),
+  };
+}
+
+async function handleMarketRelativeStrength(bypassCache) {
+  const key = "market:relative-strength";
+  const data = bypassCache
+    ? await cachedWithBypass(
+        key,
+        relativeStrengthTtlMs,
+        async () => fetchRelativeStrengthBinance(),
+        true,
+      )
+    : await cachedWithStaleRevalidate(
+        key,
+        relativeStrengthTtlMs,
+        10 * 60 * 1000, // serve stale up to 10m while refreshing
+        async () => fetchRelativeStrengthBinance(),
+      );
+  return jsonResponse(data);
+}
+
+async function proxyToRemote(req, targetUrl) {
+  try {
+    const headers = new Headers(req.headers);
+    headers.delete("host");
+    const upstream = await fetch(targetUrl, {
+      method: req.method,
+      headers,
+      body:
+        req.method === "GET" || req.method === "HEAD"
+          ? undefined
+          : req.body,
+      redirect: "follow",
+    });
+    const responseHeaders = new Headers(upstream.headers);
+    // Bun/Fetch may return a decoded body while preserving upstream encoding
+    // headers; strip them to avoid browser double-decoding failures.
+    responseHeaders.delete("content-encoding");
+    responseHeaders.delete("content-length");
+    responseHeaders.delete("transfer-encoding");
+    withUnloadAllowedPermissionsPolicy(responseHeaders);
+    responseHeaders.set("x-proxy-origin", REMOTE_ORIGIN);
+
+    const contentType = upstream.headers.get("content-type") ?? "";
+    if (req.method !== "HEAD" && contentType.includes("text/html")) {
+      const html = await upstream.text();
+      const injected = injectUnloadGuardEarly(html);
+      responseHeaders.set("content-type", "text/html; charset=utf-8");
+      return new Response(injected, {
+        status: upstream.status,
+        statusText: upstream.statusText,
+        headers: responseHeaders,
+      });
+    }
+
+    return new Response(upstream.body, {
+      status: upstream.status,
+      statusText: upstream.statusText,
+      headers: responseHeaders,
+    });
+  } catch (error) {
+    return jsonResponse({ error: `Upstream proxy failed: ${String(error)}` }, 502);
+  }
+}
+
+const UNLOAD_GUARD_INJECT = `<script>
+(() => {
+  const origAdd = EventTarget && EventTarget.prototype && EventTarget.prototype.addEventListener;
+  if (!origAdd) return;
+  EventTarget.prototype.addEventListener = function(type, listener, options) {
+    if (type === "unload") return;
+    return origAdd.call(this, type, listener, options);
+  };
+})();
+</script>`;
+
+function injectUnloadGuardEarly(html) {
+  if (
+    html.includes(
+      "EventTarget.prototype.addEventListener = function(type, listener, options)",
+    )
+  ) {
+    return html;
+  }
+
+  if (html.includes("<head>")) {
+    return html.replace("<head>", `<head>${UNLOAD_GUARD_INJECT}`);
+  }
+
+  return html.replace("</head>", `${UNLOAD_GUARD_INJECT}</head>`);
+}
+
 async function handleApi(req, url) {
   if (req.method !== "GET") {
-    return jsonResponse({ error: "Method not allowed" }, 405);
+    return null;
   }
 
   const bypassCache = shouldBypassCache(url);
+
+  if (url.pathname.startsWith("/api/ratios/")) {
+    const symbol = decodeURIComponent(url.pathname.split("/")[3] ?? "");
+    try {
+      return await handleBreakoutRatios(symbol, bypassCache);
+    } catch (error) {
+      return jsonResponse({ error: String(error) }, 502);
+    }
+  }
+
+  if (url.pathname.startsWith("/api/open-interest/")) {
+    const symbol = decodeURIComponent(url.pathname.split("/")[3] ?? "");
+    try {
+      return await handleBreakoutOpenInterest(symbol, bypassCache);
+    } catch (error) {
+      return jsonResponse({ error: String(error) }, 502);
+    }
+  }
+
+  if (url.pathname.startsWith("/api/klines/")) {
+    const symbol = decodeURIComponent(url.pathname.split("/")[3] ?? "");
+    try {
+      return await handleSymbolKlines(symbol, url, bypassCache);
+    } catch (error) {
+      return jsonResponse({ error: String(error) }, 502);
+    }
+  }
+
+  if (url.pathname.startsWith("/api/depth/")) {
+    const symbol = decodeURIComponent(url.pathname.split("/")[3] ?? "");
+    try {
+      return await handleSymbolDepth(symbol, bypassCache);
+    } catch (error) {
+      return jsonResponse({ error: String(error) }, 502);
+    }
+  }
+
+  if (url.pathname.startsWith("/api/asset-header/")) {
+    const symbol = decodeURIComponent(url.pathname.split("/")[3] ?? "");
+    try {
+      return await handleAssetHeader(symbol, bypassCache);
+    } catch (error) {
+      return jsonResponse({ error: String(error) }, 502);
+    }
+  }
+
+  if (url.pathname === "/api/snapshot") {
+    try {
+      return await handleBreakoutSnapshot(bypassCache);
+    } catch (error) {
+      return jsonResponse({ error: String(error) }, 502);
+    }
+  }
+
+  if (url.pathname === "/api/news") {
+    try {
+      return await handleBreakoutNews(url, bypassCache);
+    } catch (error) {
+      return jsonResponse({ error: String(error) }, 502);
+    }
+  }
+
+  if (url.pathname === "/api/image-proxy") {
+    return handleImageProxy(url);
+  }
 
   if (url.pathname === "/api/leaderboard") {
     try {
@@ -728,23 +1517,124 @@ async function handleApi(req, url) {
     }
   }
 
-  return notFound();
-}
+  if (url.pathname === "/api/market/ratios") {
+    try {
+      return await handleMarketRatios(bypassCache);
+    } catch (error) {
+      return jsonResponse({ error: String(error) }, 502);
+    }
+  }
 
-async function serveStatic(pathname) {
-  const safePath =
-    pathname === "/" ? "index.html" : pathname.replace(/^\/+/, "");
-  if (safePath.includes("..")) return notFound();
+  if (url.pathname === "/api/market/open-interest") {
+    try {
+      return await handleMarketOpenInterest(bypassCache);
+    } catch (error) {
+      return jsonResponse({ error: String(error) }, 502);
+    }
+  }
 
-  const file = Bun.file(new URL(`./public/${safePath}`, import.meta.url));
-  if (!(await file.exists())) return notFound();
+  if (url.pathname === "/api/market/snapshot") {
+    try {
+      return await handleMarketSnapshot(bypassCache);
+    } catch (error) {
+      return jsonResponse({ error: String(error) }, 502);
+    }
+  }
 
-  return new Response(file, {
-    headers: { "Content-Type": file.type || "application/octet-stream" },
-  });
+  if (url.pathname === "/api/market/depth") {
+    try {
+      return await handleMarketDepth(bypassCache);
+    } catch (error) {
+      return jsonResponse({ error: String(error) }, 502);
+    }
+  }
+
+  if (url.pathname === "/api/market/relative-strength") {
+    try {
+      return await handleMarketRelativeStrength(bypassCache);
+    } catch (error) {
+      return jsonResponse({ error: String(error) }, 502);
+    }
+  }
+
+  if (url.pathname === "/api/market/binance-24h") {
+    try {
+      return await handleMarketBinance24h(bypassCache);
+    } catch (error) {
+      return jsonResponse({ error: String(error) }, 502);
+    }
+  }
+
+  return null;
 }
 
 const WALLET_PATH_REGEX = /^\/wallets\/(0x[a-fA-F0-9]{40})\/?$/;
+const PRETTY_HTML_ROUTES = new Map([
+  ["/about", "about.html"],
+  ["/heatmap", "heatmap.html"],
+  ["/liquidations", "liquidations.html"],
+  ["/perpetuals", "perpetuals.html"],
+  ["/settings", "settings.html"],
+  ["/unstaking", "unstaking.html"],
+  ["/wallet", "wallet.html"],
+]);
+
+function toLocalPath(pathname) {
+  const normalized =
+    pathname !== "/" && pathname.endsWith("/")
+      ? pathname.slice(0, -1)
+      : pathname;
+  if (normalized === "/") return null;
+  if (PRETTY_HTML_ROUTES.has(normalized)) {
+    return PRETTY_HTML_ROUTES.get(normalized);
+  }
+  if (WALLET_PATH_REGEX.test(normalized)) {
+    return "wallet.html";
+  }
+  const candidate = normalized.replace(/^\/+/, "");
+  if (!candidate || candidate.includes("..")) return null;
+  return candidate;
+}
+
+function fileResponse(file, localPath = "") {
+  const headers = new Headers({
+    "Content-Type": file.type || "application/octet-stream",
+  });
+  if (localPath === "liquidations.html") {
+    headers.set("Cache-Control", "public, max-age=86400");
+  }
+
+  return new Response(file, { headers });
+}
+
+async function serveStatic(pathname) {
+  const localPath = toLocalPath(pathname);
+  if (!localPath) return null;
+
+  const file = Bun.file(`${import.meta.dir}/${localPath}`);
+  if (await file.exists()) {
+    return fileResponse(file, localPath);
+  }
+
+  return null;
+}
+
+async function serveAssetApp() {
+  const file = Bun.file(`${import.meta.dir}/web/dist/index.html`);
+  if (!(await file.exists())) {
+    return new Response(
+      "Asset app not built. Run `bun run web:build` and reload this route.",
+      { status: 503 },
+    );
+  }
+
+  return new Response(file, {
+    headers: {
+      "Content-Type": "text/html; charset=utf-8",
+      "Cache-Control": "no-store",
+    },
+  });
+}
 
 Bun.serve({
   port: PORT,
@@ -753,19 +1643,43 @@ Bun.serve({
   idleTimeout: 60,
   async fetch(req) {
     const url = new URL(req.url);
-    if (url.pathname.startsWith("/api/")) {
-      return handleApi(req, url);
-    }
 
-    if (WALLET_PATH_REGEX.test(url.pathname)) {
-      const file = Bun.file(new URL("./public/wallet.html", import.meta.url));
-      return new Response(file, {
-        headers: { "Content-Type": "text/html" },
+    if (url.pathname === "/") {
+      return new Response(null, {
+        status: 302,
+        headers: { Location: "/asset/HYPE%2FUSD" },
       });
     }
 
-    return serveStatic(url.pathname);
+    if (url.pathname === "/trade" || url.pathname.startsWith("/trade/")) {
+      return new Response(null, {
+        status: 302,
+        headers: { Location: "/" },
+      });
+    }
+
+    if (url.pathname === "/tools" || url.pathname.startsWith("/tools/")) {
+      return notFound();
+    }
+    if (url.pathname === "/calculator" || url.pathname.startsWith("/calculator/")) {
+      return notFound();
+    }
+
+    if (url.pathname.startsWith("/api/")) {
+      const localApiResponse = await handleApi(req, url);
+      if (localApiResponse) return localApiResponse;
+      return proxyToRemote(req, `${REMOTE_ORIGIN}${url.pathname}${url.search}`);
+    }
+
+    if (url.pathname === "/asset" || url.pathname.startsWith("/asset/")) {
+      return serveAssetApp();
+    }
+
+    const localStaticResponse = await serveStatic(url.pathname);
+    if (localStaticResponse) return localStaticResponse;
+
+    return proxyToRemote(req, `${REMOTE_ORIGIN}${url.pathname}${url.search}`);
   },
 });
 
-console.log(`hl-stats running on http://localhost:${PORT}`);
+console.log(`stats running on http://localhost:${PORT}`);

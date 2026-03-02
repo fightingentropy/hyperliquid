@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Heatmap · HL Stats</title>
+        <meta name="theme-color" content="#09090b" />
+        <script src="/theme.js"></script>
+        <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+        <link rel="stylesheet" href="/geist.css" />
+        <link rel="stylesheet" href="/styles.css" />
+        <script src="/heatmap.js" defer></script>
+    </head>
+    <body class="perpetuals-page">
+        <nav class="top-nav">
+            <a class="brand" href="/">HL Stats</a>
+            <div class="nav-links">
+                <a class="nav-link" href="/perpetuals">Perpetuals Analytics</a>
+                <a class="nav-link active" href="/heatmap">Heatmap</a>
+                <a class="nav-link" href="/liquidations">Liquidations</a>
+                <a class="nav-link" href="/unstaking">Unstaking</a>
+                <a class="nav-link" href="/wallet">Wallet</a>
+                <a class="nav-link" href="/settings">Settings</a>
+                <a class="nav-link" href="/about">About</a>
+            </div>
+        </nav>
+
+        <main class="layout perpetuals-layout">
+            <section class="panel perpetuals-panel">
+                <div class="perpetuals-toolbar">
+                    <div class="search">
+                        <input id="heatmap-search" type="text" placeholder="Search..." />
+                    </div>
+                    <div class="segmented" id="heatmap-metric">
+                        <button data-metric="change1d" class="active">1D Change</button>
+                        <button data-metric="oi1h">OI Chg 1H</button>
+                        <button data-metric="oi1d">OI Chg 1D</button>
+                    </div>
+                </div>
+                <div id="heatmap-grid" class="heatmap-grid"></div>
+            </section>
+        </main>
+    </body>
+</html>

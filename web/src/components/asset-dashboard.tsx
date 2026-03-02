@@ -1,0 +1,1167 @@
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useLocation, useParams } from "react-router-dom";
+import {
+  Area,
+  AreaChart,
+  CartesianGrid,
+  Line,
+  LineChart,
+  ReferenceLine,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
+import {
+  CrosshairMode,
+  ColorType,
+  createChart,
+  type IChartApi,
+  type UTCTimestamp,
+} from "lightweight-charts";
+import { Activity, ArrowLeft, TrendingDown, TrendingUp } from "lucide-react";
+
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { cn } from "@/lib/utils";
+
+type Timeframe = "1m" | "5m" | "15m" | "30m" | "1h" | "4h" | "1d" | "1w";
+
+type Candle = {
+  time: number;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+};
+
+type DepthLevel = {
+  price: number;
+  size: number;
+};
+
+type RatiosResponse = {
+  symbol: string;
+  long_pct: number;
+  short_pct: number;
+};
+
+type OpenInterestBlock = {
+  long_pct: number;
+  short_pct: number;
+};
+
+type OpenInterestResponse = {
+  symbol: string;
+  evaluation: OpenInterestBlock;
+  funded: OpenInterestBlock;
+  total: OpenInterestBlock;
+};
+
+type RelativeStrengthSymbol = {
+  sparkline: number[];
+  times: number[];
+  change_pct: number | null;
+  last_price: number | null;
+};
+
+type RelativeStrengthResponse = {
+  symbols: Record<string, RelativeStrengthSymbol>;
+};
+
+type DepthResponse = {
+  symbol: string;
+  bids: DepthLevel[];
+  asks: DepthLevel[];
+};
+
+type KlineResponse = {
+  candles: Candle[];
+};
+type AssetHeaderResponse = {
+  source: string;
+  symbol: string;
+  pair: string;
+  updatedAt: number;
+  last: number | null;
+  changePct: number | null;
+  volume24h: number | null;
+  openInterest: number | null;
+  openInterestUsd?: number | null;
+};
+
+const TIMEFRAMES: Array<{ key: Timeframe; label: string }> = [
+  { key: "1m", label: "1m" },
+  { key: "5m", label: "5m" },
+  { key: "15m", label: "15m" },
+  { key: "30m", label: "30m" },
+  { key: "1h", label: "1H" },
+  { key: "4h", label: "4H" },
+  { key: "1d", label: "1D" },
+  { key: "1w", label: "1W" },
+];
+const TOP_NAV_LINKS: Array<{ label: string; href: string }> = [
+  { label: "Perpetuals Analytics", href: "/perpetuals" },
+  { label: "Heatmap", href: "/heatmap" },
+  { label: "Liquidations", href: "/liquidations" },
+  { label: "Unstaking", href: "/unstaking" },
+  { label: "Wallet", href: "/wallet" },
+  { label: "Settings", href: "/settings" },
+  { label: "About", href: "/about" },
+];
+const RELATIVE_Y_MIN = -10;
+const RELATIVE_Y_MAX = 25;
+const THREE_HOURS_MS = 3 * 60 * 60 * 1000;
+const RELATIVE_Y_TICKS = Array.from(
+  { length: Math.floor((RELATIVE_Y_MAX - RELATIVE_Y_MIN) / 2.5) + 1 },
+  (_, index) => RELATIVE_Y_MIN + index * 2.5,
+);
+
+function formatPrice(value: number | null | undefined) {
+  if (!Number.isFinite(value ?? NaN)) return "--";
+  const amount = Number(value);
+  if (amount >= 1000) {
+    return amount.toLocaleString("en-US", { maximumFractionDigits: 2 });
+  }
+  if (amount >= 1) {
+    return amount.toLocaleString("en-US", {
+      minimumFractionDigits: 3,
+      maximumFractionDigits: 3,
+    });
+  }
+  return amount.toLocaleString("en-US", {
+    minimumFractionDigits: 4,
+    maximumFractionDigits: 6,
+  });
+}
+
+function formatPercent(value: number | null | undefined) {
+  if (!Number.isFinite(value ?? NaN)) return "--";
+  const amount = Number(value);
+  const sign = amount > 0 ? "+" : "";
+  return `${sign}${amount.toFixed(2)}%`;
+}
+
+function formatCompact(value: number | null | undefined) {
+  if (!Number.isFinite(value ?? NaN)) return "--";
+  const amount = Number(value);
+  const abs = Math.abs(amount);
+  if (abs >= 1_000_000_000) return `${(amount / 1_000_000_000).toFixed(2)}B`;
+  if (abs >= 1_000_000) return `${(amount / 1_000_000).toFixed(2)}M`;
+  if (abs >= 1_000) return `${(amount / 1_000).toFixed(2)}K`;
+  return amount.toFixed(2);
+}
+
+function toAssetContext(rawParam: string | undefined) {
+  const fallback = "HYPE/USD";
+  const decoded = decodeURIComponent(rawParam ?? fallback)
+    .trim()
+    .toUpperCase();
+
+  const cleaned = decoded.replace(/\s+/g, "");
+  if (!cleaned) {
+    return {
+      pair: fallback,
+      base: "HYPE",
+      quote: "USD",
+      apiSymbol: "HYPEUSD",
+      binanceSymbol: "HYPEUSDT",
+      relativeStrengthKey: "HYPE/USD",
+    };
+  }
+
+  if (cleaned.includes("/")) {
+    const [baseRaw, quoteRaw] = cleaned.split("/");
+    const base = (baseRaw || "HYPE").replace(/[^A-Z0-9]/g, "") || "HYPE";
+    const quote = (quoteRaw || "USD").replace(/[^A-Z0-9]/g, "") || "USD";
+    const breakoutQuote = quote === "USDT" ? "USD" : quote;
+    return {
+      pair: `${base}/${breakoutQuote}`,
+      base,
+      quote: breakoutQuote,
+      apiSymbol: `${base}${breakoutQuote}`,
+      binanceSymbol: `${base}USDT`,
+      relativeStrengthKey: `${base}/USD`,
+    };
+  }
+
+  const plain = cleaned.replace(/[^A-Z0-9]/g, "");
+  if (plain.endsWith("USDT")) {
+    const base = plain.slice(0, -4) || "HYPE";
+    return {
+      pair: `${base}/USD`,
+      base,
+      quote: "USD",
+      apiSymbol: `${base}USD`,
+      binanceSymbol: `${base}USDT`,
+      relativeStrengthKey: `${base}/USD`,
+    };
+  }
+
+  if (plain.endsWith("USD")) {
+    const base = plain.slice(0, -3) || "HYPE";
+    return {
+      pair: `${base}/USD`,
+      base,
+      quote: "USD",
+      apiSymbol: `${base}USD`,
+      binanceSymbol: `${base}USDT`,
+      relativeStrengthKey: `${base}/USD`,
+    };
+  }
+
+  const base = plain || "HYPE";
+  return {
+    pair: `${base}/USD`,
+    base,
+    quote: "USD",
+    apiSymbol: `${base}USD`,
+    binanceSymbol: `${base}USDT`,
+    relativeStrengthKey: `${base}/USD`,
+  };
+}
+
+async function fetchJson<T>(url: string): Promise<T> {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Request failed (${response.status})`);
+  }
+  return response.json() as Promise<T>;
+}
+
+function toDepthSeries(depth: DepthResponse | null) {
+  if (!depth) return [] as Array<{ price: number; bids?: number; asks?: number }>;
+
+  const bidsNearToFar = [...depth.bids].sort((a, b) => b.price - a.price);
+  const asksNearToFar = [...depth.asks].sort((a, b) => a.price - b.price);
+
+  let bidCum = 0;
+  const bidPoints = bidsNearToFar
+    .map((level) => {
+      bidCum += level.size;
+      return { price: level.price, bids: bidCum };
+    })
+    .reverse();
+
+  let askCum = 0;
+  const askPoints = asksNearToFar.map((level) => {
+    askCum += level.size;
+    return { price: level.price, asks: askCum };
+  });
+
+  const map = new Map<number, { price: number; bids?: number; asks?: number }>();
+  for (const point of bidPoints) {
+    map.set(point.price, { price: point.price, bids: point.bids });
+  }
+
+  for (const point of askPoints) {
+    const current = map.get(point.price) ?? { price: point.price };
+    current.asks = point.asks;
+    map.set(point.price, current);
+  }
+
+  return Array.from(map.values()).sort((a, b) => a.price - b.price);
+}
+
+function toRelativeStrengthData(
+  response: RelativeStrengthResponse | null,
+  focusSymbol: string,
+) {
+  if (!response) {
+    return {
+      chartRows: [] as Array<Record<string, number>>,
+      symbols: [] as string[],
+      changeBySymbol: {} as Record<string, number | null>,
+    };
+  }
+
+  const rankedEntries = Object.entries(response.symbols)
+    .filter(([, value]) => value.sparkline.length > 1)
+    .sort((a, b) => {
+      const aChangeRaw = Number(a[1].change_pct);
+      const bChangeRaw = Number(b[1].change_pct);
+      const aChange = Number.isFinite(aChangeRaw)
+        ? aChangeRaw
+        : Number.NEGATIVE_INFINITY;
+      const bChange = Number.isFinite(bChangeRaw)
+        ? bChangeRaw
+        : Number.NEGATIVE_INFINITY;
+      if (bChange !== aChange) return bChange - aChange;
+      return a[0].localeCompare(b[0]);
+    });
+
+  const normalizedFocus = focusSymbol.toUpperCase();
+  const focusIndex = rankedEntries.findIndex(
+    ([symbol]) => symbol.toUpperCase() === normalizedFocus,
+  );
+
+  if (focusIndex > 0) {
+    const [focusEntry] = rankedEntries.splice(focusIndex, 1);
+    rankedEntries.unshift(focusEntry);
+  }
+
+  const entries = rankedEntries.slice(0, 44);
+
+  const symbols = entries.map(([name]) => name);
+  const times = entries[0]?.[1]?.times ?? [];
+
+  const chartRows = times.map((time, index) => {
+    const row: Record<string, number> = { time };
+    for (const [symbol, payload] of entries) {
+      const first = payload.sparkline[0] ?? 0;
+      const current = payload.sparkline[index] ?? first;
+      const pct = first > 0 ? ((current - first) / first) * 100 : 0;
+      row[symbol] = pct;
+    }
+    return row;
+  });
+
+  const changeBySymbol = Object.fromEntries(
+    entries.map(([symbol, payload]) => [symbol, payload.change_pct]),
+  ) as Record<string, number | null>;
+
+  return { chartRows, symbols, changeBySymbol };
+}
+
+function calculateMovingAverage(candles: Candle[], period: number) {
+  const result: Array<{ time: UTCTimestamp; value: number }> = [];
+  const closes = candles.map((candle) => candle.close);
+  let rolling = 0;
+
+  for (let index = 0; index < closes.length; index += 1) {
+    rolling += closes[index];
+    if (index >= period) rolling -= closes[index - period];
+    if (index + 1 < period) continue;
+
+    result.push({
+      time: Math.floor(candles[index].time / 1000) as UTCTimestamp,
+      value: rolling / period,
+    });
+  }
+
+  return result;
+}
+
+function CandlestickView({ candles }: { candles: Candle[] }) {
+  const RIGHT_LOGICAL_PADDING: number = 3;
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const chartRef = useRef<IChartApi | null>(null);
+  const candleSeriesRef = useRef<any>(null);
+  const ma20Ref = useRef<any>(null);
+  const ma50Ref = useRef<any>(null);
+  const ma100Ref = useRef<any>(null);
+
+  const fitWithRightPadding = (chart: IChartApi) => {
+    const timeScale = chart.timeScale();
+    timeScale.fitContent();
+    if (RIGHT_LOGICAL_PADDING === 0) return;
+    const range = timeScale.getVisibleLogicalRange();
+    if (!range) return;
+    timeScale.setVisibleLogicalRange({
+      from: range.from,
+      to: range.to + RIGHT_LOGICAL_PADDING,
+    });
+  };
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const chart = createChart(container, {
+      autoSize: true,
+      layout: {
+        background: {
+          type: ColorType.Solid,
+          color: "#0b1018",
+        },
+        textColor: "#7f93aa",
+      },
+      grid: {
+        vertLines: { color: "rgba(41, 58, 80, 0.52)" },
+        horzLines: { color: "rgba(41, 58, 80, 0.52)" },
+      },
+      rightPriceScale: {
+        borderColor: "#26384d",
+      },
+      timeScale: {
+        borderColor: "#26384d",
+        rightOffset: RIGHT_LOGICAL_PADDING,
+      },
+      crosshair: {
+        mode: CrosshairMode.Normal,
+      },
+    });
+
+    const candleSeries = chart.addCandlestickSeries({
+      upColor: "#2ecfd0",
+      downColor: "#ff606a",
+      borderVisible: false,
+      wickUpColor: "#2ecfd0",
+      wickDownColor: "#ff606a",
+      priceLineColor: "#ff606a",
+      priceLineWidth: 1,
+    });
+
+    const ma20 = chart.addLineSeries({
+      color: "#e3bc43",
+      lineWidth: 2,
+      priceLineVisible: false,
+    });
+
+    const ma50 = chart.addLineSeries({
+      color: "#a58df4",
+      lineWidth: 2,
+      priceLineVisible: false,
+    });
+
+    const ma100 = chart.addLineSeries({
+      color: "#d16ab0",
+      lineWidth: 2,
+      priceLineVisible: false,
+    });
+
+    chartRef.current = chart;
+    candleSeriesRef.current = candleSeries;
+    ma20Ref.current = ma20;
+    ma50Ref.current = ma50;
+    ma100Ref.current = ma100;
+
+    const resizeObserver = new ResizeObserver(() => {
+      fitWithRightPadding(chart);
+    });
+    resizeObserver.observe(container);
+
+    return () => {
+      resizeObserver.disconnect();
+      chart.remove();
+      chartRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!candleSeriesRef.current || candles.length === 0) return;
+
+    candleSeriesRef.current.setData(
+      candles.map((candle) => ({
+        time: Math.floor(candle.time / 1000) as UTCTimestamp,
+        open: candle.open,
+        high: candle.high,
+        low: candle.low,
+        close: candle.close,
+      })),
+    );
+
+    ma20Ref.current?.setData(calculateMovingAverage(candles, 20));
+    ma50Ref.current?.setData(calculateMovingAverage(candles, 50));
+    ma100Ref.current?.setData(calculateMovingAverage(candles, 100));
+
+    if (chartRef.current) {
+      fitWithRightPadding(chartRef.current);
+    }
+  }, [candles]);
+
+  return <div ref={containerRef} className="h-full w-full" />;
+}
+
+function DualBar({
+  longPct,
+  shortPct,
+}: {
+  longPct: number | null | undefined;
+  shortPct: number | null | undefined;
+}) {
+  const safeLong = Math.max(0, Math.min(100, Number(longPct ?? 0)));
+  const safeShort = Math.max(0, Math.min(100, Number(shortPct ?? 0)));
+
+  return (
+    <div className="mt-1 h-2 w-full overflow-hidden rounded-sm bg-[#101924]">
+      <div className="flex h-full w-full">
+        <div className="bg-[#2ecfd0]" style={{ width: `${safeLong}%` }} />
+        <div className="bg-[#ff606a]" style={{ width: `${safeShort}%` }} />
+      </div>
+    </div>
+  );
+}
+
+export function AssetDashboardPage() {
+  const params = useParams();
+  const location = useLocation();
+  const asset = useMemo(() => toAssetContext(params.symbol), [params.symbol]);
+  const [timeframe, setTimeframe] = useState<Timeframe>("1h");
+  const [candles, setCandles] = useState<Candle[]>([]);
+  const [ratios, setRatios] = useState<RatiosResponse | null>(null);
+  const [openInterest, setOpenInterest] = useState<OpenInterestResponse | null>(null);
+  const [depth, setDepth] = useState<DepthResponse | null>(null);
+  const [assetHeader, setAssetHeader] = useState<AssetHeaderResponse | null>(null);
+  const [relativeStrength, setRelativeStrength] = useState<RelativeStrengthResponse | null>(
+    null,
+  );
+  const [hoveredRelativeRow, setHoveredRelativeRow] = useState<Record<string, number> | null>(
+    null,
+  );
+  const isDocumentHidden = () =>
+    typeof document !== "undefined" && document.visibilityState === "hidden";
+
+  const [error, setError] = useState<string | null>(null);
+  const orderedTimeframes = useMemo(() => {
+    const active = TIMEFRAMES.find((item) => item.key === timeframe);
+    if (!active) return TIMEFRAMES;
+    return [active, ...TIMEFRAMES.filter((item) => item.key !== timeframe)];
+  }, [timeframe]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadCandles() {
+      if (isDocumentHidden()) return;
+      try {
+        const payload = await fetchJson<KlineResponse>(
+          `/api/klines/${encodeURIComponent(asset.apiSymbol)}?interval=${timeframe}&limit=220`,
+        );
+        if (!cancelled) {
+          setCandles(payload.candles ?? []);
+          setError(null);
+        }
+      } catch (fetchError) {
+        if (!cancelled) {
+          setError(fetchError instanceof Error ? fetchError.message : "Failed to load candles");
+        }
+      }
+    }
+
+    loadCandles();
+    const intervalId = window.setInterval(loadCandles, 25_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [asset.apiSymbol, timeframe]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadAssetHeader() {
+      if (isDocumentHidden()) return;
+      try {
+        const payload = await fetchJson<AssetHeaderResponse>(
+          `/api/asset-header/${encodeURIComponent(asset.apiSymbol)}?refresh=1`,
+        );
+        if (!cancelled) {
+          setAssetHeader(payload);
+        }
+      } catch {
+        // Keep prior value on transient errors.
+      }
+    }
+
+    loadAssetHeader();
+    const intervalId = window.setInterval(loadAssetHeader, 5000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [asset.apiSymbol]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadStats() {
+      if (isDocumentHidden()) return;
+      try {
+        const [ratiosRes, openInterestRes] = await Promise.all([
+          fetchJson<RatiosResponse>(`/api/ratios/${encodeURIComponent(asset.apiSymbol)}`),
+          fetchJson<OpenInterestResponse>(
+            `/api/open-interest/${encodeURIComponent(asset.apiSymbol)}`,
+          ),
+        ]);
+
+        if (!cancelled) {
+          setRatios(ratiosRes);
+          setOpenInterest(openInterestRes);
+          setError(null);
+        }
+      } catch (fetchError) {
+        if (!cancelled) {
+          setError(fetchError instanceof Error ? fetchError.message : "Failed to load stats");
+        }
+      }
+    }
+
+    loadStats();
+    const intervalId = window.setInterval(loadStats, 30_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [asset.apiSymbol]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadDepth = async () => {
+      if (isDocumentHidden()) return;
+      try {
+        const payload = await fetchJson<DepthResponse>(
+          `/api/depth/${encodeURIComponent(asset.apiSymbol)}?refresh=1`,
+        );
+        if (!cancelled) {
+          setDepth(payload);
+        }
+      } catch {
+        // Keep prior depth on transient failures.
+      }
+    };
+
+    loadDepth();
+    const intervalId = window.setInterval(loadDepth, 1000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [asset.apiSymbol]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadRelativeStrength() {
+      if (isDocumentHidden()) return;
+      try {
+        const payload = await fetchJson<RelativeStrengthResponse>(
+          "/api/market/relative-strength",
+        );
+        if (!cancelled) {
+          setRelativeStrength(payload);
+          setError(null);
+        }
+      } catch (fetchError) {
+        if (!cancelled) {
+          setError(
+            fetchError instanceof Error
+              ? fetchError.message
+              : "Failed to load relative strength",
+          );
+        }
+      }
+    }
+
+    loadRelativeStrength();
+    const intervalId = window.setInterval(loadRelativeStrength, 60_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, []);
+
+  const lastCandle = candles[candles.length - 1];
+  const prevCandle = candles[candles.length - 2];
+  const lastPrice = lastCandle?.close ?? null;
+  const lastVolume = lastCandle?.volume ?? null;
+  const changePct =
+    lastCandle && prevCandle
+      ? ((lastCandle.close - prevCandle.close) / prevCandle.close) * 100
+      : null;
+  const headerLast = assetHeader?.last ?? lastPrice;
+  const headerChangePct = assetHeader?.changePct ?? changePct;
+  const headerVolume = assetHeader?.volume24h ?? lastVolume;
+  const headerOpenInterest =
+    assetHeader?.openInterestUsd ??
+    (openInterest?.total.long_pct ?? 0) + (openInterest?.total.short_pct ?? 0);
+
+  const depthChartRows = useMemo(() => toDepthSeries(depth), [depth]);
+  const depthMid =
+    depth?.bids?.[0] && depth?.asks?.[0]
+      ? (depth.bids[0].price + depth.asks[0].price) / 2
+      : null;
+  const depthChartRowsForRender = useMemo(() => {
+    if (depthChartRows.length < 2 || !Number.isFinite(depthMid ?? NaN)) {
+      return depthChartRows;
+    }
+
+    const mid = Number(depthMid);
+    const domainMin = mid - 0.5;
+    const domainMax = mid + 0.5;
+    const bounded = depthChartRows.filter(
+      (row) => row.price >= domainMin && row.price <= domainMax,
+    );
+    return bounded.length ? bounded : depthChartRows;
+  }, [depthChartRows, depthMid]);
+
+  const relative = useMemo(
+    () => toRelativeStrengthData(relativeStrength, asset.relativeStrengthKey),
+    [asset.relativeStrengthKey, relativeStrength],
+  );
+
+  const selectedStrengthKey = relative.symbols.includes(asset.relativeStrengthKey)
+    ? asset.relativeStrengthKey
+    : relative.symbols[0] ?? null;
+
+  const bullish = (ratios?.long_pct ?? 0) >= (ratios?.short_pct ?? 0);
+  const latestRelativeRow = relative.chartRows[relative.chartRows.length - 1] ?? null;
+  const activeRelativeRow = hoveredRelativeRow ?? latestRelativeRow;
+  const visibleRelativeChangeBySymbol = useMemo(() => {
+    const out: Record<string, number | null> = {};
+    for (const symbol of relative.symbols) {
+      const value = activeRelativeRow?.[symbol];
+      if (typeof value === "number" && Number.isFinite(value)) {
+        out[symbol] = value;
+      } else {
+        out[symbol] = relative.changeBySymbol[symbol] ?? null;
+      }
+    }
+    return out;
+  }, [activeRelativeRow, relative.changeBySymbol, relative.symbols]);
+  const splitIndex = Math.ceil(relative.symbols.length / 2);
+  const leftRelativeSymbols = relative.symbols.slice(0, splitIndex);
+  const rightRelativeSymbols = relative.symbols.slice(splitIndex);
+  const selectedRelativeValue =
+    selectedStrengthKey != null
+      ? (activeRelativeRow?.[selectedStrengthKey] ?? null)
+      : null;
+  const selectedRelativeTopPct = useMemo(() => {
+    if (
+      selectedRelativeValue == null ||
+      !Number.isFinite(selectedRelativeValue) ||
+      RELATIVE_Y_MAX <= RELATIVE_Y_MIN
+    ) {
+      return 50;
+    }
+    const normalized =
+      (selectedRelativeValue - RELATIVE_Y_MIN) /
+      (RELATIVE_Y_MAX - RELATIVE_Y_MIN);
+    const inverted = 1 - normalized;
+    return Math.max(2, Math.min(98, inverted * 100));
+  }, [selectedRelativeValue]);
+  const relativeXTicks = useMemo(() => {
+    if (!relative.chartRows.length) return [] as number[];
+    const firstTime = Number(relative.chartRows[0]?.time ?? NaN);
+    const lastTime = Number(relative.chartRows[relative.chartRows.length - 1]?.time ?? NaN);
+    if (!Number.isFinite(firstTime) || !Number.isFinite(lastTime) || lastTime <= firstTime) {
+      return [] as number[];
+    }
+
+    const alignedStart = Math.ceil(firstTime / THREE_HOURS_MS) * THREE_HOURS_MS;
+    const ticks: number[] = [];
+    for (let tick = alignedStart; tick <= lastTime; tick += THREE_HOURS_MS) {
+      ticks.push(tick);
+    }
+    return ticks;
+  }, [relative.chartRows]);
+
+  const renderRelativeRow = (symbol: string) => {
+    const change = visibleRelativeChangeBySymbol[symbol];
+    const active = symbol === selectedStrengthKey;
+
+    return (
+      <div
+        key={symbol}
+        className={cn(
+          "flex items-center justify-between rounded-sm px-1 py-[2px] font-mono",
+          active ? "bg-[#162536] text-[#d6e6f8]" : "text-[#8fa2b8]",
+        )}
+      >
+        <span>{symbol.replace("/USD", "")}</span>
+        <span
+          className={cn(
+            "ml-1",
+            (change ?? 0) >= 0 ? "text-[#2ecfd0]" : "text-[#ff606a]",
+          )}
+        >
+          {formatPercent(change)}
+        </span>
+      </div>
+    );
+  };
+  const isTopLinkActive = (href: string) =>
+    location.pathname === href || location.pathname.startsWith(`${href}/`);
+
+  return (
+    <main className="asset-page-shell h-screen overflow-hidden bg-transparent text-[#93a2b9]">
+      <nav className="top-nav asset-shared-nav">
+        <a className="brand" href="/">
+          HL Stats
+        </a>
+        <div className="nav-links">
+          {TOP_NAV_LINKS.map((item) => (
+            <a
+              key={item.href}
+              href={item.href}
+              className={cn("nav-link", isTopLinkActive(item.href) ? "active" : undefined)}
+            >
+              {item.label}
+            </a>
+          ))}
+        </div>
+      </nav>
+
+      <div className="asset-page-content">
+        <div className="asset-grid grid h-full min-h-0 gap-2">
+          <Card className="asset-panel flex min-h-0 flex-col overflow-hidden bg-[#0b1018]">
+          <CardHeader className="border-b border-[#1b2635] p-2.5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-3">
+                <a
+                  href="/perpetuals"
+                  className="inline-flex h-7 w-7 items-center justify-center rounded-sm border border-[#2b3c51] bg-[#111824] text-[#93a2b9] transition-colors hover:bg-[#1b2635] hover:text-[#e6edf7]"
+                  aria-label="Go to Perpetuals Analytics"
+                  title="Perpetuals Analytics"
+                >
+                  <ArrowLeft className="h-3.5 w-3.5" />
+                </a>
+                <Tabs
+                  value={timeframe}
+                  onValueChange={(value: string) => setTimeframe(value as Timeframe)}
+                >
+                  <div className="group relative">
+                    <TabsList className="h-7 w-[56px] gap-0.5 p-0.5">
+                      <TabsTrigger value={timeframe} className="px-2 py-0.5 text-[11px]">
+                        {TIMEFRAMES.find((item) => item.key === timeframe)?.label}
+                      </TabsTrigger>
+                    </TabsList>
+
+                    <div className="pointer-events-none absolute left-0 top-[calc(100%+4px)] z-40 opacity-0 transition-opacity duration-150 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
+                      <TabsList className="h-auto w-[56px] flex-col gap-0.5 p-0.5">
+                        {orderedTimeframes
+                          .filter((item) => item.key !== timeframe)
+                          .map((item) => (
+                            <TabsTrigger
+                              key={item.key}
+                              value={item.key}
+                              className="w-full px-2 py-0.5 text-[11px]"
+                            >
+                              {item.label}
+                            </TabsTrigger>
+                          ))}
+                      </TabsList>
+                    </div>
+                  </div>
+                </Tabs>
+
+                <div className="flex min-w-0 items-center gap-2 overflow-hidden leading-none text-[#9aaec4]">
+                  <span className="shrink-0 text-[22px] sm:text-[26px]">{asset.pair}</span>
+                  <span className="truncate text-[10px] uppercase tracking-[0.16em] text-[#6f849d]">
+                    Perpetual · {TIMEFRAMES.find((item) => item.key === timeframe)?.label}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-4 text-[10px] uppercase tracking-wide text-[#8599b1]">
+                <div>
+                  <div>Last</div>
+                  <div className="font-mono text-[9px] text-[#e6edf7] sm:text-[11px]">
+                    ${formatPrice(headerLast)}
+                  </div>
+                </div>
+                <div>
+                  <div>Change</div>
+                  <div
+                    className={cn(
+                      "font-mono text-[9px] sm:text-[11px]",
+                      (headerChangePct ?? 0) >= 0 ? "text-[#2ecfd0]" : "text-[#ff606a]",
+                    )}
+                  >
+                    {formatPercent(headerChangePct)}
+                  </div>
+                </div>
+                <div>
+                  <div>Volume</div>
+                  <div className="font-mono text-[9px] text-[#e6edf7] sm:text-[11px]">
+                    ${formatCompact(headerVolume)}
+                  </div>
+                </div>
+                <div>
+                  <div>Open Interest</div>
+                  <div className="font-mono text-[9px] text-[#e6edf7] sm:text-[11px]">
+                    {formatCompact(headerOpenInterest)}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="h-full p-0">
+            <CandlestickView candles={candles} />
+          </CardContent>
+        </Card>
+
+        <Card className="asset-panel flex min-h-0 flex-col overflow-hidden bg-[#0b1018]">
+          <CardHeader className="border-b border-[#1b2635] p-2.5">
+            <CardTitle className="flex items-center justify-between text-sm uppercase tracking-[0.14em] text-[#93a7be]">
+              <span>Orderbook Depth</span>
+              <Badge variant={bullish ? "positive" : "negative"}>
+                {bullish ? "Bid Bias" : "Ask Bias"}
+              </Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="h-full p-0 pr-2">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart
+                data={depthChartRowsForRender}
+                margin={{ top: 8, right: 0, left: 0, bottom: 8 }}
+              >
+                <defs>
+                  <linearGradient id="depthBids" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#2ecfd0" stopOpacity={0.35} />
+                    <stop offset="100%" stopColor="#2ecfd0" stopOpacity={0.02} />
+                  </linearGradient>
+                  <linearGradient id="depthAsks" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#ff606a" stopOpacity={0.34} />
+                    <stop offset="100%" stopColor="#ff606a" stopOpacity={0.02} />
+                  </linearGradient>
+                </defs>
+
+                <CartesianGrid stroke="rgba(41, 58, 80, 0.52)" strokeDasharray="0" />
+                <XAxis
+                  dataKey="price"
+                  type="number"
+                  tick={{ fill: "#7f93aa", fontSize: 11 }}
+                  tickFormatter={(value) => `$${formatPrice(value)}`}
+                  domain={["dataMin", "dataMax"]}
+                />
+                <YAxis
+                  tick={{ fill: "#7f93aa", fontSize: 11 }}
+                  tickFormatter={(value) => formatCompact(value)}
+                />
+                {depthMid ? (
+                  <ReferenceLine x={depthMid} stroke="#31475f" strokeDasharray="3 4" />
+                ) : null}
+                <Tooltip
+                  cursor={false}
+                  contentStyle={{
+                    border: "1px solid #1b2635",
+                    borderRadius: "4px",
+                    backgroundColor: "#101722",
+                    color: "#c0cfdd",
+                    fontSize: "11px",
+                  }}
+                  formatter={(value: number | undefined, name: string | undefined) =>
+                    [
+                      formatCompact(value),
+                      name === "bids" ? "Bids" : "Asks",
+                    ] as [string, string]
+                  }
+                  labelFormatter={(value) => `Price: $${formatPrice(Number(value))}`}
+                />
+
+                <Area
+                  type="stepAfter"
+                  dataKey="bids"
+                  stroke="#2ecfd0"
+                  fill="url(#depthBids)"
+                  strokeWidth={2}
+                  connectNulls
+                  dot={false}
+                  isAnimationActive={false}
+                />
+                <Area
+                  type="stepBefore"
+                  dataKey="asks"
+                  stroke="#ff606a"
+                  fill="url(#depthAsks)"
+                  strokeWidth={2}
+                  connectNulls
+                  dot={false}
+                  isAnimationActive={false}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        <Card className="asset-panel flex min-h-0 flex-col overflow-hidden bg-[#0b1018]">
+          <CardHeader className="border-b border-[#1b2635] p-2.5">
+            <CardTitle className="flex items-center gap-2 text-sm uppercase tracking-[0.14em] text-[#93a7be]">
+              <Activity className="h-3.5 w-3.5 text-[#2ecfd0]" />
+              Relative Strength
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="relative h-full min-h-0 p-0">
+            <div className="absolute inset-0">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart
+                  data={relative.chartRows}
+                  margin={{ top: 8, right: 14, left: 8, bottom: 0 }}
+                  onMouseMove={(state: any) => {
+                    const payloadRow = state?.activePayload?.[0]?.payload;
+                    if (payloadRow && typeof payloadRow === "object") {
+                      setHoveredRelativeRow(payloadRow as Record<string, number>);
+                      return;
+                    }
+
+                    const tooltipIndex = state?.activeTooltipIndex;
+                    if (
+                      typeof tooltipIndex === "number" &&
+                      tooltipIndex >= 0 &&
+                      tooltipIndex < relative.chartRows.length
+                    ) {
+                      setHoveredRelativeRow(relative.chartRows[tooltipIndex]);
+                      return;
+                    }
+
+                    const activeLabel = Number(state?.activeLabel);
+                    if (Number.isFinite(activeLabel)) {
+                      const rowByTime = relative.chartRows.find(
+                        (row) => Number(row.time) === activeLabel,
+                      );
+                      if (rowByTime) {
+                        setHoveredRelativeRow(rowByTime);
+                        return;
+                      }
+                    }
+
+                    setHoveredRelativeRow(null);
+                  }}
+                  onMouseLeave={() => setHoveredRelativeRow(null)}
+                >
+                  <CartesianGrid stroke="rgba(41, 58, 80, 0.52)" />
+                  <XAxis
+                    dataKey="time"
+                    type="number"
+                    ticks={relativeXTicks}
+                    domain={["dataMin", "dataMax"]}
+                    tick={{ fill: "#7f93aa", fontSize: 11 }}
+                    tickFormatter={(time) => {
+                      const date = new Date(Number(time));
+                      const hours = date.getHours();
+                      const minutes = date.getMinutes();
+                      if (hours === 0 && minutes === 0) {
+                        return String(date.getDate());
+                      }
+                      return `${String(hours).padStart(2, "0")}:00`;
+                    }}
+                  />
+                  <YAxis
+                    orientation="right"
+                    tick={{ fill: "#7f93aa", fontSize: 11 }}
+                    tickFormatter={(value) => formatPercent(Number(value))}
+                    domain={[RELATIVE_Y_MIN, RELATIVE_Y_MAX]}
+                    ticks={RELATIVE_Y_TICKS}
+                  />
+                  <Tooltip
+                    content={() => null}
+                    cursor={{ stroke: "#2b567e", strokeWidth: 1, strokeDasharray: "4 4" }}
+                  />
+
+                  {relative.symbols.map((symbol, index) => {
+                    const isActive = symbol === selectedStrengthKey;
+                    const hue = (index * 19) % 360;
+                    const stroke = isActive ? "#2ecfd0" : `hsla(${hue} 70% 62% / 0.35)`;
+                    return (
+                      <Line
+                        key={symbol}
+                        type="monotone"
+                        dataKey={symbol}
+                        stroke={stroke}
+                        strokeWidth={isActive ? 2.5 : 1}
+                        dot={false}
+                        activeDot={
+                          isActive
+                            ? {
+                                r: 3.5,
+                                fill: "#2ecfd0",
+                                stroke: "#9fb9c9",
+                                strokeWidth: 1,
+                              }
+                            : false
+                        }
+                        isAnimationActive={false}
+                      />
+                    );
+                  })}
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+
+            {selectedStrengthKey && selectedRelativeValue != null ? (
+              <div
+                className="pointer-events-none absolute right-0 z-20 -translate-y-1/2 rounded-sm bg-[#1f4f71] px-1.5 py-[1px] font-mono text-[9px] font-medium text-[#dbe8ed]"
+                style={{ top: `${selectedRelativeTopPct}%` }}
+              >
+                {selectedStrengthKey.replace("/USD", "")} {formatPercent(selectedRelativeValue)}
+              </div>
+            ) : null}
+
+            <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-[220px] overflow-hidden bg-gradient-to-r from-[#0b1018f2] via-[#0b1018cc] to-transparent p-2">
+              <div className="grid h-full grid-cols-2 gap-x-2 overflow-auto pr-1 text-[8px] leading-[1.15] sm:text-[10px]">
+                <div className="space-y-0.5">{leftRelativeSymbols.map(renderRelativeRow)}</div>
+                <div className="space-y-0.5">{rightRelativeSymbols.map(renderRelativeRow)}</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="asset-panel flex min-h-0 flex-col overflow-hidden bg-[#0b1018]">
+          <CardHeader className="border-b border-[#1b2635] p-2.5">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm uppercase tracking-[0.14em] text-[#93a7be]">
+                Breakout Stats
+              </CardTitle>
+              <Badge variant={bullish ? "positive" : "negative"}>
+                {bullish ? "Bullish" : "Bearish"}
+              </Badge>
+            </div>
+          </CardHeader>
+
+          <CardContent className="flex h-full flex-col gap-5 p-4 pt-3">
+            <section>
+              <div className="mb-1 text-xs uppercase tracking-[0.16em] text-[#7f93aa]">Sentiment</div>
+              <div className="mb-1 flex items-center justify-between font-mono text-base">
+                <div className="flex items-center gap-1 text-[#2ecfd0]">
+                  <TrendingUp className="h-4 w-4" />
+                  <span>{(ratios?.long_pct ?? 0).toFixed(1)}% Long</span>
+                </div>
+                <div className="flex items-center gap-1 text-[#ff606a]">
+                  <span>{(ratios?.short_pct ?? 0).toFixed(1)}% Short</span>
+                  <TrendingDown className="h-4 w-4" />
+                </div>
+              </div>
+              <DualBar longPct={ratios?.long_pct} shortPct={ratios?.short_pct} />
+            </section>
+
+            <Separator />
+
+            <section className="space-y-4">
+              <div className="text-xs uppercase tracking-[0.16em] text-[#7f93aa]">Open Interest</div>
+
+              <div>
+                <div className="mb-1 flex items-center justify-between text-[11px] uppercase tracking-[0.14em] text-[#8397af]">
+                  <span>Evaluation</span>
+                  <span>{(openInterest?.evaluation.long_pct ?? 0).toFixed(1)} / {(openInterest?.evaluation.short_pct ?? 0).toFixed(1)}</span>
+                </div>
+                <div className="flex items-center justify-between text-[11px] font-mono">
+                  <span className="text-[#2ecfd0]">Long {(openInterest?.evaluation.long_pct ?? 0).toFixed(1)}%</span>
+                  <span className="text-[#ff606a]">Short {(openInterest?.evaluation.short_pct ?? 0).toFixed(1)}%</span>
+                </div>
+                <DualBar
+                  longPct={openInterest?.evaluation.long_pct}
+                  shortPct={openInterest?.evaluation.short_pct}
+                />
+              </div>
+
+              <div>
+                <div className="mb-1 flex items-center justify-between text-[11px] uppercase tracking-[0.14em] text-[#8397af]">
+                  <span>Funded</span>
+                  <span>{(openInterest?.funded.long_pct ?? 0).toFixed(1)} / {(openInterest?.funded.short_pct ?? 0).toFixed(1)}</span>
+                </div>
+                <div className="flex items-center justify-between text-[11px] font-mono">
+                  <span className="text-[#2ecfd0]">Long {(openInterest?.funded.long_pct ?? 0).toFixed(1)}%</span>
+                  <span className="text-[#ff606a]">Short {(openInterest?.funded.short_pct ?? 0).toFixed(1)}%</span>
+                </div>
+                <DualBar
+                  longPct={openInterest?.funded.long_pct}
+                  shortPct={openInterest?.funded.short_pct}
+                />
+              </div>
+            </section>
+
+            {error ? (
+              <p className="mt-auto text-xs text-[#ff606a]">{error}</p>
+            ) : null}
+          </CardContent>
+        </Card>
+        </div>
+      </div>
+    </main>
+  );
+}

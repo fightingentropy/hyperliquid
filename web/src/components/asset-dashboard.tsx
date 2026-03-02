@@ -114,6 +114,7 @@ const RELATIVE_Y_MIN = -10;
 const RELATIVE_Y_MAX = 25;
 const THREE_HOURS_MS = 3 * 60 * 60 * 1000;
 const RELATIVE_LIST_MAX_SYMBOLS = 32;
+const DEPTH_LEVELS_PER_SIDE = 32;
 const RELATIVE_Y_TICKS = Array.from(
   { length: Math.floor((RELATIVE_Y_MAX - RELATIVE_Y_MIN) / 2.5) + 1 },
   (_, index) => RELATIVE_Y_MIN + index * 2.5,
@@ -231,11 +232,15 @@ async function fetchJson<T>(url: string): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-function toDepthSeries(depth: DepthResponse | null) {
+function toDepthSeries(depth: DepthResponse | null, levelsPerSide = DEPTH_LEVELS_PER_SIDE) {
   if (!depth) return [] as Array<{ price: number; bids?: number; asks?: number }>;
 
-  const bidsNearToFar = [...depth.bids].sort((a, b) => b.price - a.price);
-  const asksNearToFar = [...depth.asks].sort((a, b) => a.price - b.price);
+  const bidsNearToFar = [...depth.bids]
+    .sort((a, b) => b.price - a.price)
+    .slice(0, levelsPerSide);
+  const asksNearToFar = [...depth.asks]
+    .sort((a, b) => a.price - b.price)
+    .slice(0, levelsPerSide);
 
   let bidCum = 0;
   const bidPoints = bidsNearToFar
@@ -758,24 +763,14 @@ export function AssetDashboardPage() {
     assetHeader?.openInterestUsd ??
     (openInterest?.total.long_pct ?? 0) + (openInterest?.total.short_pct ?? 0);
 
-  const depthChartRows = useMemo(() => toDepthSeries(depth), [depth]);
+  const depthChartRowsForRender = useMemo(
+    () => toDepthSeries(depth, DEPTH_LEVELS_PER_SIDE),
+    [depth],
+  );
   const depthMid =
     depth?.bids?.[0] && depth?.asks?.[0]
       ? (depth.bids[0].price + depth.asks[0].price) / 2
       : null;
-  const depthChartRowsForRender = useMemo(() => {
-    if (depthChartRows.length < 2 || !Number.isFinite(depthMid ?? NaN)) {
-      return depthChartRows;
-    }
-
-    const mid = Number(depthMid);
-    const domainMin = mid - 0.5;
-    const domainMax = mid + 0.5;
-    const bounded = depthChartRows.filter(
-      (row) => row.price >= domainMin && row.price <= domainMax,
-    );
-    return bounded.length ? bounded : depthChartRows;
-  }, [depthChartRows, depthMid]);
 
   const relative = useMemo(
     () => toRelativeStrengthData(relativeStrength, asset.relativeStrengthKey),

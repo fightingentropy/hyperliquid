@@ -555,6 +555,19 @@ function renderEmptyChart(message) {
   ui.clusterBars.appendChild(empty);
 }
 
+function getAxisTickCount() {
+  const width =
+    toNumber(ui.clusterBars?.clientWidth) ??
+    toNumber(window.innerWidth) ??
+    0;
+
+  if (width >= 1800) return 11;
+  if (width >= 1400) return 9;
+  if (width >= 1000) return 8;
+  if (width >= 760) return 7;
+  return 5;
+}
+
 function renderAxisTicks(min, max, tickCount = 5) {
   if (!ui.axis) return;
   ui.axis.innerHTML = "";
@@ -578,7 +591,7 @@ function renderAxisTicks(min, max, tickCount = 5) {
 
 function renderClusters(clusterData) {
   if (!clusterData || !clusterData.bins.length) {
-    renderAxisTicks(null, null);
+    renderAxisTicks(null, null, getAxisTickCount());
     setText(ui.priceRange, "--");
     if (ui.currentPriceLine) {
       ui.currentPriceLine.classList.remove("visible");
@@ -620,7 +633,7 @@ function renderClusters(clusterData) {
     ui.clusterBars.appendChild(bar);
   });
 
-  renderAxisTicks(min, max);
+  renderAxisTicks(min, max, getAxisTickCount());
   let rangeLabel = `${formatPrice(min)} - ${formatPrice(max)}`;
   if (state.settings.showBinSize) {
     rangeLabel += ` | Bin ${formatPrice(size)}`;
@@ -969,6 +982,12 @@ function init() {
   attachEvents();
   loadMidPrice();
   loadLeaderboard();
+
+  let resizeTimer = null;
+  window.addEventListener("resize", () => {
+    if (resizeTimer) clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => renderAll(), 120);
+  });
 
   window.addEventListener("storage", (event) => {
     if (event.key !== SETTINGS_KEY) return;

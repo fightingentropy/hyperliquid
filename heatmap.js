@@ -11,6 +11,9 @@ const heatmapUi = {
 };
 
 const HEATMAP_TILE_GAP = 4;
+const MIN_VISIBLE_TILE_WIDTH = 78;
+const MIN_VISIBLE_TILE_HEIGHT = 52;
+const MIN_VISIBLE_TILE_AREA = 4800;
 
 function toNumber(value) {
   const num = Number(value);
@@ -198,7 +201,13 @@ function renderHeatmap() {
     .map(({ row, x, y, w, h }) => {
       const tileWidth = Math.max(0, w - HEATMAP_TILE_GAP);
       const tileHeight = Math.max(0, h - HEATMAP_TILE_GAP);
-      if (tileWidth < 8 || tileHeight < 8) return "";
+      if (
+        tileWidth < MIN_VISIBLE_TILE_WIDTH ||
+        tileHeight < MIN_VISIBLE_TILE_HEIGHT ||
+        tileWidth * tileHeight < MIN_VISIBLE_TILE_AREA
+      ) {
+        return "";
+      }
 
       const metricValue = row[metric];
       const color = metricColor(metricValue);

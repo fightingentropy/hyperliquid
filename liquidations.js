@@ -137,6 +137,17 @@ function formatPrice(value) {
   }).format(num);
 }
 
+function formatAxisPrice(value) {
+  if (value === null || value === undefined) return "--";
+  const num = Number(value);
+  if (!Number.isFinite(num)) return "--";
+  const decimals = num >= 1000 ? 0 : num >= 100 ? 1 : num >= 1 ? 2 : 4;
+  return new Intl.NumberFormat("en-US", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: decimals,
+  }).format(num);
+}
+
 function formatTime(value) {
   const timestamp = Number(value);
   if (!Number.isFinite(timestamp)) return "--";
@@ -560,12 +571,9 @@ function getAxisTickCount() {
     toNumber(ui.clusterBars?.clientWidth) ??
     toNumber(window.innerWidth) ??
     0;
-
-  if (width >= 1800) return 11;
-  if (width >= 1400) return 9;
-  if (width >= 1000) return 8;
-  if (width >= 760) return 7;
-  return 5;
+  if (!Number.isFinite(width) || width <= 0) return 5;
+  const estimated = Math.floor(width / 130) + 1;
+  return Math.max(5, Math.min(15, estimated));
 }
 
 function renderAxisTicks(min, max, tickCount = 5) {
@@ -584,7 +592,7 @@ function renderAxisTicks(min, max, tickCount = 5) {
     const fraction = tickCount === 1 ? 0 : index / (tickCount - 1);
     const value = min + range * fraction;
     const tick = document.createElement("span");
-    tick.textContent = formatPrice(value);
+    tick.textContent = formatAxisPrice(value);
     ui.axis.appendChild(tick);
   }
 }

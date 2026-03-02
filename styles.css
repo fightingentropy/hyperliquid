@@ -2039,3 +2039,8 @@ a.ghost {
 .liquidations-page .cluster-panel .chart-meta {
     color: #9fafc2;
 }
+
+.liquidations-page .cluster-panel .chart-axis {
+    font-size: 0.66rem;
+    letter-spacing: 0.01em;
+}

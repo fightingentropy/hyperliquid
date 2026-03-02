@@ -1915,6 +1915,9 @@ a.ghost {
 .app-shell-page .nav-link.active,
 .liquidations-page .nav-link.active,
 .perpetuals-page .nav-link.active {
+    border: 0;
+    background: transparent;
+    box-shadow: none;
     color: #f3fbff;
     text-shadow: 0 0 12px rgba(133, 210, 245, 0.32);
 }

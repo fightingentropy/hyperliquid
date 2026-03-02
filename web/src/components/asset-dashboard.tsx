@@ -820,7 +820,8 @@ export function AssetDashboardPage() {
     <main className="asset-page-shell h-screen overflow-hidden bg-transparent text-[#a0adbe]">
       <nav className="top-nav asset-shared-nav">
         <a className="brand" href="/">
-          HL Stats
+          <span className="brand-logo" aria-hidden="true" />
+          <span className="brand-text">Stats</span>
         </a>
         <div className="nav-links">
           {TOP_NAV_LINKS.map((item) => (

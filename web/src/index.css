@@ -70,6 +70,9 @@ body {
 
 .asset-shared-nav .brand {
   text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   border: 1px solid #343d49;
   border-radius: 10px;
   background: rgba(18, 23, 29, 0.56);
@@ -78,6 +81,22 @@ body {
   font-size: 0.78rem;
   font-weight: 700;
   letter-spacing: 0.02em;
+  text-transform: none;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.asset-shared-nav .brand-logo {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+  background: #74d8cf;
+  -webkit-mask: url("/imgs/hyperliquid-hype-logo.svg") center / contain no-repeat;
+  mask: url("/imgs/hyperliquid-hype-logo.svg") center / contain no-repeat;
+}
+
+.asset-shared-nav .brand-text {
+  color: inherit;
   line-height: 1;
 }
 

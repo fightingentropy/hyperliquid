@@ -8,6 +8,7 @@
         "Liberation Mono", "Courier New", monospace;
 
     --bg: #07090d;
+    --dot-pattern: url("/imgs/dot-grid.svg");
     --bg-elevated: #0b1017;
     --bg-alt: #0e141d;
     --bg-nav: rgba(9, 13, 19, 0.9);
@@ -110,18 +111,10 @@ body {
     margin: 0;
     font-family: var(--font-sans);
     color: var(--ink);
-    background:
-        radial-gradient(
-            circle at 22% -20%,
-            rgba(38, 84, 140, 0.14),
-            transparent 42%
-        ),
-        radial-gradient(
-            circle at 82% -22%,
-            rgba(46, 207, 208, 0.06),
-            transparent 36%
-        ),
-        var(--bg);
+    background-color: var(--bg);
+    background-image: var(--dot-pattern);
+    background-repeat: repeat;
+    background-size: 48px 48px;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
 }
@@ -1016,18 +1009,10 @@ a.ghost {
 
 /* Shared blue shell used by Liquidations + static analytics pages. */
 .app-shell-page {
-    background:
-        radial-gradient(
-            circle at 18% -10%,
-            rgba(33, 112, 181, 0.22),
-            transparent 40%
-        ),
-        radial-gradient(
-            circle at 86% -12%,
-            rgba(46, 207, 208, 0.1),
-            transparent 34%
-        ),
-        #070c14;
+    background-color: var(--bg);
+    background-image: var(--dot-pattern);
+    background-repeat: repeat;
+    background-size: 48px 48px;
 }
 
 .app-shell-page .top-nav {
@@ -1071,9 +1056,7 @@ a.ghost {
     padding: 22px 26px;
     border: 1px solid #1b2635;
     border-radius: 10px;
-    background:
-        linear-gradient(120deg, rgba(10, 45, 83, 0.46), rgba(2, 12, 34, 0.7)),
-        #070c14;
+    background: #070c14;
     align-items: stretch;
 }
 
@@ -1222,18 +1205,10 @@ a.ghost {
 
 /* Liquidations page: align with blue dashboard style */
 .liquidations-page {
-    background:
-        radial-gradient(
-            circle at 18% -10%,
-            rgba(33, 112, 181, 0.22),
-            transparent 40%
-        ),
-        radial-gradient(
-            circle at 86% -12%,
-            rgba(46, 207, 208, 0.1),
-            transparent 34%
-        ),
-        #070c14;
+    background-color: var(--bg);
+    background-image: var(--dot-pattern);
+    background-repeat: repeat;
+    background-size: 48px 48px;
 }
 
 .liquidations-page .top-nav {
@@ -1290,9 +1265,7 @@ a.ghost {
     padding: 22px 26px;
     border: 1px solid #1b2635;
     border-radius: 10px;
-    background:
-        linear-gradient(120deg, rgba(10, 45, 83, 0.46), rgba(2, 12, 34, 0.7)),
-        #070c14;
+    background: #070c14;
     align-items: stretch;
 }
 
@@ -1446,18 +1419,10 @@ a.ghost {
 
 /* Local perpetuals/heatmap pages */
 .perpetuals-page {
-    background:
-        radial-gradient(
-            circle at 18% -10%,
-            rgba(33, 112, 181, 0.22),
-            transparent 40%
-        ),
-        radial-gradient(
-            circle at 86% -12%,
-            rgba(46, 207, 208, 0.1),
-            transparent 34%
-        ),
-        #070c14;
+    background-color: var(--bg);
+    background-image: var(--dot-pattern);
+    background-repeat: repeat;
+    background-size: 48px 48px;
 }
 
 .perpetuals-page .top-nav {

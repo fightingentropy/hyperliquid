@@ -1163,8 +1163,8 @@ export function AssetDashboardPage() {
               </div>
             ) : null}
 
-            <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-[176px] overflow-hidden bg-[#11161dbf] p-1.5 backdrop-blur-[2px] sm:w-[188px]">
-              <div className="grid h-full grid-cols-2 gap-x-1.5 overflow-auto pr-0.5 text-[7px] leading-[1.1] sm:text-[9px]">
+            <div className="pointer-events-none absolute left-0 top-0 z-10 w-[176px] overflow-hidden bg-[#11161dbf] p-1.5 sm:w-[188px]">
+              <div className="grid grid-cols-2 gap-x-1.5 pr-0.5 text-[7px] leading-[1.1] sm:text-[9px]">
                 <div className="space-y-[2px]">{leftRelativeSymbols.map(renderRelativeRow)}</div>
                 <div className="space-y-[2px]">{rightRelativeSymbols.map(renderRelativeRow)}</div>
               </div>

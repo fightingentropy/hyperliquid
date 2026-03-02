@@ -33,11 +33,6 @@
             <div class="hero-content">
                 <p class="eyebrow">Hyperliquid Intelligence</p>
                 <h1>HYPE Liquidation Clusters</h1>
-                <div class="hero-actions">
-                    <button id="refresh-button" class="primary">
-                        Refresh Scan
-                    </button>
-                </div>
             </div>
             <div class="hero-metrics">
                 <div class="metric">
@@ -63,7 +58,27 @@
             <section class="panel cluster-panel">
                 <div class="panel-header">
                     <div>
-                        <h2>Liquidation Distribution</h2>
+                        <div class="cluster-heading">
+                            <h2>Liquidation Distribution</h2>
+                            <button
+                                id="refresh-button"
+                                class="cluster-refresh-button"
+                                type="button"
+                                aria-label="Refresh scan"
+                                title="Refresh scan"
+                            >
+                                <svg viewBox="0 0 24 24" aria-hidden="true">
+                                    <path
+                                        d="M20 12a8 8 0 1 1-2.34-5.66M20 4v4h-4"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        stroke-width="1.8"
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                    />
+                                </svg>
+                            </button>
+                        </div>
                     </div>
                     <div class="controls">
                         <div class="segmented" id="side-toggle">

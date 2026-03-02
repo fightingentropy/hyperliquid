@@ -2081,6 +2081,44 @@ a.ghost {
     border-bottom: 0;
 }
 
+.liquidations-page .cluster-heading {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.liquidations-page .cluster-refresh-button {
+    width: 22px;
+    height: 22px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: #8ca7bf;
+    padding: 0;
+    cursor: pointer;
+    opacity: 0.92;
+    transition: color 0.15s ease, opacity 0.15s ease, transform 0.15s ease;
+}
+
+.liquidations-page .cluster-refresh-button svg {
+    width: 16px;
+    height: 16px;
+}
+
+.liquidations-page .cluster-refresh-button:hover {
+    color: #bde7ff;
+    opacity: 1;
+    transform: rotate(20deg);
+}
+
+.liquidations-page .cluster-refresh-button:focus-visible {
+    outline: 1px solid rgba(118, 196, 235, 0.6);
+    outline-offset: 2px;
+}
+
 .liquidations-page .cluster-panel .chart-shell {
     margin: 0 16px 10px;
     padding: 0;

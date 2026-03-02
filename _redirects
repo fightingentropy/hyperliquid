@@ -1,0 +1,22 @@
+/ /asset/HYPE%2FUSD 302
+/trade / 302
+/trade/* / 302
+
+/about /about.html 200
+/about/ /about.html 200
+/heatmap /heatmap.html 200
+/heatmap/ /heatmap.html 200
+/liquidations /liquidations.html 200
+/liquidations/ /liquidations.html 200
+/perpetuals /perpetuals.html 200
+/perpetuals/ /perpetuals.html 200
+/settings /settings.html 200
+/settings/ /settings.html 200
+/unstaking /unstaking.html 200
+/unstaking/ /unstaking.html 200
+/wallet /wallet.html 200
+/wallet/ /wallet.html 200
+/wallets/* /wallet.html 200
+
+/asset /web/dist/index.html 200
+/asset/* /web/dist/index.html 200

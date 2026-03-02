@@ -6,7 +6,10 @@
     "start": "bun index.ts",
     "web:dev": "bunx --bun vite --config web/vite.config.ts",
     "web:build": "bunx --bun vite build --config web/vite.config.ts",
-    "web:typecheck": "bunx --bun tsc -p web/tsconfig.json --noEmit"
+    "web:typecheck": "bunx --bun tsc -p web/tsconfig.json --noEmit",
+    "pages:build": "bash scripts/build-pages.sh",
+    "pages:dev": "bun run pages:build && bunx --bun wrangler pages dev .cloudflare/pages",
+    "pages:deploy": "bun run pages:build && bunx --bun wrangler pages deploy .cloudflare/pages"
   },
   "dependencies": {
     "@radix-ui/react-progress": "^1.1.8",

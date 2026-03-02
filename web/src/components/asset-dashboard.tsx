@@ -7,7 +7,6 @@ import {
   Line,
   LineChart,
   ReferenceLine,
-  ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
@@ -345,6 +344,35 @@ function calculateMovingAverage(candles: Candle[], period: number) {
   return result;
 }
 
+function useElementSize<T extends HTMLElement>() {
+  const ref = useRef<T | null>(null);
+  const [size, setSize] = useState({ width: 0, height: 0 });
+
+  useEffect(() => {
+    const element = ref.current;
+    if (!element) return;
+
+    const update = () => {
+      const rect = element.getBoundingClientRect();
+      const width = Math.max(0, Math.floor(rect.width));
+      const height = Math.max(0, Math.floor(rect.height));
+      setSize((prev) =>
+        prev.width === width && prev.height === height ? prev : { width, height },
+      );
+    };
+
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(element);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, []);
+
+  return [ref, size] as const;
+}
+
 function CandlestickView({ candles }: { candles: Candle[] }) {
   const RIGHT_LOGICAL_PADDING: number = 3;
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -502,6 +530,8 @@ export function AssetDashboardPage() {
   const [hoveredRelativeRow, setHoveredRelativeRow] = useState<Record<string, number> | null>(
     null,
   );
+  const [depthChartRef, depthChartSize] = useElementSize<HTMLDivElement>();
+  const [relativeChartRef, relativeChartSize] = useElementSize<HTMLDivElement>();
   const isDocumentHidden = () =>
     typeof document !== "undefined" && document.visibilityState === "hidden";
 
@@ -894,78 +924,82 @@ export function AssetDashboardPage() {
               </Badge>
             </CardTitle>
           </CardHeader>
-          <CardContent className="h-full p-0 pr-2">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart
-                data={depthChartRowsForRender}
-                margin={{ top: 8, right: 0, left: 0, bottom: 8 }}
-              >
-                <defs>
-                  <linearGradient id="depthBids" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#2ecfd0" stopOpacity={0.35} />
-                    <stop offset="100%" stopColor="#2ecfd0" stopOpacity={0.02} />
-                  </linearGradient>
-                  <linearGradient id="depthAsks" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#ff606a" stopOpacity={0.34} />
-                    <stop offset="100%" stopColor="#ff606a" stopOpacity={0.02} />
-                  </linearGradient>
-                </defs>
+          <CardContent className="h-full min-h-[220px] p-0 pr-2">
+            <div ref={depthChartRef} className="h-full w-full">
+              {depthChartSize.width > 0 && depthChartSize.height > 0 ? (
+                <AreaChart
+                  width={depthChartSize.width}
+                  height={depthChartSize.height}
+                  data={depthChartRowsForRender}
+                  margin={{ top: 8, right: 0, left: 0, bottom: 8 }}
+                >
+                  <defs>
+                    <linearGradient id="depthBids" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#2ecfd0" stopOpacity={0.35} />
+                      <stop offset="100%" stopColor="#2ecfd0" stopOpacity={0.02} />
+                    </linearGradient>
+                    <linearGradient id="depthAsks" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#ff606a" stopOpacity={0.34} />
+                      <stop offset="100%" stopColor="#ff606a" stopOpacity={0.02} />
+                    </linearGradient>
+                  </defs>
 
-                <CartesianGrid stroke="rgba(41, 58, 80, 0.52)" strokeDasharray="0" />
-                <XAxis
-                  dataKey="price"
-                  type="number"
-                  tick={{ fill: "#7f93aa", fontSize: 11 }}
-                  tickFormatter={(value) => `$${formatPrice(value)}`}
-                  domain={["dataMin", "dataMax"]}
-                />
-                <YAxis
-                  tick={{ fill: "#7f93aa", fontSize: 11 }}
-                  tickFormatter={(value) => formatCompact(value)}
-                />
-                {depthMid ? (
-                  <ReferenceLine x={depthMid} stroke="#31475f" strokeDasharray="3 4" />
-                ) : null}
-                <Tooltip
-                  cursor={false}
-                  contentStyle={{
-                    border: "1px solid #1b2635",
-                    borderRadius: "4px",
-                    backgroundColor: "#101722",
-                    color: "#c0cfdd",
-                    fontSize: "11px",
-                  }}
-                  formatter={(value: number | undefined, name: string | undefined) =>
-                    [
-                      formatCompact(value),
-                      name === "bids" ? "Bids" : "Asks",
-                    ] as [string, string]
-                  }
-                  labelFormatter={(value) => `Price: $${formatPrice(Number(value))}`}
-                />
+                  <CartesianGrid stroke="rgba(41, 58, 80, 0.52)" strokeDasharray="0" />
+                  <XAxis
+                    dataKey="price"
+                    type="number"
+                    tick={{ fill: "#7f93aa", fontSize: 11 }}
+                    tickFormatter={(value) => `$${formatPrice(value)}`}
+                    domain={["dataMin", "dataMax"]}
+                  />
+                  <YAxis
+                    tick={{ fill: "#7f93aa", fontSize: 11 }}
+                    tickFormatter={(value) => formatCompact(value)}
+                  />
+                  {depthMid ? (
+                    <ReferenceLine x={depthMid} stroke="#31475f" strokeDasharray="3 4" />
+                  ) : null}
+                  <Tooltip
+                    cursor={false}
+                    contentStyle={{
+                      border: "1px solid #1b2635",
+                      borderRadius: "4px",
+                      backgroundColor: "#101722",
+                      color: "#c0cfdd",
+                      fontSize: "11px",
+                    }}
+                    formatter={(value: number | undefined, name: string | undefined) =>
+                      [
+                        formatCompact(value),
+                        name === "bids" ? "Bids" : "Asks",
+                      ] as [string, string]
+                    }
+                    labelFormatter={(value) => `Price: $${formatPrice(Number(value))}`}
+                  />
 
-                <Area
-                  type="stepAfter"
-                  dataKey="bids"
-                  stroke="#2ecfd0"
-                  fill="url(#depthBids)"
-                  strokeWidth={2}
-                  connectNulls
-                  dot={false}
-                  isAnimationActive={false}
-                />
-                <Area
-                  type="stepBefore"
-                  dataKey="asks"
-                  stroke="#ff606a"
-                  fill="url(#depthAsks)"
-                  strokeWidth={2}
-                  connectNulls
-                  dot={false}
-                  isAnimationActive={false}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
+                  <Area
+                    type="stepAfter"
+                    dataKey="bids"
+                    stroke="#2ecfd0"
+                    fill="url(#depthBids)"
+                    strokeWidth={2}
+                    connectNulls
+                    dot={false}
+                    isAnimationActive={false}
+                  />
+                  <Area
+                    type="stepBefore"
+                    dataKey="asks"
+                    stroke="#ff606a"
+                    fill="url(#depthAsks)"
+                    strokeWidth={2}
+                    connectNulls
+                    dot={false}
+                    isAnimationActive={false}
+                  />
+                </AreaChart>
+              ) : null}
+            </div>
           </CardContent>
         </Card>
 
@@ -976,10 +1010,12 @@ export function AssetDashboardPage() {
               Relative Strength
             </CardTitle>
           </CardHeader>
-          <CardContent className="relative h-full min-h-0 p-0">
-            <div className="absolute inset-0">
-              <ResponsiveContainer width="100%" height="100%">
+          <CardContent className="relative h-full min-h-[260px] p-0">
+            <div ref={relativeChartRef} className="absolute inset-0">
+              {relativeChartSize.width > 0 && relativeChartSize.height > 0 ? (
                 <LineChart
+                  width={relativeChartSize.width}
+                  height={relativeChartSize.height}
                   data={relative.chartRows}
                   margin={{ top: 8, right: 14, left: 8, bottom: 0 }}
                   onMouseMove={(state: any) => {
@@ -1070,7 +1106,7 @@ export function AssetDashboardPage() {
                     );
                   })}
                 </LineChart>
-              </ResponsiveContainer>
+              ) : null}
             </div>
 
             {selectedStrengthKey && selectedRelativeValue != null ? (

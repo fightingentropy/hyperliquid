@@ -15,6 +15,7 @@
     "0xadd12adbbd5db87674b38af99b6dd34dd2a45e0d",
   ];
   const DEFAULT_FOLLOWED_WALLET_LABELS = Object.freeze({
+    "0xaf0fdd39e5d92499b0ed9f68693da99c0ec1e92e": "purple surfer",
     "0x8def9f50456c6c4e37fa5d3d57f108ed23992dae": "loracle",
     "0xcb58b8f5ec6d47985f0728465c25a08ef9ad2c7b": "CL",
     "0xadd12adbbd5db87674b38af99b6dd34dd2a45e0d": "nexus",

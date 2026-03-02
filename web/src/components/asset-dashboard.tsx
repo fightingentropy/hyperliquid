@@ -495,6 +495,26 @@ function CandlestickView({ candles }: { candles: Candle[] }) {
   return <div ref={containerRef} className="h-full w-full" />;
 }
 
+function LongShortBar({
+  longPct,
+  shortPct,
+}: {
+  longPct: number | null | undefined;
+  shortPct: number | null | undefined;
+}) {
+  const longValue = Math.max(0, Math.min(100, Number(longPct ?? 0)));
+  const shortValue = Math.max(0, Math.min(100, Number(shortPct ?? 0)));
+
+  return (
+    <div className="mt-1 h-2 w-full overflow-hidden rounded-sm bg-[#202a36]">
+      <div className="flex h-full w-full">
+        <div className="bg-[#2ecfd0]" style={{ width: `${longValue}%` }} />
+        <div className="bg-[#ff606a]" style={{ width: `${shortValue}%` }} />
+      </div>
+    </div>
+  );
+}
+
 export function AssetDashboardPage() {
   const location = useLocation();
   const [assetPair, setAssetPair] = useState(() => {
@@ -1149,11 +1169,83 @@ export function AssetDashboardPage() {
                 <div className="space-y-[2px]">{rightRelativeSymbols.map(renderRelativeRow)}</div>
               </div>
             </div>
-            {error ? (
-              <p className="pointer-events-none absolute bottom-2 right-2 text-xs text-[#ff606a]">
-                {error}
-              </p>
-            ) : null}
+          </CardContent>
+        </Card>
+
+        <Card className="asset-panel asset-panel-stats flex min-h-0 flex-col overflow-hidden">
+          <CardHeader className="px-2.5 pb-2 pt-2.5">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm uppercase tracking-[0.14em] text-[#a1afbe]">
+                Sentiment
+              </CardTitle>
+              <Badge variant={bullish ? "positive" : "negative"}>
+                {bullish ? "Bullish" : "Bearish"}
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="flex h-full flex-col gap-5 p-4 pt-2">
+            <section>
+              <div className="mb-1 text-xs uppercase tracking-[0.16em] text-[#8f9dac]">
+                Long vs Short
+              </div>
+              <div className="mb-1 flex items-center justify-between font-mono text-base">
+                <div className="text-[#2ecfd0]">{(ratios?.long_pct ?? 0).toFixed(1)}% Long</div>
+                <div className="text-[#ff606a]">{(ratios?.short_pct ?? 0).toFixed(1)}% Short</div>
+              </div>
+              <LongShortBar longPct={ratios?.long_pct} shortPct={ratios?.short_pct} />
+            </section>
+
+            <section className="space-y-4">
+              <div className="text-xs uppercase tracking-[0.16em] text-[#8f9dac]">
+                Open Interest
+              </div>
+
+              <div>
+                <div className="mb-1 flex items-center justify-between text-[11px] uppercase tracking-[0.14em] text-[#90a0b3]">
+                  <span>Evaluation</span>
+                  <span>
+                    {(openInterest?.evaluation.long_pct ?? 0).toFixed(1)} /{" "}
+                    {(openInterest?.evaluation.short_pct ?? 0).toFixed(1)}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-[11px] font-mono">
+                  <span className="text-[#2ecfd0]">
+                    Long {(openInterest?.evaluation.long_pct ?? 0).toFixed(1)}%
+                  </span>
+                  <span className="text-[#ff606a]">
+                    Short {(openInterest?.evaluation.short_pct ?? 0).toFixed(1)}%
+                  </span>
+                </div>
+                <LongShortBar
+                  longPct={openInterest?.evaluation.long_pct}
+                  shortPct={openInterest?.evaluation.short_pct}
+                />
+              </div>
+
+              <div>
+                <div className="mb-1 flex items-center justify-between text-[11px] uppercase tracking-[0.14em] text-[#90a0b3]">
+                  <span>Funded</span>
+                  <span>
+                    {(openInterest?.funded.long_pct ?? 0).toFixed(1)} /{" "}
+                    {(openInterest?.funded.short_pct ?? 0).toFixed(1)}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-[11px] font-mono">
+                  <span className="text-[#2ecfd0]">
+                    Long {(openInterest?.funded.long_pct ?? 0).toFixed(1)}%
+                  </span>
+                  <span className="text-[#ff606a]">
+                    Short {(openInterest?.funded.short_pct ?? 0).toFixed(1)}%
+                  </span>
+                </div>
+                <LongShortBar
+                  longPct={openInterest?.funded.long_pct}
+                  shortPct={openInterest?.funded.short_pct}
+                />
+              </div>
+            </section>
+
+            {error ? <p className="mt-auto text-xs text-[#ff606a]">{error}</p> : null}
           </CardContent>
         </Card>
 

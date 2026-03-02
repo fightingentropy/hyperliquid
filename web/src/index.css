@@ -176,7 +176,11 @@ body {
 }
 
 .asset-grid > .asset-panel-relative {
-  grid-column: 1 / -1;
+  grid-column: 1 / 2;
+}
+
+.asset-grid > .asset-panel-stats {
+  grid-column: 2 / 3;
 }
 
 @media (max-width: 1300px) {
@@ -188,6 +192,11 @@ body {
 
   .asset-page-content {
     padding: 12px;
+  }
+
+  .asset-grid > .asset-panel-relative,
+  .asset-grid > .asset-panel-stats {
+    grid-column: 1 / -1;
   }
 }
 

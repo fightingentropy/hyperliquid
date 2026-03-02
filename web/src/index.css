@@ -113,28 +113,26 @@ body {
 }
 
 .asset-shared-nav .nav-link {
+  position: relative;
+  overflow: hidden;
   text-decoration: none;
-  border: 1px solid rgba(113, 169, 194, 0.3);
+  border: 1px solid rgba(132, 169, 193, 0.32);
   border-radius: 8px;
-  color: #a4d8e5;
-  background: linear-gradient(
-    180deg,
-    rgba(120, 167, 193, 0.2) 0%,
-    rgba(28, 43, 57, 0.18) 100%
-  );
+  color: #b9d8ea;
+  background: rgba(22, 34, 47, 0.42);
   padding: 9px 13px;
   font-size: 0.66rem;
-  font-weight: 600;
+  font-weight: 550;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   font-family: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   line-height: 1;
   white-space: nowrap;
-  backdrop-filter: blur(14px) saturate(140%);
+  backdrop-filter: blur(18px) saturate(165%) contrast(112%);
   box-shadow:
-    inset 0 1px 0 rgba(224, 242, 255, 0.28),
-    inset 0 -1px 0 rgba(7, 14, 24, 0.58),
-    0 8px 20px rgba(0, 0, 0, 0.22);
+    inset 0 1px 0 rgba(232, 246, 255, 0.26),
+    inset 0 -1px 0 rgba(8, 15, 24, 0.52),
+    0 6px 16px rgba(0, 0, 0, 0.2);
   transition:
     background 0.18s ease,
     border-color 0.18s ease,
@@ -143,33 +141,41 @@ body {
     transform 0.18s ease;
 }
 
-.asset-shared-nav .nav-link:hover {
-  border-color: rgba(150, 209, 232, 0.5);
-  color: #d9f6ff;
+.asset-shared-nav .nav-link::before {
+  content: "";
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  top: 1px;
+  height: 42%;
+  pointer-events: none;
+  border-radius: 999px;
   background: linear-gradient(
     180deg,
-    rgba(148, 196, 222, 0.3) 0%,
-    rgba(39, 57, 73, 0.26) 100%
+    rgba(248, 252, 255, 0.22) 0%,
+    rgba(248, 252, 255, 0) 100%
   );
+}
+
+.asset-shared-nav .nav-link:hover {
+  border-color: rgba(154, 194, 221, 0.48);
+  color: #def2ff;
+  background: rgba(34, 50, 67, 0.5);
   box-shadow:
-    inset 0 1px 0 rgba(237, 249, 255, 0.4),
-    inset 0 -1px 0 rgba(8, 17, 29, 0.5),
-    0 10px 24px rgba(0, 0, 0, 0.26);
+    inset 0 1px 0 rgba(244, 251, 255, 0.33),
+    inset 0 -1px 0 rgba(9, 17, 28, 0.46),
+    0 8px 19px rgba(0, 0, 0, 0.24);
   transform: translateY(-1px);
 }
 
 .asset-shared-nav .nav-link.active {
-  border-color: rgba(166, 224, 238, 0.64);
-  color: #e9f9ff;
-  background: linear-gradient(
-    180deg,
-    rgba(164, 212, 232, 0.36) 0%,
-    rgba(49, 74, 96, 0.33) 100%
-  );
+  border-color: rgba(177, 223, 245, 0.56);
+  color: #f1fbff;
+  background: rgba(49, 80, 105, 0.44);
   box-shadow:
-    inset 0 1px 0 rgba(245, 253, 255, 0.52),
-    inset 0 -1px 0 rgba(11, 22, 35, 0.44),
-    0 12px 26px rgba(0, 0, 0, 0.28);
+    inset 0 1px 0 rgba(249, 254, 255, 0.4),
+    inset 0 -1px 0 rgba(11, 21, 34, 0.4),
+    0 10px 22px rgba(0, 0, 0, 0.28);
 }
 
 .asset-page-content {

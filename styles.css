@@ -1832,31 +1832,43 @@ a.ghost {
 .app-shell-page .nav-links,
 .liquidations-page .nav-links,
 .perpetuals-page .nav-links {
-    background: rgba(18, 23, 29, 0.52);
-    border-color: #323b47;
+    gap: 6px;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
 }
 
 .app-shell-page .nav-link,
 .liquidations-page .nav-link,
 .perpetuals-page .nav-link {
-    color: #aeb9c8;
+    border-color: #0f3c50;
+    background: rgba(8, 35, 50, 0.84);
+    color: #7ed8d7;
+    border-radius: 4px;
+    font-family: var(--font-mono);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-size: 0.66rem;
+    font-weight: 500;
+    padding: 9px 12px;
 }
 
 .app-shell-page .nav-link:hover,
 .liquidations-page .nav-link:hover,
 .perpetuals-page .nav-link:hover {
-    border-color: #495665;
-    color: #f0f4fa;
-    background: rgba(42, 50, 61, 0.56);
+    border-color: #2a697d;
+    color: #b5f2f0;
+    background: rgba(15, 69, 91, 0.92);
 }
 
 .app-shell-page .nav-link.active,
 .liquidations-page .nav-link.active,
 .perpetuals-page .nav-link.active {
-    border-color: #58667a;
-    background: rgba(53, 64, 77, 0.62);
-    color: #f2f6fb;
-    box-shadow: inset 0 0 0 1px rgba(46, 207, 208, 0.24);
+    border-color: #8fe5dd;
+    background: #7ad7cf;
+    color: #04232b;
+    box-shadow: none;
 }
 
 .app-shell-page .hero,

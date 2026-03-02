@@ -85,39 +85,42 @@ body {
   display: flex;
   min-width: 0;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   overflow-x: auto;
-  padding: 4px;
-  border: 1px solid #323b47;
-  border-radius: 12px;
-  background: rgba(18, 23, 29, 0.52);
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
 }
 
 .asset-shared-nav .nav-link {
   text-decoration: none;
-  border: 1px solid transparent;
-  border-radius: 8px;
-  color: #aeb9c8;
+  border: 1px solid #0f3c50;
+  border-radius: 4px;
+  color: #7ed8d7;
+  background: rgba(8, 35, 50, 0.84);
   padding: 9px 12px;
-  font-size: 0.73rem;
-  font-weight: 600;
-  letter-spacing: 0.02em;
+  font-size: 0.66rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-family: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   line-height: 1;
   white-space: nowrap;
   transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
 }
 
 .asset-shared-nav .nav-link:hover {
-  border-color: #495665;
-  color: #f0f4fa;
-  background: rgba(42, 50, 61, 0.56);
+  border-color: #2a697d;
+  color: #b5f2f0;
+  background: rgba(15, 69, 91, 0.92);
 }
 
 .asset-shared-nav .nav-link.active {
-  border-color: #58667a;
-  background: rgba(53, 64, 77, 0.62);
-  color: #f2f6fb;
-  box-shadow: inset 0 0 0 1px rgba(46, 207, 208, 0.24);
+  border-color: #8fe5dd;
+  background: #7ad7cf;
+  color: #04232b;
+  box-shadow: none;
 }
 
 .asset-page-content {

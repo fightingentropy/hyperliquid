@@ -114,6 +114,7 @@ const TOP_NAV_LINKS: Array<{ label: string; href: string }> = [
 const RELATIVE_Y_MIN = -10;
 const RELATIVE_Y_MAX = 25;
 const THREE_HOURS_MS = 3 * 60 * 60 * 1000;
+const RELATIVE_LIST_MAX_SYMBOLS = 32;
 const RELATIVE_Y_TICKS = Array.from(
   { length: Math.floor((RELATIVE_Y_MAX - RELATIVE_Y_MIN) / 2.5) + 1 },
   (_, index) => RELATIVE_Y_MIN + index * 2.5,
@@ -302,7 +303,7 @@ function toRelativeStrengthData(
     rankedEntries.unshift(focusEntry);
   }
 
-  const entries = rankedEntries.slice(0, 44);
+  const entries = rankedEntries.slice(0, RELATIVE_LIST_MAX_SYMBOLS);
 
   const symbols = entries.map(([name]) => name);
   const times = entries[0]?.[1]?.times ?? [];
@@ -788,7 +789,7 @@ export function AssetDashboardPage() {
       <div
         key={symbol}
         className={cn(
-          "flex items-center justify-between rounded-sm px-1 py-[2px] font-mono",
+          "flex items-center justify-between rounded-sm px-0.5 py-[1px] font-mono",
           active ? "bg-[#242d38] text-[#dfe6ef]" : "text-[#9daab9]",
         )}
       >
@@ -1118,10 +1119,10 @@ export function AssetDashboardPage() {
               </div>
             ) : null}
 
-            <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-[220px] overflow-hidden bg-[#11161dbf] p-2 backdrop-blur-[2px]">
-              <div className="grid h-full grid-cols-2 gap-x-2 overflow-auto pr-1 text-[8px] leading-[1.15] sm:text-[10px]">
-                <div className="space-y-0.5">{leftRelativeSymbols.map(renderRelativeRow)}</div>
-                <div className="space-y-0.5">{rightRelativeSymbols.map(renderRelativeRow)}</div>
+            <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-[176px] overflow-hidden bg-[#11161dbf] p-1.5 backdrop-blur-[2px] sm:w-[188px]">
+              <div className="grid h-full grid-cols-2 gap-x-1.5 overflow-auto pr-0.5 text-[7px] leading-[1.1] sm:text-[9px]">
+                <div className="space-y-[2px]">{leftRelativeSymbols.map(renderRelativeRow)}</div>
+                <div className="space-y-[2px]">{rightRelativeSymbols.map(renderRelativeRow)}</div>
               </div>
             </div>
           </CardContent>

@@ -14,6 +14,11 @@
     "0xcb58b8f5ec6d47985f0728465c25a08ef9ad2c7b",
     "0xadd12adbbd5db87674b38af99b6dd34dd2a45e0d",
   ];
+  const DEFAULT_FOLLOWED_WALLET_LABELS = Object.freeze({
+    "0x8def9f50456c6c4e37fa5d3d57f108ed23992dae": "loracle",
+    "0xcb58b8f5ec6d47985f0728465c25a08ef9ad2c7b": "CL",
+    "0xadd12adbbd5db87674b38af99b6dd34dd2a45e0d": "nexus",
+  });
 
   const ui = {
     addressInput: document.getElementById("address-input"),
@@ -151,6 +156,19 @@
     return `${address.slice(0, 6)}...${address.slice(-4)}`;
   }
 
+  function walletLabel(address) {
+    const normalized = normalizeAddress(address);
+    if (!normalized) return null;
+    return DEFAULT_FOLLOWED_WALLET_LABELS[normalized] ?? null;
+  }
+
+  function formatFollowedWalletLabel(address) {
+    const short = formatAddressShort(address);
+    const label = walletLabel(address);
+    if (!label) return short;
+    return `${label} (${short})`;
+  }
+
   function saveFollowedWallets() {
     try {
       localStorage.setItem(FOLLOWED_WALLETS_KEY, JSON.stringify(state.followedWallets));
@@ -208,6 +226,7 @@
     for (const wallet of state.followedWallets) {
       const chip = document.createElement("div");
       chip.className = "followed-wallet-chip";
+      const label = walletLabel(wallet);
 
       const openButton = document.createElement("button");
       openButton.type = "button";
@@ -215,14 +234,15 @@
       if (wallet === state.address) openButton.classList.add("active");
       openButton.dataset.role = "open";
       openButton.dataset.address = wallet;
-      openButton.textContent = formatAddressShort(wallet);
+      openButton.textContent = formatFollowedWalletLabel(wallet);
+      openButton.title = label ? `${label} - ${wallet}` : wallet;
 
       const removeButton = document.createElement("button");
       removeButton.type = "button";
       removeButton.className = "followed-wallet-remove";
       removeButton.dataset.role = "remove";
       removeButton.dataset.address = wallet;
-      removeButton.ariaLabel = `Remove ${wallet} from followed wallets`;
+      removeButton.ariaLabel = `Remove ${formatFollowedWalletLabel(wallet)} from followed wallets`;
       removeButton.textContent = "x";
 
       chip.appendChild(openButton);

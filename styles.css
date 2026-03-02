@@ -1979,6 +1979,35 @@ a.ghost {
     border-color: rgba(108, 121, 140, 0.94);
 }
 
+/* Heatmap should sit directly on the dotted canvas (no outer framing). */
+.heatmap-page .perpetuals-panel {
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+    backdrop-filter: none;
+    overflow: visible;
+}
+
+.heatmap-page .perpetuals-toolbar {
+    border-bottom: 0;
+    padding-left: 0;
+    padding-right: 0;
+}
+
+.heatmap-page .heatmap-grid {
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+}
+
+.heatmap-page .heatmap-tile {
+    border: 0;
+}
+
+.heatmap-page .heatmap-tile:hover {
+    border-color: transparent;
+}
+
 /* Liquidation distribution should sit directly on the dotted canvas. */
 .liquidations-page .cluster-panel {
     border: 0;

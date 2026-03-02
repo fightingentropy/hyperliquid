@@ -1947,3 +1947,35 @@ a.ghost {
 .heatmap-tile:hover {
     border-color: rgba(108, 121, 140, 0.94);
 }
+
+/* Liquidation distribution should sit directly on the dotted canvas. */
+.liquidations-page .cluster-panel {
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+    overflow: visible;
+}
+
+.liquidations-page .cluster-panel .panel-header {
+    margin: 0 16px;
+    padding: 14px 0 10px;
+    border-bottom: 0;
+}
+
+.liquidations-page .cluster-panel .chart-shell {
+    margin: 0 16px 10px;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+}
+
+.liquidations-page .cluster-panel .chart-area {
+    padding: 8px 0;
+}
+
+.liquidations-page .cluster-panel .chart-axis,
+.liquidations-page .cluster-panel .chart-legend,
+.liquidations-page .cluster-panel .chart-meta {
+    color: #9fafc2;
+}

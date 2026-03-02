@@ -1645,10 +1645,7 @@ Bun.serve({
     const url = new URL(req.url);
 
     if (url.pathname === "/") {
-      return new Response(null, {
-        status: 302,
-        headers: { Location: "/asset/HYPE%2FUSD" },
-      });
+      return serveAssetApp();
     }
 
     if (url.pathname === "/trade" || url.pathname.startsWith("/trade/")) {

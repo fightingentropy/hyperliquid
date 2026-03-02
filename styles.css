@@ -1580,38 +1580,83 @@ a.ghost {
 }
 
 .heatmap-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-    gap: 10px;
-    padding: 12px;
+    position: relative;
+    border: 1px solid #1b2635;
+    border-radius: 0;
+    overflow: hidden;
+    height: min(78vh, calc(100vh - 180px));
+    min-height: 520px;
+    background: #070c14;
 }
 
 .heatmap-tile {
-    display: grid;
-    gap: 5px;
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    gap: 6px;
     border: 1px solid rgba(17, 57, 95, 0.8);
     border-radius: 10px;
     text-decoration: none;
     color: #e6edf7;
     padding: 10px;
-    min-height: 84px;
+    transition:
+        filter 0.15s ease,
+        transform 0.15s ease,
+        border-color 0.15s ease;
+}
+
+.heatmap-tile:hover {
+    filter: brightness(1.06);
+    transform: translateY(-1px);
+    border-color: rgba(63, 110, 162, 0.9);
+}
+
+.heatmap-tile.compact {
+    gap: 3px;
+    padding: 7px;
+}
+
+.heatmap-tile.tiny {
+    gap: 2px;
+    padding: 6px;
 }
 
 .heatmap-symbol {
-    font-size: 0.9rem;
+    font-size: clamp(0.78rem, 1.1vw, 1.05rem);
     font-weight: 700;
+    line-height: 1.1;
 }
 
 .heatmap-value {
     font-family: var(--font-mono);
-    font-size: 1rem;
+    font-size: clamp(0.78rem, 1.15vw, 1.15rem);
     font-weight: 700;
+    line-height: 1.1;
 }
 
 .heatmap-meta {
     color: #a3b5ca;
-    font-size: 0.74rem;
+    font-size: clamp(0.65rem, 0.85vw, 0.82rem);
     font-family: var(--font-mono);
+    line-height: 1.15;
+}
+
+.heatmap-tile.compact .heatmap-meta.secondary {
+    display: none;
+}
+
+.heatmap-tile.tiny .heatmap-meta {
+    display: none;
+}
+
+.heatmap-grid > .muted {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
 }
 
 @media (max-width: 1240px) {
@@ -1681,6 +1726,11 @@ a.ghost {
 
     .chart-area {
         height: 220px;
+    }
+
+    .heatmap-grid {
+        height: 62vh;
+        min-height: 360px;
     }
 
     .chart-legend {

@@ -10,6 +10,8 @@ const heatmapUi = {
   grid: document.getElementById("heatmap-grid"),
 };
 
+const HEATMAP_TILE_GAP = 4;
+
 function toNumber(value) {
   const num = Number(value);
   return Number.isFinite(num) ? num : null;
@@ -49,13 +51,125 @@ function metricColor(value) {
   return `rgba(255, 96, 106, ${0.18 + intensity * 0.45})`;
 }
 
+function worstAspect(row, side) {
+  if (!row.length || side <= 0) return Number.POSITIVE_INFINITY;
+  let sum = 0;
+  let min = Number.POSITIVE_INFINITY;
+  let max = 0;
+  for (const node of row) {
+    const area = Math.max(0, node.area);
+    sum += area;
+    if (area < min) min = area;
+    if (area > max) max = area;
+  }
+  if (sum <= 0 || min <= 0) return Number.POSITIVE_INFINITY;
+  const sideSq = side * side;
+  return Math.max((sideSq * max) / (sum * sum), (sum * sum) / (sideSq * min));
+}
+
+function layoutTreemapRow(row, rect, out) {
+  const totalArea = row.reduce((sum, node) => sum + node.area, 0);
+  if (!row.length || totalArea <= 0) return rect;
+
+  if (rect.w >= rect.h) {
+    const rowHeight = rect.w > 0 ? totalArea / rect.w : 0;
+    let cursorX = rect.x;
+    for (const node of row) {
+      const itemWidth = rowHeight > 0 ? node.area / rowHeight : 0;
+      out.push({ row: node.row, x: cursorX, y: rect.y, w: itemWidth, h: rowHeight });
+      cursorX += itemWidth;
+    }
+    return {
+      x: rect.x,
+      y: rect.y + rowHeight,
+      w: rect.w,
+      h: Math.max(0, rect.h - rowHeight),
+    };
+  }
+
+  const colWidth = rect.h > 0 ? totalArea / rect.h : 0;
+  let cursorY = rect.y;
+  for (const node of row) {
+    const itemHeight = colWidth > 0 ? node.area / colWidth : 0;
+    out.push({ row: node.row, x: rect.x, y: cursorY, w: colWidth, h: itemHeight });
+    cursorY += itemHeight;
+  }
+
+  return {
+    x: rect.x + colWidth,
+    y: rect.y,
+    w: Math.max(0, rect.w - colWidth),
+    h: rect.h,
+  };
+}
+
+function squarifyTreemap(nodes, currentRow, rect, out) {
+  if (!nodes.length) {
+    if (currentRow.length) layoutTreemapRow(currentRow, rect, out);
+    return;
+  }
+
+  if (rect.w <= 0 || rect.h <= 0) return;
+
+  const side = Math.min(rect.w, rect.h);
+  const nextNode = nodes[0];
+
+  if (!currentRow.length) {
+    squarifyTreemap(nodes.slice(1), [nextNode], rect, out);
+    return;
+  }
+
+  const currentWorst = worstAspect(currentRow, side);
+  const nextWorst = worstAspect([...currentRow, nextNode], side);
+
+  if (nextWorst <= currentWorst) {
+    squarifyTreemap(nodes.slice(1), [...currentRow, nextNode], rect, out);
+    return;
+  }
+
+  const nextRect = layoutTreemapRow(currentRow, rect, out);
+  squarifyTreemap(nodes, [], nextRect, out);
+}
+
+function computeTreemapLayout(rows, width, height) {
+  if (!rows.length || width <= 0 || height <= 0) return [];
+
+  const withWeight = rows
+    .map((row) => {
+      const openInterestUsd = toNumber(row.openInterestUsd);
+      return {
+        row,
+        weight: openInterestUsd != null ? Math.max(0, openInterestUsd) : 0,
+      };
+    })
+    .filter((entry) => entry.weight > 0)
+    .sort((a, b) => b.weight - a.weight);
+
+  if (!withWeight.length) return [];
+
+  const totalWeight = withWeight.reduce((sum, entry) => sum + entry.weight, 0);
+  if (totalWeight <= 0) return [];
+
+  const totalArea = width * height;
+  const nodes = withWeight.map((entry) => ({
+    row: entry.row,
+    area: (entry.weight / totalWeight) * totalArea,
+  }));
+
+  const out = [];
+  squarifyTreemap(nodes, [], { x: 0, y: 0, w: width, h: height }, out);
+  return out;
+}
+
 function renderHeatmap() {
   if (!heatmapUi.grid) return;
+
   const query = heatmapState.search.trim().toUpperCase();
   let rows = heatmapState.rows;
   if (query) {
     rows = rows.filter((row) => row.base.includes(query));
   }
+
   rows = rows
     .slice()
     .sort((a, b) => (b.openInterestUsd ?? -Infinity) - (a.openInterestUsd ?? -Infinity));
@@ -65,17 +179,41 @@ function renderHeatmap() {
     return;
   }
 
+  const width = Math.max(0, Math.floor(heatmapUi.grid.clientWidth));
+  const height = Math.max(0, Math.floor(heatmapUi.grid.clientHeight));
+
+  if (!width || !height) return;
+
   const metric = heatmapState.metric;
-  heatmapUi.grid.innerHTML = rows
-    .map((row) => {
+  const layout = computeTreemapLayout(rows, width, height);
+
+  if (!layout.length) {
+    heatmapUi.grid.innerHTML = '<div class="muted">No markets with open interest data yet.</div>';
+    return;
+  }
+
+  heatmapUi.grid.innerHTML = layout
+    .map(({ row, x, y, w, h }) => {
+      const tileWidth = Math.max(0, w - HEATMAP_TILE_GAP);
+      const tileHeight = Math.max(0, h - HEATMAP_TILE_GAP);
+      if (tileWidth < 8 || tileHeight < 8) return "";
+
       const metricValue = row[metric];
       const color = metricColor(metricValue);
       const href = `/asset/${encodeURIComponent(`${row.base}/USD`)}`;
-      return `<a class="heatmap-tile" href="${href}" style="background:${color}">
+
+      const compact = tileWidth < 130 || tileHeight < 100;
+      const tiny = tileWidth < 95 || tileHeight < 72;
+
+      const classes = ["heatmap-tile"];
+      if (compact) classes.push("compact");
+      if (tiny) classes.push("tiny");
+
+      return `<a class="${classes.join(" ")}" href="${href}" style="left:${x + HEATMAP_TILE_GAP / 2}px;top:${y + HEATMAP_TILE_GAP / 2}px;width:${tileWidth}px;height:${tileHeight}px;background:${color}">
         <div class="heatmap-symbol">${row.base}</div>
         <div class="heatmap-value">${formatPercent(metricValue)}</div>
         <div class="heatmap-meta">$${formatCompact(row.openInterestUsd)} OI</div>
-        <div class="heatmap-meta">$${formatCompact(row.volume1d)} Vol</div>
+        <div class="heatmap-meta secondary">$${formatCompact(row.volume1d)} Vol</div>
       </a>`;
     })
     .join("");
@@ -158,8 +296,17 @@ function initHeatmapControls() {
   });
 }
 
+function initHeatmapResize() {
+  let resizeTimer = null;
+  window.addEventListener("resize", () => {
+    if (resizeTimer) window.clearTimeout(resizeTimer);
+    resizeTimer = window.setTimeout(renderHeatmap, 120);
+  });
+}
+
 function initHeatmap() {
   initHeatmapControls();
+  initHeatmapResize();
   loadHeatmapData();
   setInterval(loadHeatmapData, 10_000);
 }

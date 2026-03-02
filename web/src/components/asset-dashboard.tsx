@@ -18,11 +18,10 @@ import {
   type IChartApi,
   type UTCTimestamp,
 } from "lightweight-charts";
-import { Activity, ArrowLeft, TrendingDown, TrendingUp } from "lucide-react";
+import { Activity, ArrowLeft } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 
@@ -494,26 +493,6 @@ function CandlestickView({ candles }: { candles: Candle[] }) {
   }, [candles]);
 
   return <div ref={containerRef} className="h-full w-full" />;
-}
-
-function DualBar({
-  longPct,
-  shortPct,
-}: {
-  longPct: number | null | undefined;
-  shortPct: number | null | undefined;
-}) {
-  const safeLong = Math.max(0, Math.min(100, Number(longPct ?? 0)));
-  const safeShort = Math.max(0, Math.min(100, Number(shortPct ?? 0)));
-
-  return (
-    <div className="mt-1 h-2 w-full overflow-hidden rounded-sm bg-[#171d25]">
-      <div className="flex h-full w-full">
-        <div className="bg-[#2ecfd0]" style={{ width: `${safeLong}%` }} />
-        <div className="bg-[#ff606a]" style={{ width: `${safeShort}%` }} />
-      </div>
-    </div>
-  );
 }
 
 export function AssetDashboardPage() {
@@ -1048,7 +1027,7 @@ export function AssetDashboardPage() {
           </CardContent>
         </Card>
 
-        <Card className="asset-panel flex min-h-0 flex-col overflow-hidden">
+        <Card className="asset-panel asset-panel-relative flex min-h-0 flex-col overflow-hidden">
           <CardHeader className="px-2.5 pb-2 pt-2.5">
             <CardTitle className="flex items-center gap-2 text-sm uppercase tracking-[0.14em] text-[#a1afbe]">
               <Activity className="h-3.5 w-3.5 text-[#2ecfd0]" />
@@ -1169,78 +1148,14 @@ export function AssetDashboardPage() {
                 <div className="space-y-[2px]">{rightRelativeSymbols.map(renderRelativeRow)}</div>
               </div>
             </div>
-          </CardContent>
-        </Card>
-
-        <Card className="asset-panel flex min-h-0 flex-col overflow-hidden">
-          <CardHeader className="px-2.5 pb-2 pt-2.5">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm uppercase tracking-[0.14em] text-[#a1afbe]">
-                Breakout Stats
-              </CardTitle>
-              <Badge variant={bullish ? "positive" : "negative"}>
-                {bullish ? "Bullish" : "Bearish"}
-              </Badge>
-            </div>
-          </CardHeader>
-
-          <CardContent className="flex h-full flex-col gap-5 p-4 pt-3">
-            <section>
-              <div className="mb-1 text-xs uppercase tracking-[0.16em] text-[#95a2b2]">Sentiment</div>
-              <div className="mb-1 flex items-center justify-between font-mono text-base">
-                <div className="flex items-center gap-1 text-[#2ecfd0]">
-                  <TrendingUp className="h-4 w-4" />
-                  <span>{(ratios?.long_pct ?? 0).toFixed(1)}% Long</span>
-                </div>
-                <div className="flex items-center gap-1 text-[#ff606a]">
-                  <span>{(ratios?.short_pct ?? 0).toFixed(1)}% Short</span>
-                  <TrendingDown className="h-4 w-4" />
-                </div>
-              </div>
-              <DualBar longPct={ratios?.long_pct} shortPct={ratios?.short_pct} />
-            </section>
-
-            <Separator />
-
-            <section className="space-y-4">
-              <div className="text-xs uppercase tracking-[0.16em] text-[#95a2b2]">Open Interest</div>
-
-              <div>
-                <div className="mb-1 flex items-center justify-between text-[11px] uppercase tracking-[0.14em] text-[#8fa0b3]">
-                  <span>Evaluation</span>
-                  <span>{(openInterest?.evaluation.long_pct ?? 0).toFixed(1)} / {(openInterest?.evaluation.short_pct ?? 0).toFixed(1)}</span>
-                </div>
-                <div className="flex items-center justify-between text-[11px] font-mono">
-                  <span className="text-[#2ecfd0]">Long {(openInterest?.evaluation.long_pct ?? 0).toFixed(1)}%</span>
-                  <span className="text-[#ff606a]">Short {(openInterest?.evaluation.short_pct ?? 0).toFixed(1)}%</span>
-                </div>
-                <DualBar
-                  longPct={openInterest?.evaluation.long_pct}
-                  shortPct={openInterest?.evaluation.short_pct}
-                />
-              </div>
-
-              <div>
-                <div className="mb-1 flex items-center justify-between text-[11px] uppercase tracking-[0.14em] text-[#8fa0b3]">
-                  <span>Funded</span>
-                  <span>{(openInterest?.funded.long_pct ?? 0).toFixed(1)} / {(openInterest?.funded.short_pct ?? 0).toFixed(1)}</span>
-                </div>
-                <div className="flex items-center justify-between text-[11px] font-mono">
-                  <span className="text-[#2ecfd0]">Long {(openInterest?.funded.long_pct ?? 0).toFixed(1)}%</span>
-                  <span className="text-[#ff606a]">Short {(openInterest?.funded.short_pct ?? 0).toFixed(1)}%</span>
-                </div>
-                <DualBar
-                  longPct={openInterest?.funded.long_pct}
-                  shortPct={openInterest?.funded.short_pct}
-                />
-              </div>
-            </section>
-
             {error ? (
-              <p className="mt-auto text-xs text-[#ff606a]">{error}</p>
+              <p className="pointer-events-none absolute bottom-2 right-2 text-xs text-[#ff606a]">
+                {error}
+              </p>
             ) : null}
           </CardContent>
         </Card>
+
         </div>
       </div>
     </main>

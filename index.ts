@@ -1669,7 +1669,7 @@ Bun.serve({
     }
 
     if (url.pathname === "/asset" || url.pathname.startsWith("/asset/")) {
-      return serveAssetApp();
+      return notFound();
     }
 
     const localStaticResponse = await serveStatic(url.pathname);

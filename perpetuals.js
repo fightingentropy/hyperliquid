@@ -135,7 +135,7 @@ function renderRows() {
       const change1hClass = (row.change1h ?? 0) >= 0 ? "positive" : "negative";
       const oi1dClass = (row.oiChg1d ?? 0) >= 0 ? "positive" : "negative";
       const oi1hClass = (row.oiChg1h ?? 0) >= 0 ? "positive" : "negative";
-      const href = `/asset/${encodeURIComponent(`${row.base}/USD`)}`;
+      const href = `/?asset=${encodeURIComponent(`${row.base}/USD`)}`;
       return `<tr>
         <td><a class="market-link" href="${href}">${row.base}</a></td>
         <td>$${formatPrice(row.price)}</td>

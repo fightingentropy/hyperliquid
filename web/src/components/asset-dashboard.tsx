@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useLocation, useParams } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import {
   Area,
   AreaChart,
@@ -111,6 +111,7 @@ const TOP_NAV_LINKS: Array<{ label: string; href: string }> = [
   { label: "Settings", href: "/settings" },
   { label: "About", href: "/about" },
 ];
+const DEFAULT_ASSET_PAIRS = ["HYPE/USD", "BTC/USD", "ETH/USD", "SOL/USD"];
 const RELATIVE_Y_MIN = -10;
 const RELATIVE_Y_MAX = 25;
 const THREE_HOURS_MS = 3 * 60 * 60 * 1000;
@@ -516,9 +517,14 @@ function DualBar({
 }
 
 export function AssetDashboardPage() {
-  const params = useParams();
   const location = useLocation();
-  const asset = useMemo(() => toAssetContext(params.symbol), [params.symbol]);
+  const [assetPair, setAssetPair] = useState(() => {
+    const params = new URLSearchParams(
+      typeof window === "undefined" ? "" : window.location.search,
+    );
+    return toAssetContext(params.get("asset") ?? undefined).pair;
+  });
+  const asset = useMemo(() => toAssetContext(assetPair), [assetPair]);
   const [timeframe, setTimeframe] = useState<Timeframe>("1h");
   const [candles, setCandles] = useState<Candle[]>([]);
   const [ratios, setRatios] = useState<RatiosResponse | null>(null);
@@ -537,6 +543,20 @@ export function AssetDashboardPage() {
     typeof document !== "undefined" && document.visibilityState === "hidden";
 
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const nextPair = toAssetContext(params.get("asset") ?? undefined).pair;
+    setAssetPair((prev) => (prev === nextPair ? prev : nextPair));
+  }, [location.search]);
+
+  const handleAssetPairChange = (nextPair: string) => {
+    const normalized = toAssetContext(nextPair).pair;
+    setAssetPair((prev) => (prev === normalized ? prev : normalized));
+    setHoveredRelativeRow(null);
+    setError(null);
+  };
+
   const orderedTimeframes = useMemo(() => {
     const active = TIMEFRAMES.find((item) => item.key === timeframe);
     if (!active) return TIMEFRAMES;
@@ -724,6 +744,15 @@ export function AssetDashboardPage() {
     () => toRelativeStrengthData(relativeStrength, asset.relativeStrengthKey),
     [asset.relativeStrengthKey, relativeStrength],
   );
+  const assetPairOptions = useMemo(() => {
+    const options = new Set<string>(DEFAULT_ASSET_PAIRS);
+    options.add(asset.pair);
+    for (const symbol of relative.symbols) {
+      options.add(toAssetContext(symbol).pair);
+    }
+    const sorted = Array.from(options).sort((a, b) => a.localeCompare(b));
+    return [asset.pair, ...sorted.filter((pair) => pair !== asset.pair)];
+  }, [asset.pair, relative.symbols]);
 
   const selectedStrengthKey = relative.symbols.includes(asset.relativeStrengthKey)
     ? asset.relativeStrengthKey
@@ -871,6 +900,21 @@ export function AssetDashboardPage() {
                 </Tabs>
 
                 <div className="flex min-w-0 items-center gap-2 overflow-hidden leading-none text-[#b2becc]">
+                  <label className="sr-only" htmlFor="asset-pair-select">
+                    Asset pair
+                  </label>
+                  <select
+                    id="asset-pair-select"
+                    value={asset.pair}
+                    onChange={(event) => handleAssetPairChange(event.target.value)}
+                    className="h-7 min-w-[92px] rounded-sm border border-[#3a4554] bg-[#1a212b] px-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#dbe5f1] outline-none transition-colors hover:bg-[#27313d] focus:border-[#5a687b]"
+                  >
+                    {assetPairOptions.map((pair) => (
+                      <option key={pair} value={pair}>
+                        {pair.replace("/USD", "")}
+                      </option>
+                    ))}
+                  </select>
                   <span className="shrink-0 text-[22px] sm:text-[26px]">{asset.pair}</span>
                   <span className="truncate text-[10px] uppercase tracking-[0.16em] text-[#8e9ba9]">
                     Perpetual · {TIMEFRAMES.find((item) => item.key === timeframe)?.label}

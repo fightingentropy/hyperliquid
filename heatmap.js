@@ -211,7 +211,7 @@ function renderHeatmap() {
 
       const metricValue = row[metric];
       const color = metricColor(metricValue);
-      const href = `/asset/${encodeURIComponent(`${row.base}/USD`)}`;
+      const href = `/?asset=${encodeURIComponent(`${row.base}/USD`)}`;
 
       const compact = tileWidth < 130 || tileHeight < 100;
       const tiny = tileWidth < 95 || tileHeight < 72;

@@ -1,9 +1,6 @@
 / /asset-app 200
 /favicon.ico /favicon.svg 200
 
-/asset /asset-app 200
-/asset/* /asset-app 200
-
 /trade / 302
 /trade/* / 302
 /wallets/* /wallet 200

@@ -7,11 +7,11 @@
         "Geist Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
         "Liberation Mono", "Courier New", monospace;
 
-    --bg: #0f1114;
+    --bg: #101318;
     --dot-pattern: url("/imgs/dot-grid.svg");
-    --bg-elevated: #151a21;
-    --bg-alt: #1a2028;
-    --bg-nav: rgba(16, 20, 26, 0.86);
+    --bg-elevated: rgba(21, 27, 35, 0.62);
+    --bg-alt: rgba(26, 33, 43, 0.62);
+    --bg-nav: rgba(16, 20, 27, 0.66);
     --ink: #e9edf4;
     --muted: #a0aab8;
     --muted-2: #7c8796;
@@ -20,10 +20,10 @@
     --accent-2: #2ecfd0;
     --accent-soft: rgba(46, 207, 208, 0.16);
 
-    --panel: rgba(18, 23, 30, 0.9);
+    --panel: rgba(17, 22, 30, 0.62);
     --panel-border: #2a313b;
     --panel-border-strong: #37414e;
-    --hover: #1d2530;
+    --hover: rgba(35, 44, 56, 0.8);
 
     --profit: #2ecfd0;
     --loss: #ff606a;
@@ -41,10 +41,10 @@
 :root[data-theme="dark"] {
     color-scheme: dark;
 
-    --bg: #0f1114;
-    --bg-elevated: #151a21;
-    --bg-alt: #1a2028;
-    --bg-nav: rgba(16, 20, 26, 0.86);
+    --bg: #101318;
+    --bg-elevated: rgba(21, 27, 35, 0.62);
+    --bg-alt: rgba(26, 33, 43, 0.62);
+    --bg-nav: rgba(16, 20, 27, 0.66);
     --ink: #e9edf4;
     --muted: #a0aab8;
     --muted-2: #7c8796;
@@ -53,10 +53,10 @@
     --accent-2: #2ecfd0;
     --accent-soft: rgba(46, 207, 208, 0.16);
 
-    --panel: rgba(18, 23, 30, 0.9);
+    --panel: rgba(17, 22, 30, 0.62);
     --panel-border: #2a313b;
     --panel-border-strong: #37414e;
-    --hover: #1d2530;
+    --hover: rgba(35, 44, 56, 0.8);
 
     --profit: #2ecfd0;
     --loss: #ff606a;
@@ -71,10 +71,10 @@
 :root[data-theme="light"] {
     color-scheme: dark;
 
-    --bg: #0f1114;
-    --bg-elevated: #151a21;
-    --bg-alt: #1a2028;
-    --bg-nav: rgba(16, 20, 26, 0.86);
+    --bg: #101318;
+    --bg-elevated: rgba(21, 27, 35, 0.62);
+    --bg-alt: rgba(26, 33, 43, 0.62);
+    --bg-nav: rgba(16, 20, 27, 0.66);
     --ink: #e9edf4;
     --muted: #a0aab8;
     --muted-2: #7c8796;
@@ -83,10 +83,10 @@
     --accent-2: #2ecfd0;
     --accent-soft: rgba(46, 207, 208, 0.16);
 
-    --panel: rgba(18, 23, 30, 0.9);
+    --panel: rgba(17, 22, 30, 0.62);
     --panel-border: #2a313b;
     --panel-border-strong: #37414e;
-    --hover: #1d2530;
+    --hover: rgba(35, 44, 56, 0.8);
 
     --profit: #2ecfd0;
     --loss: #ff606a;
@@ -114,7 +114,8 @@ body {
     background-color: var(--bg);
     background-image: var(--dot-pattern);
     background-repeat: repeat;
-    background-size: 32px 32px;
+    background-size: 36px 36px;
+    background-attachment: fixed;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
 }
@@ -1012,7 +1013,8 @@ a.ghost {
     background-color: var(--bg);
     background-image: var(--dot-pattern);
     background-repeat: repeat;
-    background-size: 32px 32px;
+    background-size: 36px 36px;
+    background-attachment: fixed;
 }
 
 .app-shell-page .top-nav {
@@ -1208,7 +1210,8 @@ a.ghost {
     background-color: var(--bg);
     background-image: var(--dot-pattern);
     background-repeat: repeat;
-    background-size: 32px 32px;
+    background-size: 36px 36px;
+    background-attachment: fixed;
 }
 
 .liquidations-page .top-nav {
@@ -1422,7 +1425,8 @@ a.ghost {
     background-color: var(--bg);
     background-image: var(--dot-pattern);
     background-repeat: repeat;
-    background-size: 32px 32px;
+    background-size: 36px 36px;
+    background-attachment: fixed;
 }
 
 .perpetuals-page .top-nav {
@@ -1812,72 +1816,79 @@ a.ghost {
 .app-shell-page .top-nav,
 .liquidations-page .top-nav,
 .perpetuals-page .top-nav {
-    background: rgba(16, 20, 26, 0.84);
-    border-bottom-color: #2a313b;
+    background: rgba(14, 17, 22, 0.62);
+    border-bottom-color: #2a3039;
     backdrop-filter: blur(16px);
 }
 
 .app-shell-page .brand,
 .liquidations-page .brand,
 .perpetuals-page .brand {
-    border-color: #303844;
-    background: rgba(20, 25, 33, 0.92);
-    color: #ebeff5;
+    border-color: #343d49;
+    background: rgba(18, 23, 29, 0.56);
+    color: #edf1f7;
 }
 
 .app-shell-page .nav-links,
 .liquidations-page .nav-links,
 .perpetuals-page .nav-links {
-    background: rgba(20, 25, 33, 0.9);
-    border-color: #303844;
+    background: rgba(18, 23, 29, 0.52);
+    border-color: #323b47;
 }
 
 .app-shell-page .nav-link,
 .liquidations-page .nav-link,
 .perpetuals-page .nav-link {
-    color: #a4afbe;
+    color: #aeb9c8;
 }
 
 .app-shell-page .nav-link:hover,
 .liquidations-page .nav-link:hover,
 .perpetuals-page .nav-link:hover {
-    border-color: #444f5f;
-    color: #edf1f7;
-    background: #232c38;
+    border-color: #495665;
+    color: #f0f4fa;
+    background: rgba(42, 50, 61, 0.56);
 }
 
 .app-shell-page .nav-link.active,
 .liquidations-page .nav-link.active,
 .perpetuals-page .nav-link.active {
-    border-color: #505d70;
-    background: #2b3543;
-    color: #eef2f8;
+    border-color: #58667a;
+    background: rgba(53, 64, 77, 0.62);
+    color: #f2f6fb;
     box-shadow: inset 0 0 0 1px rgba(46, 207, 208, 0.24);
 }
 
 .app-shell-page .hero,
 .liquidations-page .hero {
-    border-color: #2a313b;
-    background: rgba(16, 20, 26, 0.88);
+    border-color: #2c333d;
+    background: rgba(13, 17, 22, 0.52);
 }
 
 .app-shell-page .hero-metrics,
 .liquidations-page .hero-metrics {
-    border-color: #2a313b;
-    background: rgba(20, 25, 33, 0.9);
+    border-color: #303844;
+    background: rgba(18, 23, 29, 0.56);
 }
 
 .app-shell-page .panel,
 .liquidations-page .panel,
 .perpetuals-panel {
-    border-color: #2a313b;
-    background: rgba(16, 20, 26, 0.88);
+    border-color: #2c333d;
+    background: rgba(13, 17, 22, 0.58);
+    backdrop-filter: blur(3px);
 }
 
 .app-shell-page .panel-header,
 .liquidations-page .panel-header,
 .perpetuals-toolbar {
-    border-bottom-color: #2a313b;
+    border-bottom-color: #2c333d;
+}
+
+.app-shell-page .chart-shell,
+.liquidations-page .chart-shell {
+    background: rgba(18, 23, 29, 0.54);
+    border-color: #303844;
 }
 
 .app-shell-page .table-wrap,
@@ -1886,21 +1897,53 @@ a.ghost {
 .app-shell-page .stat,
 .perpetuals-table-wrap,
 .heatmap-grid {
-    background: rgba(20, 25, 33, 0.88);
-    border-color: #2a313b;
+    background: rgba(18, 23, 29, 0.54);
+    border-color: #2c333d;
 }
 
 .app-shell-page th,
 .liquidations-page th,
 .perpetuals-page th {
-    background: rgba(27, 33, 41, 0.96);
-    color: #98a4b4;
+    background: rgba(18, 23, 30, 0.72);
+    color: #9da9ba;
+}
+
+.perpetuals-toolbar .search input,
+.perpetuals-toolbar .segmented {
+    background: rgba(18, 23, 29, 0.54);
+    border-color: #303844;
+}
+
+.perpetuals-page td {
+    border-bottom-color: rgba(58, 66, 77, 0.52);
+    color: #dbe2eb;
+}
+
+.market-link {
+    color: #edf2f8;
+}
+
+.market-link:hover {
+    color: #ffffff;
+}
+
+.ls-cell {
+    color: #a9b4c4;
+}
+
+.ls-bar {
+    background: rgba(28, 34, 43, 0.82);
+}
+
+.heatmap-grid {
+    border-radius: 12px;
+    background: rgba(13, 17, 22, 0.5);
 }
 
 .heatmap-tile {
-    border-color: rgba(58, 67, 79, 0.82);
+    border-color: rgba(76, 87, 102, 0.78);
 }
 
 .heatmap-tile:hover {
-    border-color: rgba(88, 101, 119, 0.92);
+    border-color: rgba(108, 121, 140, 0.94);
 }

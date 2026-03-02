@@ -35,7 +35,8 @@ body {
   background-color: #0f1114;
   background-image: url("/imgs/dot-grid.svg");
   background-repeat: repeat;
-  background-size: 32px 32px;
+  background-size: 36px 36px;
+  background-attachment: fixed;
   color: hsl(var(--foreground));
   font-family: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   letter-spacing: 0.01em;
@@ -62,17 +63,17 @@ body {
   justify-content: space-between;
   gap: 18px;
   padding: 12px 24px;
-  border-bottom: 1px solid #2a313b;
-  background: rgba(16, 20, 26, 0.84);
+  border-bottom: 1px solid #2a3039;
+  background: rgba(14, 17, 22, 0.62);
   backdrop-filter: blur(14px);
 }
 
 .asset-shared-nav .brand {
   text-decoration: none;
-  border: 1px solid #303844;
+  border: 1px solid #343d49;
   border-radius: 10px;
-  background: rgba(20, 25, 33, 0.92);
-  color: #ebeff5;
+  background: rgba(18, 23, 29, 0.56);
+  color: #edf1f7;
   padding: 0.45rem 0.75rem;
   font-size: 0.78rem;
   font-weight: 700;
@@ -87,16 +88,16 @@ body {
   gap: 8px;
   overflow-x: auto;
   padding: 4px;
-  border: 1px solid #303844;
+  border: 1px solid #323b47;
   border-radius: 12px;
-  background: rgba(20, 25, 33, 0.9);
+  background: rgba(18, 23, 29, 0.52);
 }
 
 .asset-shared-nav .nav-link {
   text-decoration: none;
   border: 1px solid transparent;
   border-radius: 8px;
-  color: #a4afbe;
+  color: #aeb9c8;
   padding: 9px 12px;
   font-size: 0.73rem;
   font-weight: 600;
@@ -107,15 +108,15 @@ body {
 }
 
 .asset-shared-nav .nav-link:hover {
-  border-color: #444f5f;
-  color: #edf1f7;
-  background: #232c38;
+  border-color: #495665;
+  color: #f0f4fa;
+  background: rgba(42, 50, 61, 0.56);
 }
 
 .asset-shared-nav .nav-link.active {
-  border-color: #505d70;
-  background: #2b3543;
-  color: #eef2f8;
+  border-color: #58667a;
+  background: rgba(53, 64, 77, 0.62);
+  color: #f2f6fb;
   box-shadow: inset 0 0 0 1px rgba(46, 207, 208, 0.24);
 }
 
@@ -136,9 +137,10 @@ body {
 }
 
 .asset-panel {
-  background: rgba(16, 20, 26, 0.9) !important;
-  border: 1px solid #2a313b !important;
-  box-shadow: inset 0 0 0 1px rgba(45, 53, 64, 0.55);
+  background: rgba(13, 17, 22, 0.58) !important;
+  border: 1px solid #2c333d !important;
+  box-shadow: inset 0 0 0 1px rgba(45, 53, 64, 0.36);
+  backdrop-filter: blur(3px);
 }
 
 .asset-grid {

@@ -403,19 +403,19 @@ function CandlestickView({ candles }: { candles: Candle[] }) {
       layout: {
         background: {
           type: ColorType.Solid,
-          color: "#0b1018",
+          color: "#10141b",
         },
-        textColor: "#7f93aa",
+        textColor: "#95a2b2",
       },
       grid: {
-        vertLines: { color: "rgba(41, 58, 80, 0.52)" },
-        horzLines: { color: "rgba(41, 58, 80, 0.52)" },
+        vertLines: { color: "rgba(60, 68, 79, 0.45)" },
+        horzLines: { color: "rgba(60, 68, 79, 0.45)" },
       },
       rightPriceScale: {
-        borderColor: "#26384d",
+        borderColor: "#323b47",
       },
       timeScale: {
-        borderColor: "#26384d",
+        borderColor: "#323b47",
         rightOffset: RIGHT_LOGICAL_PADDING,
       },
       crosshair: {
@@ -505,7 +505,7 @@ function DualBar({
   const safeShort = Math.max(0, Math.min(100, Number(shortPct ?? 0)));
 
   return (
-    <div className="mt-1 h-2 w-full overflow-hidden rounded-sm bg-[#101924]">
+    <div className="mt-1 h-2 w-full overflow-hidden rounded-sm bg-[#171d25]">
       <div className="flex h-full w-full">
         <div className="bg-[#2ecfd0]" style={{ width: `${safeLong}%` }} />
         <div className="bg-[#ff606a]" style={{ width: `${safeShort}%` }} />
@@ -789,7 +789,7 @@ export function AssetDashboardPage() {
         key={symbol}
         className={cn(
           "flex items-center justify-between rounded-sm px-1 py-[2px] font-mono",
-          active ? "bg-[#162536] text-[#d6e6f8]" : "text-[#8fa2b8]",
+          active ? "bg-[#242d38] text-[#dfe6ef]" : "text-[#9daab9]",
         )}
       >
         <span>{symbol.replace("/USD", "")}</span>
@@ -808,7 +808,7 @@ export function AssetDashboardPage() {
     location.pathname === href || location.pathname.startsWith(`${href}/`);
 
   return (
-    <main className="asset-page-shell h-screen overflow-hidden bg-transparent text-[#93a2b9]">
+    <main className="asset-page-shell h-screen overflow-hidden bg-transparent text-[#a0adbe]">
       <nav className="top-nav asset-shared-nav">
         <a className="brand" href="/">
           HL Stats
@@ -828,13 +828,13 @@ export function AssetDashboardPage() {
 
       <div className="asset-page-content">
         <div className="asset-grid grid h-full min-h-0 gap-2">
-          <Card className="asset-panel flex min-h-0 flex-col overflow-hidden bg-[#0b1018]">
-          <CardHeader className="border-b border-[#1b2635] p-2.5">
+        <Card className="asset-panel flex min-h-0 flex-col overflow-hidden">
+          <CardHeader className="border-b border-[#2c333d] p-2.5">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex min-w-0 items-center gap-3">
                 <a
                   href="/perpetuals"
-                  className="inline-flex h-7 w-7 items-center justify-center rounded-sm border border-[#2b3c51] bg-[#111824] text-[#93a2b9] transition-colors hover:bg-[#1b2635] hover:text-[#e6edf7]"
+                  className="inline-flex h-7 w-7 items-center justify-center rounded-sm border border-[#3a4554] bg-[#1a212b] text-[#b0bccb] transition-colors hover:bg-[#27313d] hover:text-[#eef4fa]"
                   aria-label="Go to Perpetuals Analytics"
                   title="Perpetuals Analytics"
                 >
@@ -869,18 +869,18 @@ export function AssetDashboardPage() {
                   </div>
                 </Tabs>
 
-                <div className="flex min-w-0 items-center gap-2 overflow-hidden leading-none text-[#9aaec4]">
+                <div className="flex min-w-0 items-center gap-2 overflow-hidden leading-none text-[#b2becc]">
                   <span className="shrink-0 text-[22px] sm:text-[26px]">{asset.pair}</span>
-                  <span className="truncate text-[10px] uppercase tracking-[0.16em] text-[#6f849d]">
+                  <span className="truncate text-[10px] uppercase tracking-[0.16em] text-[#8e9ba9]">
                     Perpetual · {TIMEFRAMES.find((item) => item.key === timeframe)?.label}
                   </span>
                 </div>
               </div>
 
-              <div className="flex items-center gap-4 text-[10px] uppercase tracking-wide text-[#8599b1]">
+              <div className="flex items-center gap-4 text-[10px] uppercase tracking-wide text-[#90a0b3]">
                 <div>
                   <div>Last</div>
-                  <div className="font-mono text-[9px] text-[#e6edf7] sm:text-[11px]">
+                  <div className="font-mono text-[9px] text-[#ecf2f9] sm:text-[11px]">
                     ${formatPrice(headerLast)}
                   </div>
                 </div>
@@ -897,13 +897,13 @@ export function AssetDashboardPage() {
                 </div>
                 <div>
                   <div>Volume</div>
-                  <div className="font-mono text-[9px] text-[#e6edf7] sm:text-[11px]">
+                  <div className="font-mono text-[9px] text-[#ecf2f9] sm:text-[11px]">
                     ${formatCompact(headerVolume)}
                   </div>
                 </div>
                 <div>
                   <div>Open Interest</div>
-                  <div className="font-mono text-[9px] text-[#e6edf7] sm:text-[11px]">
+                  <div className="font-mono text-[9px] text-[#ecf2f9] sm:text-[11px]">
                     {formatCompact(headerOpenInterest)}
                   </div>
                 </div>
@@ -915,9 +915,9 @@ export function AssetDashboardPage() {
           </CardContent>
         </Card>
 
-        <Card className="asset-panel flex min-h-0 flex-col overflow-hidden bg-[#0b1018]">
-          <CardHeader className="border-b border-[#1b2635] p-2.5">
-            <CardTitle className="flex items-center justify-between text-sm uppercase tracking-[0.14em] text-[#93a7be]">
+        <Card className="asset-panel flex min-h-0 flex-col overflow-hidden">
+          <CardHeader className="border-b border-[#2c333d] p-2.5">
+            <CardTitle className="flex items-center justify-between text-sm uppercase tracking-[0.14em] text-[#a1afbe]">
               <span>Orderbook Depth</span>
               <Badge variant={bullish ? "positive" : "negative"}>
                 {bullish ? "Bid Bias" : "Ask Bias"}
@@ -944,28 +944,28 @@ export function AssetDashboardPage() {
                     </linearGradient>
                   </defs>
 
-                  <CartesianGrid stroke="rgba(41, 58, 80, 0.52)" strokeDasharray="0" />
+                  <CartesianGrid stroke="rgba(60, 68, 79, 0.45)" strokeDasharray="0" />
                   <XAxis
                     dataKey="price"
                     type="number"
-                    tick={{ fill: "#7f93aa", fontSize: 11 }}
+                    tick={{ fill: "#95a2b2", fontSize: 11 }}
                     tickFormatter={(value) => `$${formatPrice(value)}`}
                     domain={["dataMin", "dataMax"]}
                   />
                   <YAxis
-                    tick={{ fill: "#7f93aa", fontSize: 11 }}
+                    tick={{ fill: "#95a2b2", fontSize: 11 }}
                     tickFormatter={(value) => formatCompact(value)}
                   />
                   {depthMid ? (
-                    <ReferenceLine x={depthMid} stroke="#31475f" strokeDasharray="3 4" />
+                    <ReferenceLine x={depthMid} stroke="#485465" strokeDasharray="3 4" />
                   ) : null}
                   <Tooltip
                     cursor={false}
                     contentStyle={{
-                      border: "1px solid #1b2635",
+                      border: "1px solid #36404c",
                       borderRadius: "4px",
-                      backgroundColor: "#101722",
-                      color: "#c0cfdd",
+                      backgroundColor: "#151b24",
+                      color: "#d3dce7",
                       fontSize: "11px",
                     }}
                     formatter={(value: number | undefined, name: string | undefined) =>
@@ -1003,9 +1003,9 @@ export function AssetDashboardPage() {
           </CardContent>
         </Card>
 
-        <Card className="asset-panel flex min-h-0 flex-col overflow-hidden bg-[#0b1018]">
-          <CardHeader className="border-b border-[#1b2635] p-2.5">
-            <CardTitle className="flex items-center gap-2 text-sm uppercase tracking-[0.14em] text-[#93a7be]">
+        <Card className="asset-panel flex min-h-0 flex-col overflow-hidden">
+          <CardHeader className="border-b border-[#2c333d] p-2.5">
+            <CardTitle className="flex items-center gap-2 text-sm uppercase tracking-[0.14em] text-[#a1afbe]">
               <Activity className="h-3.5 w-3.5 text-[#2ecfd0]" />
               Relative Strength
             </CardTitle>
@@ -1050,13 +1050,13 @@ export function AssetDashboardPage() {
                   }}
                   onMouseLeave={() => setHoveredRelativeRow(null)}
                 >
-                  <CartesianGrid stroke="rgba(41, 58, 80, 0.52)" />
+                  <CartesianGrid stroke="rgba(60, 68, 79, 0.45)" />
                   <XAxis
                     dataKey="time"
                     type="number"
                     ticks={relativeXTicks}
                     domain={["dataMin", "dataMax"]}
-                    tick={{ fill: "#7f93aa", fontSize: 11 }}
+                    tick={{ fill: "#95a2b2", fontSize: 11 }}
                     tickFormatter={(time) => {
                       const date = new Date(Number(time));
                       const hours = date.getHours();
@@ -1069,14 +1069,14 @@ export function AssetDashboardPage() {
                   />
                   <YAxis
                     orientation="right"
-                    tick={{ fill: "#7f93aa", fontSize: 11 }}
+                    tick={{ fill: "#95a2b2", fontSize: 11 }}
                     tickFormatter={(value) => formatPercent(Number(value))}
                     domain={[RELATIVE_Y_MIN, RELATIVE_Y_MAX]}
                     ticks={RELATIVE_Y_TICKS}
                   />
                   <Tooltip
                     content={() => null}
-                    cursor={{ stroke: "#2b567e", strokeWidth: 1, strokeDasharray: "4 4" }}
+                    cursor={{ stroke: "#586476", strokeWidth: 1, strokeDasharray: "4 4" }}
                   />
 
                   {relative.symbols.map((symbol, index) => {
@@ -1111,14 +1111,14 @@ export function AssetDashboardPage() {
 
             {selectedStrengthKey && selectedRelativeValue != null ? (
               <div
-                className="pointer-events-none absolute right-0 z-20 -translate-y-1/2 rounded-sm bg-[#1f4f71] px-1.5 py-[1px] font-mono text-[9px] font-medium text-[#dbe8ed]"
+                className="pointer-events-none absolute right-0 z-20 -translate-y-1/2 rounded-sm bg-[#2c3745] px-1.5 py-[1px] font-mono text-[9px] font-medium text-[#e3eaf2]"
                 style={{ top: `${selectedRelativeTopPct}%` }}
               >
                 {selectedStrengthKey.replace("/USD", "")} {formatPercent(selectedRelativeValue)}
               </div>
             ) : null}
 
-            <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-[220px] overflow-hidden bg-gradient-to-r from-[#0b1018f2] via-[#0b1018cc] to-transparent p-2">
+            <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-[220px] overflow-hidden bg-[#11161dbf] p-2 backdrop-blur-[2px]">
               <div className="grid h-full grid-cols-2 gap-x-2 overflow-auto pr-1 text-[8px] leading-[1.15] sm:text-[10px]">
                 <div className="space-y-0.5">{leftRelativeSymbols.map(renderRelativeRow)}</div>
                 <div className="space-y-0.5">{rightRelativeSymbols.map(renderRelativeRow)}</div>
@@ -1127,10 +1127,10 @@ export function AssetDashboardPage() {
           </CardContent>
         </Card>
 
-        <Card className="asset-panel flex min-h-0 flex-col overflow-hidden bg-[#0b1018]">
-          <CardHeader className="border-b border-[#1b2635] p-2.5">
+        <Card className="asset-panel flex min-h-0 flex-col overflow-hidden">
+          <CardHeader className="border-b border-[#2c333d] p-2.5">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-sm uppercase tracking-[0.14em] text-[#93a7be]">
+              <CardTitle className="text-sm uppercase tracking-[0.14em] text-[#a1afbe]">
                 Breakout Stats
               </CardTitle>
               <Badge variant={bullish ? "positive" : "negative"}>
@@ -1141,7 +1141,7 @@ export function AssetDashboardPage() {
 
           <CardContent className="flex h-full flex-col gap-5 p-4 pt-3">
             <section>
-              <div className="mb-1 text-xs uppercase tracking-[0.16em] text-[#7f93aa]">Sentiment</div>
+              <div className="mb-1 text-xs uppercase tracking-[0.16em] text-[#95a2b2]">Sentiment</div>
               <div className="mb-1 flex items-center justify-between font-mono text-base">
                 <div className="flex items-center gap-1 text-[#2ecfd0]">
                   <TrendingUp className="h-4 w-4" />
@@ -1158,10 +1158,10 @@ export function AssetDashboardPage() {
             <Separator />
 
             <section className="space-y-4">
-              <div className="text-xs uppercase tracking-[0.16em] text-[#7f93aa]">Open Interest</div>
+              <div className="text-xs uppercase tracking-[0.16em] text-[#95a2b2]">Open Interest</div>
 
               <div>
-                <div className="mb-1 flex items-center justify-between text-[11px] uppercase tracking-[0.14em] text-[#8397af]">
+                <div className="mb-1 flex items-center justify-between text-[11px] uppercase tracking-[0.14em] text-[#8fa0b3]">
                   <span>Evaluation</span>
                   <span>{(openInterest?.evaluation.long_pct ?? 0).toFixed(1)} / {(openInterest?.evaluation.short_pct ?? 0).toFixed(1)}</span>
                 </div>
@@ -1176,7 +1176,7 @@ export function AssetDashboardPage() {
               </div>
 
               <div>
-                <div className="mb-1 flex items-center justify-between text-[11px] uppercase tracking-[0.14em] text-[#8397af]">
+                <div className="mb-1 flex items-center justify-between text-[11px] uppercase tracking-[0.14em] text-[#8fa0b3]">
                   <span>Funded</span>
                   <span>{(openInterest?.funded.long_pct ?? 0).toFixed(1)} / {(openInterest?.funded.short_pct ?? 0).toFixed(1)}</span>
                 </div>

@@ -104,7 +104,7 @@ body {
   display: flex;
   min-width: 0;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   overflow-x: auto;
   padding: 0;
   border: 0;
@@ -114,32 +114,62 @@ body {
 
 .asset-shared-nav .nav-link {
   text-decoration: none;
-  border: 1px solid #0f3c50;
-  border-radius: 4px;
-  color: #7ed8d7;
-  background: rgba(8, 35, 50, 0.84);
-  padding: 9px 12px;
+  border: 1px solid rgba(113, 169, 194, 0.3);
+  border-radius: 8px;
+  color: #a4d8e5;
+  background: linear-gradient(
+    180deg,
+    rgba(120, 167, 193, 0.2) 0%,
+    rgba(28, 43, 57, 0.18) 100%
+  );
+  padding: 9px 13px;
   font-size: 0.66rem;
-  font-weight: 500;
+  font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   font-family: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   line-height: 1;
   white-space: nowrap;
-  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+  backdrop-filter: blur(14px) saturate(140%);
+  box-shadow:
+    inset 0 1px 0 rgba(224, 242, 255, 0.28),
+    inset 0 -1px 0 rgba(7, 14, 24, 0.58),
+    0 8px 20px rgba(0, 0, 0, 0.22);
+  transition:
+    background 0.18s ease,
+    border-color 0.18s ease,
+    color 0.18s ease,
+    box-shadow 0.18s ease,
+    transform 0.18s ease;
 }
 
 .asset-shared-nav .nav-link:hover {
-  border-color: #2a697d;
-  color: #b5f2f0;
-  background: rgba(15, 69, 91, 0.92);
+  border-color: rgba(150, 209, 232, 0.5);
+  color: #d9f6ff;
+  background: linear-gradient(
+    180deg,
+    rgba(148, 196, 222, 0.3) 0%,
+    rgba(39, 57, 73, 0.26) 100%
+  );
+  box-shadow:
+    inset 0 1px 0 rgba(237, 249, 255, 0.4),
+    inset 0 -1px 0 rgba(8, 17, 29, 0.5),
+    0 10px 24px rgba(0, 0, 0, 0.26);
+  transform: translateY(-1px);
 }
 
 .asset-shared-nav .nav-link.active {
-  border-color: #8fe5dd;
-  background: #7ad7cf;
-  color: #04232b;
-  box-shadow: none;
+  border-color: rgba(166, 224, 238, 0.64);
+  color: #e9f9ff;
+  background: linear-gradient(
+    180deg,
+    rgba(164, 212, 232, 0.36) 0%,
+    rgba(49, 74, 96, 0.33) 100%
+  );
+  box-shadow:
+    inset 0 1px 0 rgba(245, 253, 255, 0.52),
+    inset 0 -1px 0 rgba(11, 22, 35, 0.44),
+    0 12px 26px rgba(0, 0, 0, 0.28);
 }
 
 .asset-page-content {

@@ -7,11 +7,17 @@
   // HL tends to merge sequential orders that build/close a position over hours.
   const AGGREGATE_MERGE_GAP_MS = 24 * 60 * 60 * 1000; // 24 hours
   const AGGREGATE_MERGE_MAX_PX_DIFF = 0.12; // 12% relative difference guardrail
+  const FOLLOWED_WALLETS_KEY = "hl-followed-wallets-v1";
+  const DEFAULT_FOLLOWED_WALLETS = [
+    "0xaf0fdd39e5d92499b0ed9f68693da99c0ec1e92e",
+  ];
 
   const ui = {
     addressInput: document.getElementById("address-input"),
     lookupButton: document.getElementById("lookup-button"),
+    followWalletButton: document.getElementById("follow-wallet-button"),
     addressError: document.getElementById("address-error"),
+    followedWalletsList: document.getElementById("followed-wallets-list"),
     walletMain: document.getElementById("wallet-main"),
     walletAddressTitle: document.getElementById("wallet-address-title"),
     explorerLink: document.getElementById("explorer-link"),
@@ -55,10 +61,17 @@
     loading: false,
     holdingsSortKey: "usdValue",
     holdingsSortDir: "desc",
+    followedWallets: [],
   };
 
   function isAddress(value) {
     return typeof value === "string" && /^0x[a-fA-F0-9]{40}$/.test(value.trim());
+  }
+
+  function normalizeAddress(value) {
+    if (typeof value !== "string") return null;
+    const normalized = value.trim().toLowerCase();
+    return isAddress(normalized) ? normalized : null;
   }
 
   function setText(el, value) {
@@ -128,6 +141,102 @@
     const t = toTimeMs(ts);
     if (!Number.isFinite(t)) return "—";
     return new Date(t).toLocaleString();
+  }
+
+  function formatAddressShort(address) {
+    if (!isAddress(address)) return address ?? "—";
+    return `${address.slice(0, 6)}...${address.slice(-4)}`;
+  }
+
+  function saveFollowedWallets() {
+    try {
+      localStorage.setItem(FOLLOWED_WALLETS_KEY, JSON.stringify(state.followedWallets));
+    } catch {
+      // Ignore storage failures (private mode/quota/etc).
+    }
+  }
+
+  function loadFollowedWallets() {
+    try {
+      const raw = localStorage.getItem(FOLLOWED_WALLETS_KEY);
+      if (!raw) return DEFAULT_FOLLOWED_WALLETS.slice();
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return DEFAULT_FOLLOWED_WALLETS.slice();
+      const seen = new Set();
+      const wallets = [];
+      for (const candidate of parsed) {
+        const normalized = normalizeAddress(candidate);
+        if (!normalized || seen.has(normalized)) continue;
+        seen.add(normalized);
+        wallets.push(normalized);
+      }
+      return wallets.length ? wallets : DEFAULT_FOLLOWED_WALLETS.slice();
+    } catch {
+      return DEFAULT_FOLLOWED_WALLETS.slice();
+    }
+  }
+
+  function renderFollowedWallets() {
+    const root = ui.followedWalletsList;
+    if (!root) return;
+
+    root.innerHTML = "";
+
+    if (!state.followedWallets.length) {
+      const empty = document.createElement("p");
+      empty.className = "followed-wallet-empty";
+      empty.textContent = "No followed wallets yet.";
+      root.appendChild(empty);
+      return;
+    }
+
+    const fragment = document.createDocumentFragment();
+    for (const wallet of state.followedWallets) {
+      const chip = document.createElement("div");
+      chip.className = "followed-wallet-chip";
+
+      const openButton = document.createElement("button");
+      openButton.type = "button";
+      openButton.className = "followed-wallet-open";
+      if (wallet === state.address) openButton.classList.add("active");
+      openButton.dataset.role = "open";
+      openButton.dataset.address = wallet;
+      openButton.textContent = formatAddressShort(wallet);
+
+      const removeButton = document.createElement("button");
+      removeButton.type = "button";
+      removeButton.className = "followed-wallet-remove";
+      removeButton.dataset.role = "remove";
+      removeButton.dataset.address = wallet;
+      removeButton.ariaLabel = `Remove ${wallet} from followed wallets`;
+      removeButton.textContent = "x";
+
+      chip.appendChild(openButton);
+      chip.appendChild(removeButton);
+      fragment.appendChild(chip);
+    }
+
+    root.appendChild(fragment);
+  }
+
+  function addFollowedWallet(value) {
+    const normalized = normalizeAddress(value);
+    if (!normalized) return false;
+    state.followedWallets = [
+      normalized,
+      ...state.followedWallets.filter((wallet) => wallet !== normalized),
+    ];
+    saveFollowedWallets();
+    renderFollowedWallets();
+    return true;
+  }
+
+  function removeFollowedWallet(value) {
+    const normalized = normalizeAddress(value);
+    if (!normalized) return;
+    state.followedWallets = state.followedWallets.filter((wallet) => wallet !== normalized);
+    saveFollowedWallets();
+    renderFollowedWallets();
   }
 
   function tradeKey(fill) {
@@ -722,17 +831,20 @@
   }
 
   async function loadWallet(address) {
-    if (!isAddress(address)) {
+    const normalized = normalizeAddress(address);
+    if (!normalized) {
       showError("Please enter a valid Ethereum address (0x...).");
       return;
     }
 
     clearError();
-    state.address = address.trim();
+    state.address = normalized;
     state.loading = true;
     if (ui.lookupButton) ui.lookupButton.disabled = true;
+    if (ui.addressInput) ui.addressInput.value = state.address;
 
     updateWalletUrl(state.address);
+    renderFollowedWallets();
     ui.walletMain.hidden = true;
     setText(ui.walletAddressTitle, state.address);
     ui.explorerLink.href = `https://hypurrscan.io/address/${encodeURIComponent(state.address)}`;
@@ -929,6 +1041,47 @@
     }
   }
 
+  function initFollowedWallets() {
+    state.followedWallets = loadFollowedWallets();
+    saveFollowedWallets();
+    renderFollowedWallets();
+  }
+
+  function initFollowedWalletsInteractions() {
+    if (ui.followWalletButton) {
+      ui.followWalletButton.addEventListener("click", () => {
+        const candidate = ui.addressInput?.value?.trim() || state.address;
+        if (!addFollowedWallet(candidate)) {
+          showError("Enter a valid wallet address first, then click Follow.");
+          return;
+        }
+        clearError();
+      });
+    }
+
+    if (ui.followedWalletsList) {
+      ui.followedWalletsList.addEventListener("click", (event) => {
+        const target = event.target;
+        if (!(target instanceof HTMLElement)) return;
+        const button = target.closest("button");
+        if (!button) return;
+
+        const address = button.dataset.address;
+        if (!address) return;
+
+        if (button.dataset.role === "remove") {
+          removeFollowedWallet(address);
+          return;
+        }
+
+        if (button.dataset.role === "open") {
+          if (ui.addressInput) ui.addressInput.value = address;
+          loadWallet(address);
+        }
+      });
+    }
+  }
+
   function getAddressFromPath() {
     const match = location.pathname.match(/^\/wallets\/(0x[a-fA-F0-9]{40})\/?$/);
     return match ? match[1] : null;
@@ -945,8 +1098,8 @@
   function initFromUrl() {
     const addressFromPath = getAddressFromPath();
     const addressFromQuery = new URLSearchParams(location.search).get("address")?.trim();
-    const address = addressFromPath || (addressFromQuery && isAddress(addressFromQuery) ? addressFromQuery : null);
-    if (address && isAddress(address)) {
+    const address = normalizeAddress(addressFromPath) || normalizeAddress(addressFromQuery);
+    if (address) {
       if (ui.addressInput) ui.addressInput.value = address;
       loadWallet(address);
     }
@@ -1027,6 +1180,8 @@
     }
     initTabs();
     initHoldingsSort();
+    initFollowedWallets();
+    initFollowedWalletsInteractions();
     initFromUrl();
   }
 

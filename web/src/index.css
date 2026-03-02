@@ -32,10 +32,10 @@
 body {
   margin: 0;
   min-height: 100vh;
-  background-color: #070b12;
+  background-color: #0f1114;
   background-image: url("/imgs/dot-grid.svg");
   background-repeat: repeat;
-  background-size: 48px 48px;
+  background-size: 32px 32px;
   color: hsl(var(--foreground));
   font-family: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   letter-spacing: 0.01em;
@@ -62,17 +62,17 @@ body {
   justify-content: space-between;
   gap: 18px;
   padding: 12px 24px;
-  border-bottom: 1px solid #1b2635;
-  background: #0b111af0;
+  border-bottom: 1px solid #2a313b;
+  background: rgba(16, 20, 26, 0.84);
   backdrop-filter: blur(14px);
 }
 
 .asset-shared-nav .brand {
   text-decoration: none;
-  border: 1px solid #24354a;
+  border: 1px solid #303844;
   border-radius: 10px;
-  background: #0d1521;
-  color: #d5ebff;
+  background: rgba(20, 25, 33, 0.92);
+  color: #ebeff5;
   padding: 0.45rem 0.75rem;
   font-size: 0.78rem;
   font-weight: 700;
@@ -87,16 +87,16 @@ body {
   gap: 8px;
   overflow-x: auto;
   padding: 4px;
-  border: 1px solid #24354a;
+  border: 1px solid #303844;
   border-radius: 12px;
-  background: #0d1521;
+  background: rgba(20, 25, 33, 0.9);
 }
 
 .asset-shared-nav .nav-link {
   text-decoration: none;
   border: 1px solid transparent;
   border-radius: 8px;
-  color: #90a5c3;
+  color: #a4afbe;
   padding: 9px 12px;
   font-size: 0.73rem;
   font-weight: 600;
@@ -107,16 +107,16 @@ body {
 }
 
 .asset-shared-nav .nav-link:hover {
-  border-color: #33506f;
-  color: #c7d8ed;
-  background: #162231;
+  border-color: #444f5f;
+  color: #edf1f7;
+  background: #232c38;
 }
 
 .asset-shared-nav .nav-link.active {
-  border-color: #365877;
-  background: #1c2d41;
-  color: #e6edf7;
-  box-shadow: inset 0 0 0 1px rgba(19, 130, 201, 0.35);
+  border-color: #505d70;
+  background: #2b3543;
+  color: #eef2f8;
+  box-shadow: inset 0 0 0 1px rgba(46, 207, 208, 0.24);
 }
 
 .asset-page-content {
@@ -136,7 +136,9 @@ body {
 }
 
 .asset-panel {
-  box-shadow: inset 0 0 0 1px rgba(45, 57, 74, 0.6);
+  background: rgba(16, 20, 26, 0.9) !important;
+  border: 1px solid #2a313b !important;
+  box-shadow: inset 0 0 0 1px rgba(45, 53, 64, 0.55);
 }
 
 .asset-grid {

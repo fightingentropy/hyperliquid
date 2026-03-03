@@ -1132,7 +1132,7 @@ function normalizeDepthLevels(levels, bidSide) {
 
 async function fetchDepthBinance(symbol = "HYPEUSDT") {
   const raw = await fetchJson(
-    `${BINANCE_FAPI}/fapi/v1/depth?symbol=${encodeURIComponent(symbol)}&limit=100`,
+    `${BINANCE_FAPI}/fapi/v1/depth?symbol=${encodeURIComponent(symbol)}&limit=500`,
   );
   const bids = normalizeDepthLevels(raw?.bids, true);
   const asks = normalizeDepthLevels(raw?.asks, false);

@@ -1332,7 +1332,7 @@ a.ghost {
 
 .liquidations-page .layout {
     gap: 10px;
-    padding: 0 24px 20px;
+    padding: 18px 24px 20px;
     grid-template-columns: minmax(0, 1.7fr) minmax(0, 0.85fr);
 }
 
@@ -1380,21 +1380,28 @@ a.ghost {
 
 .liquidations-page .segmented button {
     color: #90a5c3;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    padding: 4px 2px;
 }
 
 .liquidations-page .segmented {
-    background: #0b121c;
-    border-color: #1b2635;
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    padding: 0;
+    gap: 18px;
 }
 
 .liquidations-page .segmented button:hover {
     color: #e6edf7;
-    background: #1c2d41;
+    background: transparent;
 }
 
 .liquidations-page .segmented button.active {
-    border-color: #3d5f82;
-    background: #1c2d41;
+    border-bottom: 2px solid #6ccfff;
+    background: transparent;
     color: #d7e3f2;
 }
 
@@ -1841,6 +1848,12 @@ a.ghost {
     backdrop-filter: blur(16px);
 }
 
+.liquidations-page .top-nav {
+    background: transparent;
+    border-bottom: 0;
+    backdrop-filter: none;
+}
+
 .app-shell-page .brand,
 .liquidations-page .brand,
 .perpetuals-page .brand {
@@ -2072,6 +2085,7 @@ a.ghost {
     border: 0;
     background: transparent;
     box-shadow: none;
+    backdrop-filter: none;
     overflow: visible;
 }
 
@@ -2125,6 +2139,7 @@ a.ghost {
     border: 0;
     border-radius: 0;
     background: transparent;
+    backdrop-filter: none;
 }
 
 .liquidations-page .cluster-panel .chart-area {
@@ -2143,26 +2158,51 @@ a.ghost {
 }
 
 .liquidations-page .cluster-summary-metrics {
-    margin: 6px 16px 0 auto;
-    min-width: 220px;
-    max-width: 280px;
-    padding: 14px;
-    gap: 10px;
-    border-color: #303844;
-    background: rgba(18, 23, 29, 0.56);
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin: 0 16px 10px;
+    min-width: 0;
+    max-width: none;
+    padding: 0;
+    gap: 12px;
+    border: 0;
+    background: transparent;
     box-shadow: none;
 }
 
-@media (max-width: 1100px) {
-    .liquidations-page .cluster-summary-metrics {
-        width: auto;
-        grid-template-columns: 1fr;
-    }
+.liquidations-page .detail-panel .cluster-summary-metrics {
+    margin: 0 0 10px;
 }
 
 @media (max-width: 720px) {
     .liquidations-page .cluster-summary-metrics {
-        margin: 8px 16px 0;
-        max-width: none;
+        grid-template-columns: 1fr;
     }
+}
+
+/* Right-side breakdown should also sit directly on dotted canvas (no boxed shells). */
+.liquidations-page .detail-panel {
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+    backdrop-filter: none;
+    overflow: visible;
+    padding-top: 14px;
+}
+
+.liquidations-page .detail-panel .panel-header {
+    margin: 0 16px;
+    padding: 14px 0 10px;
+    border-bottom: 0;
+}
+
+.liquidations-page .detail-panel .table-wrap,
+.liquidations-page .detail-panel .stat {
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+}
+
+.liquidations-page .detail-panel th {
+    background: transparent;
 }

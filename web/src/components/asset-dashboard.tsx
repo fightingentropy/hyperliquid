@@ -100,21 +100,12 @@ const TIMEFRAMES: Array<{ key: Timeframe; label: string }> = [
   { key: "1d", label: "1D" },
   { key: "1w", label: "1W" },
 ];
-const TOP_NAV_LINKS: Array<{ label: string; href: string }> = [
-  { label: "Perpetuals Analytics", href: "/perpetuals" },
-  { label: "Heatmap", href: "/heatmap" },
-  { label: "Liquidations", href: "/liquidations" },
-  { label: "Unstaking", href: "/unstaking" },
-  { label: "Wallet", href: "/wallet" },
-  { label: "Settings", href: "/settings" },
-  { label: "About", href: "/about" },
-];
 const DEFAULT_ASSET_PAIRS = ["HYPE/USD", "BTC/USD", "ETH/USD", "SOL/USD"];
 const RELATIVE_Y_MIN = -10;
 const RELATIVE_Y_MAX = 25;
 const THREE_HOURS_MS = 3 * 60 * 60 * 1000;
 const RELATIVE_LIST_MAX_SYMBOLS = 32;
-const DEPTH_LEVELS_PER_SIDE = 32;
+const DEPTH_LEVELS_PER_SIDE = 160;
 const RELATIVE_Y_TICKS = Array.from(
   { length: Math.floor((RELATIVE_Y_MAX - RELATIVE_Y_MIN) / 2.5) + 1 },
   (_, index) => RELATIVE_Y_MIN + index * 2.5,
@@ -876,28 +867,9 @@ export function AssetDashboardPage() {
       </div>
     );
   };
-  const isTopLinkActive = (href: string) =>
-    location.pathname === href || location.pathname.startsWith(`${href}/`);
-
   return (
     <main className="asset-page-shell h-screen overflow-hidden bg-transparent text-[#a0adbe]">
-      <nav className="top-nav asset-shared-nav">
-        <a className="brand" href="/">
-          <span className="brand-logo" aria-hidden="true" />
-          <span className="brand-text">Stats</span>
-        </a>
-        <div className="nav-links">
-          {TOP_NAV_LINKS.map((item) => (
-            <a
-              key={item.href}
-              href={item.href}
-              className={cn("nav-link", isTopLinkActive(item.href) ? "active" : undefined)}
-            >
-              {item.label}
-            </a>
-          ))}
-        </div>
-      </nav>
+      <hl-navbar mode="asset" />
 
       <div className="asset-page-content">
         <div className="asset-grid grid h-full min-h-0 gap-2">

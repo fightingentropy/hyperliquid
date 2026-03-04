@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import {
   Area,
@@ -69,6 +69,24 @@ type RelativeStrengthResponse = {
   symbols: Record<string, RelativeStrengthSymbol>;
 };
 
+type RelativeZoomDomain = {
+  left: number;
+  right: number;
+  yMin: number;
+  yMax: number;
+};
+
+type RelativePanAnchor = {
+  startX: number;
+  startY: number;
+  domain: RelativeZoomDomain;
+};
+
+type RelativeContextMenu = {
+  x: number;
+  y: number;
+};
+
 type DepthResponse = {
   symbol: string;
   bids: DepthLevel[];
@@ -100,16 +118,159 @@ const TIMEFRAMES: Array<{ key: Timeframe; label: string }> = [
   { key: "1d", label: "1D" },
   { key: "1w", label: "1W" },
 ];
+const SETTINGS_KEY = "hl-settings:v1";
 const DEFAULT_ASSET_PAIRS = ["HYPE/USD", "BTC/USD", "ETH/USD", "SOL/USD"];
+const DEFAULT_RELATIVE_STRENGTH_BASES = [
+  "HYPE",
+  "GRASS",
+  "AIXBT",
+  "NEAR",
+  "AAVE",
+  "JUP",
+  "JTO",
+  "UNI",
+  "BONK",
+  "PUMP",
+  "FIL",
+  "TRX",
+  "ARB",
+  "TIA",
+  "ORDI",
+  "OP",
+  "BTC",
+  "FLOKI",
+  "LDO",
+  "PENGU",
+  "VIRTUAL",
+  "S",
+  "ETC",
+  "LTC",
+  "ALGO",
+  "WLD",
+  "POPCAT",
+  "LIT",
+  "WIF",
+  "PNUT",
+  "TRUMP",
+  "SUI",
+  "BCH",
+  "RENDER",
+  "ETH",
+  "TAO",
+  "ATOM",
+  "DOGE",
+  "XRP",
+  "CRV",
+  "XPL",
+  "AVAX",
+  "SOL",
+  "INJ",
+  "APT",
+  "HBAR",
+  "TON",
+  "ONDO",
+  "ADA",
+  "LINK",
+  "STX",
+  "POL",
+  "ASTER",
+  "MOODENG",
+  "SHIB",
+  "KAITO",
+  "PEPE",
+  "FARTCOIN",
+  "ZEC",
+  "DOT",
+  "IP",
+];
+const DEFAULT_RELATIVE_STRENGTH_SYMBOLS = DEFAULT_RELATIVE_STRENGTH_BASES.map(
+  (base) => `${base}/USD`,
+);
+const DEFAULT_RELATIVE_STRENGTH_BASE_SET = new Set(DEFAULT_RELATIVE_STRENGTH_BASES);
 const RELATIVE_Y_MIN = -10;
 const RELATIVE_Y_MAX = 25;
 const THREE_HOURS_MS = 3 * 60 * 60 * 1000;
 const RELATIVE_LIST_MAX_SYMBOLS = 32;
+const RELATIVE_SETTINGS_MAX_SYMBOLS = 128;
 const DEPTH_LEVELS_PER_SIDE = 160;
 const RELATIVE_Y_TICKS = Array.from(
   { length: Math.floor((RELATIVE_Y_MAX - RELATIVE_Y_MIN) / 2.5) + 1 },
   (_, index) => RELATIVE_Y_MIN + index * 2.5,
 );
+const RELATIVE_ZOOM_MIN_Y_SPAN = 1;
+const RELATIVE_ZOOM_BASE_STEP = 0.045;
+const RELATIVE_ZOOM_DELTA_NORMALIZER = 120;
+const RELATIVE_ZOOM_MIN_DELTA_SCALE = 0.16;
+const RELATIVE_ZOOM_MIN_POINTS = 8;
+const RELATIVE_CHART_MARGIN = { top: 8, right: 14, left: 8, bottom: 0 } as const;
+
+function clampNumber(value: number, min: number, max: number) {
+  if (value < min) return min;
+  if (value > max) return max;
+  return value;
+}
+
+function normalizeRelativeStrengthSymbol(rawValue: string) {
+  const compact = rawValue.trim().toUpperCase().replace(/\s+/g, "");
+  if (!compact) return null;
+
+  const [baseCandidate = ""] = compact.split("/");
+  const sanitized = baseCandidate.replace(/[^A-Z0-9]/g, "");
+  if (!sanitized) return null;
+
+  if (sanitized.endsWith("USDT") && sanitized.length > 4) {
+    return `${sanitized.slice(0, -4)}/USD`;
+  }
+
+  if (sanitized.endsWith("USD") && sanitized.length > 3) {
+    return `${sanitized.slice(0, -3)}/USD`;
+  }
+
+  return `${sanitized}/USD`;
+}
+
+function parseRelativeStrengthDefaults(rawValue: unknown): string[] {
+  const source = Array.isArray(rawValue)
+    ? rawValue.map((value) => String(value)).join(",")
+    : typeof rawValue === "string"
+      ? rawValue
+      : "";
+
+  const seen = new Set<string>();
+  const symbols: string[] = [];
+  for (const token of source.split(/[\s,]+/g)) {
+    const normalized = normalizeRelativeStrengthSymbol(token);
+    if (!normalized || seen.has(normalized)) continue;
+    seen.add(normalized);
+    symbols.push(normalized);
+    if (symbols.length >= RELATIVE_SETTINGS_MAX_SYMBOLS) break;
+  }
+  return symbols;
+}
+
+function readRelativeStrengthDefaultsFromStorage() {
+  if (typeof window === "undefined") {
+    return [...DEFAULT_RELATIVE_STRENGTH_SYMBOLS];
+  }
+
+  try {
+    const raw = window.localStorage.getItem(SETTINGS_KEY);
+    if (!raw) return [...DEFAULT_RELATIVE_STRENGTH_SYMBOLS];
+    const parsed = JSON.parse(raw);
+    const settings = parsed && typeof parsed === "object" ? parsed : {};
+    const hasCustomDefaults = Object.prototype.hasOwnProperty.call(
+      settings,
+      "relativeStrengthDefaults",
+    );
+
+    if (!hasCustomDefaults) return [...DEFAULT_RELATIVE_STRENGTH_SYMBOLS];
+    return parseRelativeStrengthDefaults(
+      (settings as { relativeStrengthDefaults?: unknown }).relativeStrengthDefaults,
+    );
+  } catch {
+    return [...DEFAULT_RELATIVE_STRENGTH_SYMBOLS];
+  }
+}
 
 function formatPrice(value: number | null | undefined) {
   if (!Number.isFinite(value ?? NaN)) return "--";
@@ -264,6 +425,7 @@ function toDepthSeries(depth: DepthResponse | null, levelsPerSide = DEPTH_LEVELS
 function toRelativeStrengthData(
   response: RelativeStrengthResponse | null,
   focusSymbol: string,
+  preferredSymbols: string[],
 ) {
   if (!response) {
     return {
@@ -288,17 +450,26 @@ function toRelativeStrengthData(
       return a[0].localeCompare(b[0]);
     });
 
-  const normalizedFocus = focusSymbol.toUpperCase();
-  const focusIndex = rankedEntries.findIndex(
-    ([symbol]) => symbol.toUpperCase() === normalizedFocus,
+  const entryBySymbol = new Map(
+    rankedEntries.map((entry) => [entry[0].toUpperCase(), entry]),
   );
+  const preferredSet = new Set(
+    preferredSymbols
+      .map((symbol) => normalizeRelativeStrengthSymbol(symbol)?.toUpperCase() ?? "")
+      .filter(Boolean),
+  );
+  const filteredEntries =
+    preferredSet.size > 0
+      ? rankedEntries.filter(([symbol]) => preferredSet.has(symbol.toUpperCase()))
+      : rankedEntries;
 
-  if (focusIndex > 0) {
-    const [focusEntry] = rankedEntries.splice(focusIndex, 1);
-    rankedEntries.unshift(focusEntry);
-  }
+  const normalizedFocus = normalizeRelativeStrengthSymbol(focusSymbol)?.toUpperCase() ?? "";
+  const focusEntry = normalizedFocus ? entryBySymbol.get(normalizedFocus) : undefined;
 
-  const entries = rankedEntries.slice(0, RELATIVE_LIST_MAX_SYMBOLS);
+  const entries = [
+    ...(focusEntry ? [focusEntry] : []),
+    ...filteredEntries.filter(([symbol]) => symbol !== focusEntry?.[0]),
+  ].slice(0, RELATIVE_LIST_MAX_SYMBOLS);
 
   const symbols = entries.map(([name]) => name);
   const times = entries[0]?.[1]?.times ?? [];
@@ -319,6 +490,32 @@ function toRelativeStrengthData(
   ) as Record<string, number | null>;
 
   return { chartRows, symbols, changeBySymbol };
+}
+
+function getRelativeRowFromState(
+  state: any,
+  chartRows: Array<Record<string, number>>,
+) {
+  const payloadRow = state?.activePayload?.[0]?.payload;
+  if (payloadRow && typeof payloadRow === "object") {
+    return payloadRow as Record<string, number>;
+  }
+
+  const tooltipIndex = state?.activeTooltipIndex;
+  if (
+    typeof tooltipIndex === "number" &&
+    tooltipIndex >= 0 &&
+    tooltipIndex < chartRows.length
+  ) {
+    return chartRows[tooltipIndex];
+  }
+
+  const activeLabel = Number(state?.activeLabel);
+  if (Number.isFinite(activeLabel)) {
+    return chartRows.find((row) => Number(row.time) === activeLabel) ?? null;
+  }
+
+  return null;
 }
 
 function calculateMovingAverage(candles: Candle[], period: number) {
@@ -531,6 +728,15 @@ export function AssetDashboardPage() {
   const [hoveredRelativeRow, setHoveredRelativeRow] = useState<Record<string, number> | null>(
     null,
   );
+  const [relativeZoomDomain, setRelativeZoomDomain] = useState<RelativeZoomDomain | null>(
+    null,
+  );
+  const [relativePanActive, setRelativePanActive] = useState(false);
+  const [relativeContextMenu, setRelativeContextMenu] =
+    useState<RelativeContextMenu | null>(null);
+  const [relativeDefaultSymbols, setRelativeDefaultSymbols] = useState<string[]>(() =>
+    readRelativeStrengthDefaultsFromStorage(),
+  );
   const [depthChartRef, depthChartSize] = useElementSize<HTMLDivElement>();
   const [relativeChartRef, relativeChartSize] = useElementSize<HTMLDivElement>();
   const isDocumentHidden = () =>
@@ -540,8 +746,22 @@ export function AssetDashboardPage() {
   const [symbolMenuOpen, setSymbolMenuOpen] = useState(false);
   const [timeframeMenuOpen, setTimeframeMenuOpen] = useState(false);
   const [symbolSearch, setSymbolSearch] = useState("");
+  const relativePanAnchorRef = useRef<RelativePanAnchor | null>(null);
+  const relativeContextMenuRef = useRef<HTMLDivElement | null>(null);
   const symbolDropdownRef = useRef<HTMLDivElement | null>(null);
   const timeframeDropdownRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const syncRelativeDefaults = () => {
+      setRelativeDefaultSymbols(readRelativeStrengthDefaultsFromStorage());
+    };
+
+    syncRelativeDefaults();
+    window.addEventListener("storage", syncRelativeDefaults);
+    return () => {
+      window.removeEventListener("storage", syncRelativeDefaults);
+    };
+  }, []);
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -553,6 +773,10 @@ export function AssetDashboardPage() {
     const normalized = toAssetContext(nextPair).pair;
     setAssetPair((prev) => (prev === normalized ? prev : normalized));
     setHoveredRelativeRow(null);
+    relativePanAnchorRef.current = null;
+    setRelativePanActive(false);
+    setRelativeContextMenu(null);
+    setRelativeZoomDomain(null);
     setSymbolSearch("");
     setSymbolMenuOpen(false);
     setError(null);
@@ -595,6 +819,34 @@ export function AssetDashboardPage() {
       document.removeEventListener("mousedown", onPointerDown);
     };
   }, []);
+
+  useEffect(() => {
+    if (!relativeContextMenu) return;
+
+    const onPointerDown = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (
+        relativeContextMenuRef.current &&
+        relativeContextMenuRef.current.contains(target)
+      ) {
+        return;
+      }
+      setRelativeContextMenu(null);
+    };
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setRelativeContextMenu(null);
+      }
+    };
+
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [relativeContextMenu]);
 
   useEffect(() => {
     let cancelled = false;
@@ -764,14 +1016,57 @@ export function AssetDashboardPage() {
       : null;
 
   const relative = useMemo(
-    () => toRelativeStrengthData(relativeStrength, asset.relativeStrengthKey),
-    [asset.relativeStrengthKey, relativeStrength],
+    () =>
+      toRelativeStrengthData(
+        relativeStrength,
+        asset.relativeStrengthKey,
+        relativeDefaultSymbols,
+      ),
+    [asset.relativeStrengthKey, relativeDefaultSymbols, relativeStrength],
   );
+  useEffect(() => {
+    if (!relativeZoomDomain) return;
+
+    const firstTime = Number(relative.chartRows[0]?.time ?? NaN);
+    const lastTime = Number(relative.chartRows[relative.chartRows.length - 1]?.time ?? NaN);
+    if (!Number.isFinite(firstTime) || !Number.isFinite(lastTime)) {
+      setRelativeZoomDomain(null);
+      return;
+    }
+
+    if (relativeZoomDomain.right < firstTime || relativeZoomDomain.left > lastTime) {
+      setRelativeZoomDomain(null);
+      return;
+    }
+
+    const nextLeft = Math.max(firstTime, relativeZoomDomain.left);
+    const nextRight = Math.min(lastTime, relativeZoomDomain.right);
+    if (nextRight <= nextLeft) {
+      setRelativeZoomDomain(null);
+      return;
+    }
+
+    if (nextLeft !== relativeZoomDomain.left || nextRight !== relativeZoomDomain.right) {
+      setRelativeZoomDomain((prev) =>
+        prev
+          ? {
+              ...prev,
+              left: nextLeft,
+              right: nextRight,
+            }
+          : prev,
+      );
+    }
+  }, [relative.chartRows, relativeZoomDomain]);
   const assetPairOptions = useMemo(() => {
     const options = new Set<string>(DEFAULT_ASSET_PAIRS);
     options.add(asset.pair);
     for (const symbol of relative.symbols) {
-      options.add(toAssetContext(symbol).pair);
+      const normalized = normalizeRelativeStrengthSymbol(symbol);
+      if (!normalized) continue;
+      const base = normalized.replace("/USD", "");
+      if (!DEFAULT_RELATIVE_STRENGTH_BASE_SET.has(base)) continue;
+      options.add(toAssetContext(normalized).pair);
     }
     const sorted = Array.from(options).sort((a, b) => a.localeCompare(b));
     return [asset.pair, ...sorted.filter((pair) => pair !== asset.pair)];
@@ -813,20 +1108,22 @@ export function AssetDashboardPage() {
     selectedStrengthKey != null
       ? (activeRelativeRow?.[selectedStrengthKey] ?? null)
       : null;
+  const visibleRelativeYMin = relativeZoomDomain?.yMin ?? RELATIVE_Y_MIN;
+  const visibleRelativeYMax = relativeZoomDomain?.yMax ?? RELATIVE_Y_MAX;
   const selectedRelativeTopPct = useMemo(() => {
     if (
       selectedRelativeValue == null ||
       !Number.isFinite(selectedRelativeValue) ||
-      RELATIVE_Y_MAX <= RELATIVE_Y_MIN
+      visibleRelativeYMax <= visibleRelativeYMin
     ) {
       return 50;
     }
     const normalized =
-      (selectedRelativeValue - RELATIVE_Y_MIN) /
-      (RELATIVE_Y_MAX - RELATIVE_Y_MIN);
+      (selectedRelativeValue - visibleRelativeYMin) /
+      (visibleRelativeYMax - visibleRelativeYMin);
     const inverted = 1 - normalized;
     return Math.max(2, Math.min(98, inverted * 100));
-  }, [selectedRelativeValue]);
+  }, [selectedRelativeValue, visibleRelativeYMax, visibleRelativeYMin]);
   const relativeXTicks = useMemo(() => {
     if (!relative.chartRows.length) return [] as number[];
     const firstTime = Number(relative.chartRows[0]?.time ?? NaN);
@@ -842,6 +1139,271 @@ export function AssetDashboardPage() {
     }
     return ticks;
   }, [relative.chartRows]);
+  const relativeTimeBounds = useMemo(() => {
+    if (!relative.chartRows.length) {
+      return null;
+    }
+
+    const first = Number(relative.chartRows[0]?.time ?? NaN);
+    const last = Number(relative.chartRows[relative.chartRows.length - 1]?.time ?? NaN);
+    if (!Number.isFinite(first) || !Number.isFinite(last) || last <= first) {
+      return null;
+    }
+
+    const span = last - first;
+    const averageStep = span / Math.max(1, relative.chartRows.length - 1);
+    return {
+      first,
+      last,
+      span,
+      averageStep,
+    };
+  }, [relative.chartRows]);
+  const relativeXAxisDomain: [number | string, number | string] = relativeZoomDomain
+    ? [relativeZoomDomain.left, relativeZoomDomain.right]
+    : ["dataMin", "dataMax"];
+  const relativeYAxisDomain: [number, number] = relativeZoomDomain
+    ? [relativeZoomDomain.yMin, relativeZoomDomain.yMax]
+    : [RELATIVE_Y_MIN, RELATIVE_Y_MAX];
+  const relativeXAxisTicks = relativeZoomDomain ? undefined : relativeXTicks;
+  const relativeYAxisTicks = relativeZoomDomain ? undefined : RELATIVE_Y_TICKS;
+  useEffect(() => {
+    if (!relativePanActive) return;
+
+    const stopPanning = () => {
+      relativePanAnchorRef.current = null;
+      setRelativePanActive(false);
+    };
+
+    const onMouseMove = (event: MouseEvent) => {
+      const anchor = relativePanAnchorRef.current;
+      if (!anchor || !relativeTimeBounds) return;
+
+      const xSpan = anchor.domain.right - anchor.domain.left;
+      const ySpan = anchor.domain.yMax - anchor.domain.yMin;
+      if (xSpan <= 0 || ySpan <= 0) return;
+
+      const plotWidth = Math.max(
+        1,
+        relativeChartSize.width - RELATIVE_CHART_MARGIN.left - RELATIVE_CHART_MARGIN.right,
+      );
+      const plotHeight = Math.max(
+        1,
+        relativeChartSize.height - RELATIVE_CHART_MARGIN.top - RELATIVE_CHART_MARGIN.bottom,
+      );
+
+      const deltaX = event.clientX - anchor.startX;
+      const deltaY = event.clientY - anchor.startY;
+
+      let nextLeft = anchor.domain.left - (deltaX / plotWidth) * xSpan;
+      let nextRight = anchor.domain.right - (deltaX / plotWidth) * xSpan;
+      let nextYMin = anchor.domain.yMin + (deltaY / plotHeight) * ySpan;
+      let nextYMax = anchor.domain.yMax + (deltaY / plotHeight) * ySpan;
+
+      if (nextLeft < relativeTimeBounds.first) {
+        const offset = relativeTimeBounds.first - nextLeft;
+        nextLeft += offset;
+        nextRight += offset;
+      }
+      if (nextRight > relativeTimeBounds.last) {
+        const offset = nextRight - relativeTimeBounds.last;
+        nextLeft -= offset;
+        nextRight -= offset;
+      }
+
+      if (nextYMin < RELATIVE_Y_MIN) {
+        const offset = RELATIVE_Y_MIN - nextYMin;
+        nextYMin += offset;
+        nextYMax += offset;
+      }
+      if (nextYMax > RELATIVE_Y_MAX) {
+        const offset = nextYMax - RELATIVE_Y_MAX;
+        nextYMin -= offset;
+        nextYMax -= offset;
+      }
+
+      nextLeft = clampNumber(nextLeft, relativeTimeBounds.first, relativeTimeBounds.last);
+      nextRight = clampNumber(nextRight, relativeTimeBounds.first, relativeTimeBounds.last);
+      nextYMin = clampNumber(nextYMin, RELATIVE_Y_MIN, RELATIVE_Y_MAX);
+      nextYMax = clampNumber(nextYMax, RELATIVE_Y_MIN, RELATIVE_Y_MAX);
+
+      setRelativeZoomDomain({
+        left: nextLeft,
+        right: nextRight,
+        yMin: nextYMin,
+        yMax: nextYMax,
+      });
+    };
+
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", stopPanning);
+    window.addEventListener("blur", stopPanning);
+    return () => {
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", stopPanning);
+      window.removeEventListener("blur", stopPanning);
+    };
+  }, [relativePanActive, relativeChartSize.height, relativeChartSize.width, relativeTimeBounds]);
+
+  const handleRelativeWheel = useCallback((event: WheelEvent) => {
+    if (relativePanActive) return;
+    if (!relativeTimeBounds) return;
+    if (!relativeChartRef.current) return;
+
+    if (relativeContextMenu) {
+      setRelativeContextMenu(null);
+    }
+
+    const wheelDelta = Number(event.deltaY ?? 0);
+    const direction = Math.sign(wheelDelta);
+    if (direction === 0) return;
+    if (event.cancelable) {
+      event.preventDefault();
+    }
+    event.stopPropagation();
+
+    const rect = relativeChartRef.current.getBoundingClientRect();
+    const plotWidth = Math.max(
+      1,
+      relativeChartSize.width - RELATIVE_CHART_MARGIN.left - RELATIVE_CHART_MARGIN.right,
+    );
+    const plotHeight = Math.max(
+      1,
+      relativeChartSize.height - RELATIVE_CHART_MARGIN.top - RELATIVE_CHART_MARGIN.bottom,
+    );
+
+    const pointerX = event.clientX - rect.left - RELATIVE_CHART_MARGIN.left;
+    const pointerY = event.clientY - rect.top - RELATIVE_CHART_MARGIN.top;
+    const xRatio = clampNumber(pointerX / plotWidth, 0, 1);
+    const yRatio = clampNumber(pointerY / plotHeight, 0, 1);
+
+    const currentLeft = relativeZoomDomain?.left ?? relativeTimeBounds.first;
+    const currentRight = relativeZoomDomain?.right ?? relativeTimeBounds.last;
+    const currentYMin = relativeZoomDomain?.yMin ?? RELATIVE_Y_MIN;
+    const currentYMax = relativeZoomDomain?.yMax ?? RELATIVE_Y_MAX;
+
+    const xSpan = currentRight - currentLeft;
+    const ySpan = currentYMax - currentYMin;
+    if (xSpan <= 0 || ySpan <= 0) return;
+
+    const deltaScale = clampNumber(
+      Math.abs(wheelDelta) / RELATIVE_ZOOM_DELTA_NORMALIZER,
+      RELATIVE_ZOOM_MIN_DELTA_SCALE,
+      1,
+    );
+    const zoomStep = RELATIVE_ZOOM_BASE_STEP * deltaScale;
+    const zoomFactor = direction < 0 ? 1 - zoomStep : 1 + zoomStep;
+
+    const minXSpan = Math.max(
+      RELATIVE_ZOOM_MIN_POINTS * relativeTimeBounds.averageStep,
+      relativeTimeBounds.averageStep,
+    );
+    const nextXSpan = clampNumber(xSpan * zoomFactor, minXSpan, relativeTimeBounds.span);
+    const anchorX = currentLeft + xSpan * xRatio;
+    let nextLeft = anchorX - nextXSpan * xRatio;
+    let nextRight = nextLeft + nextXSpan;
+
+    if (nextLeft < relativeTimeBounds.first) {
+      const delta = relativeTimeBounds.first - nextLeft;
+      nextLeft += delta;
+      nextRight += delta;
+    }
+    if (nextRight > relativeTimeBounds.last) {
+      const delta = nextRight - relativeTimeBounds.last;
+      nextLeft -= delta;
+      nextRight -= delta;
+    }
+
+    nextLeft = clampNumber(nextLeft, relativeTimeBounds.first, relativeTimeBounds.last);
+    nextRight = clampNumber(nextRight, relativeTimeBounds.first, relativeTimeBounds.last);
+
+    const fullYSpan = RELATIVE_Y_MAX - RELATIVE_Y_MIN;
+    const nextYSpan = clampNumber(ySpan * zoomFactor, RELATIVE_ZOOM_MIN_Y_SPAN, fullYSpan);
+    const anchorY = currentYMax - ySpan * yRatio;
+    let nextYMin = anchorY - nextYSpan * (1 - yRatio);
+    let nextYMax = anchorY + nextYSpan * yRatio;
+
+    if (nextYMin < RELATIVE_Y_MIN) {
+      const delta = RELATIVE_Y_MIN - nextYMin;
+      nextYMin += delta;
+      nextYMax += delta;
+    }
+    if (nextYMax > RELATIVE_Y_MAX) {
+      const delta = nextYMax - RELATIVE_Y_MAX;
+      nextYMin -= delta;
+      nextYMax -= delta;
+    }
+
+    nextYMin = clampNumber(nextYMin, RELATIVE_Y_MIN, RELATIVE_Y_MAX);
+    nextYMax = clampNumber(nextYMax, RELATIVE_Y_MIN, RELATIVE_Y_MAX);
+
+    const isFullX =
+      Math.abs(nextLeft - relativeTimeBounds.first) <= 1 &&
+      Math.abs(nextRight - relativeTimeBounds.last) <= 1;
+    const isFullY =
+      Math.abs(nextYMin - RELATIVE_Y_MIN) <= 0.001 &&
+      Math.abs(nextYMax - RELATIVE_Y_MAX) <= 0.001;
+
+    if (isFullX && isFullY) {
+      setRelativeZoomDomain(null);
+      return;
+    }
+
+    setRelativeZoomDomain({
+      left: nextLeft,
+      right: nextRight,
+      yMin: nextYMin,
+      yMax: nextYMax,
+    });
+  }, [
+    relativeChartRef,
+    relativeChartSize.height,
+    relativeChartSize.width,
+    relativeContextMenu,
+    relativePanActive,
+    relativeTimeBounds,
+    relativeZoomDomain,
+  ]);
+  useEffect(() => {
+    const container = relativeChartRef.current;
+    if (!container) return;
+
+    const onWheel = (event: WheelEvent) => {
+      handleRelativeWheel(event);
+    };
+
+    const blockGestureZoom = (event: Event) => {
+      if ((event as Event).cancelable) {
+        event.preventDefault();
+      }
+    };
+
+    container.addEventListener("wheel", onWheel, { passive: false });
+    container.addEventListener("gesturestart", blockGestureZoom, { passive: false });
+    container.addEventListener("gesturechange", blockGestureZoom, { passive: false });
+    container.addEventListener("gestureend", blockGestureZoom, { passive: false });
+
+    return () => {
+      container.removeEventListener("wheel", onWheel);
+      container.removeEventListener("gesturestart", blockGestureZoom);
+      container.removeEventListener("gesturechange", blockGestureZoom);
+      container.removeEventListener("gestureend", blockGestureZoom);
+    };
+  }, [handleRelativeWheel, relativeChartRef]);
+  const relativeContextMenuPosition = relativeContextMenu
+    ? {
+        left: clampNumber(
+          relativeContextMenu.x,
+          8,
+          Math.max(8, relativeChartSize.width - 158),
+        ),
+        top: clampNumber(
+          relativeContextMenu.y,
+          8,
+          Math.max(8, relativeChartSize.height - 44),
+        ),
+      }
+    : null;
 
   const renderRelativeRow = (symbol: string) => {
     const change = visibleRelativeChangeBySymbol[symbol];
@@ -1119,51 +1681,58 @@ export function AssetDashboardPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="relative h-full min-h-[260px] p-0">
-            <div ref={relativeChartRef} className="absolute inset-0">
+            <div
+              ref={relativeChartRef}
+              className={cn(
+                "absolute inset-0 select-none overscroll-contain",
+                relativeZoomDomain ? (relativePanActive ? "cursor-grabbing" : "cursor-grab") : undefined,
+              )}
+              onMouseDown={(event) => {
+                if (event.button !== 0) return;
+                if (!relativeZoomDomain || !relativeTimeBounds) return;
+                event.preventDefault();
+                setRelativeContextMenu(null);
+                setHoveredRelativeRow(null);
+                relativePanAnchorRef.current = {
+                  startX: event.clientX,
+                  startY: event.clientY,
+                  domain: relativeZoomDomain,
+                };
+                setRelativePanActive(true);
+              }}
+              onContextMenu={(event) => {
+                event.preventDefault();
+                setRelativePanActive(false);
+                relativePanAnchorRef.current = null;
+                if (!relativeChartRef.current) return;
+                const rect = relativeChartRef.current.getBoundingClientRect();
+                setRelativeContextMenu({
+                  x: clampNumber(event.clientX - rect.left, 0, rect.width),
+                  y: clampNumber(event.clientY - rect.top, 0, rect.height),
+                });
+              }}
+            >
               {relativeChartSize.width > 0 && relativeChartSize.height > 0 ? (
                 <LineChart
                   width={relativeChartSize.width}
                   height={relativeChartSize.height}
                   data={relative.chartRows}
-                  margin={{ top: 8, right: 14, left: 8, bottom: 0 }}
+                  margin={RELATIVE_CHART_MARGIN}
                   onMouseMove={(state: any) => {
-                    const payloadRow = state?.activePayload?.[0]?.payload;
-                    if (payloadRow && typeof payloadRow === "object") {
-                      setHoveredRelativeRow(payloadRow as Record<string, number>);
-                      return;
-                    }
-
-                    const tooltipIndex = state?.activeTooltipIndex;
-                    if (
-                      typeof tooltipIndex === "number" &&
-                      tooltipIndex >= 0 &&
-                      tooltipIndex < relative.chartRows.length
-                    ) {
-                      setHoveredRelativeRow(relative.chartRows[tooltipIndex]);
-                      return;
-                    }
-
-                    const activeLabel = Number(state?.activeLabel);
-                    if (Number.isFinite(activeLabel)) {
-                      const rowByTime = relative.chartRows.find(
-                        (row) => Number(row.time) === activeLabel,
-                      );
-                      if (rowByTime) {
-                        setHoveredRelativeRow(rowByTime);
-                        return;
-                      }
-                    }
-
+                    if (relativePanActive) return;
+                    setHoveredRelativeRow(getRelativeRowFromState(state, relative.chartRows));
+                  }}
+                  onMouseLeave={() => {
                     setHoveredRelativeRow(null);
                   }}
-                  onMouseLeave={() => setHoveredRelativeRow(null)}
                 >
                   <CartesianGrid stroke="rgba(60, 68, 79, 0.45)" />
                   <XAxis
                     dataKey="time"
                     type="number"
-                    ticks={relativeXTicks}
-                    domain={["dataMin", "dataMax"]}
+                    ticks={relativeXAxisTicks}
+                    domain={relativeXAxisDomain}
+                    allowDataOverflow
                     tick={{ fill: "#95a2b2", fontSize: 11 }}
                     tickFormatter={(time) => {
                       const date = new Date(Number(time));
@@ -1179,8 +1748,9 @@ export function AssetDashboardPage() {
                     orientation="right"
                     tick={{ fill: "#95a2b2", fontSize: 11 }}
                     tickFormatter={(value) => formatPercent(Number(value))}
-                    domain={[RELATIVE_Y_MIN, RELATIVE_Y_MAX]}
-                    ticks={RELATIVE_Y_TICKS}
+                    domain={relativeYAxisDomain}
+                    ticks={relativeYAxisTicks}
+                    allowDataOverflow
                   />
                   <Tooltip
                     content={() => null}
@@ -1232,6 +1802,38 @@ export function AssetDashboardPage() {
                 <div className="space-y-[2px]">{rightRelativeSymbols.map(renderRelativeRow)}</div>
               </div>
             </div>
+
+            {relativeContextMenuPosition ? (
+              <div
+                ref={relativeContextMenuRef}
+                className="absolute z-30 min-w-[148px] rounded-md border border-[#303b49] bg-[#111821f2] p-1 shadow-[0_8px_20px_rgba(0,0,0,0.35)]"
+                style={{
+                  left: `${relativeContextMenuPosition.left}px`,
+                  top: `${relativeContextMenuPosition.top}px`,
+                }}
+              >
+                <button
+                  type="button"
+                  disabled={!relativeZoomDomain}
+                  className={cn(
+                    "w-full rounded px-2 py-1 text-left text-[10px] uppercase tracking-[0.14em]",
+                    relativeZoomDomain
+                      ? "text-[#d9e3ed] hover:bg-[#1f2b3a]"
+                      : "cursor-not-allowed text-[#6d7c8d]",
+                  )}
+                  onClick={() => {
+                    relativePanAnchorRef.current = null;
+                    setRelativePanActive(false);
+                    setHoveredRelativeRow(null);
+                    setRelativeZoomDomain(null);
+                    setRelativeContextMenu(null);
+                  }}
+                >
+                  Reset to default
+                </button>
+              </div>
+            ) : null}
+
           </CardContent>
         </Card>
 

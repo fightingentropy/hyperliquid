@@ -125,6 +125,46 @@
                             />
                         </div>
                     </div>
+
+                    <div class="setting-card setting-card-wide">
+                        <div>
+                            <h3>Relative Strength Defaults</h3>
+                            <p class="muted">
+                                Comma or newline separated symbols included in
+                                the Relative Strength panel by default.
+                            </p>
+                        </div>
+                        <div class="range-control">
+                            <div class="range-header">
+                                <span>Included symbols</span>
+                                <span id="relative-defaults-count" class="mono"
+                                    >--</span
+                                >
+                            </div>
+                            <textarea
+                                id="relative-defaults"
+                                class="settings-textarea"
+                                rows="3"
+                                placeholder="HYPE, BTC, ETH, SOL"
+                            ></textarea>
+                            <div class="settings-inline-actions">
+                                <button
+                                    id="relative-defaults-preset-sectors"
+                                    class="ghost settings-inline-button"
+                                    type="button"
+                                >
+                                    Load HYPE + Sectors
+                                </button>
+                                <button
+                                    id="relative-defaults-reset"
+                                    class="ghost settings-inline-button"
+                                    type="button"
+                                >
+                                    Restore Default List
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </section>
         </main>

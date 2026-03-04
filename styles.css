@@ -499,6 +499,37 @@ textarea {
     gap: 11px;
 }
 
+.setting-card-wide {
+    grid-column: 1 / -1;
+}
+
+.settings-textarea {
+    width: 100%;
+    min-height: 76px;
+    border: 1px solid var(--panel-border);
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-size: 0.78rem;
+    line-height: 1.4;
+    resize: vertical;
+}
+
+.settings-textarea::placeholder {
+    color: var(--muted-2);
+}
+
+.settings-inline-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.settings-inline-button {
+    padding: 7px 10px;
+    font-size: 0.72rem;
+}
+
 .settings-toggle {
     justify-content: flex-start;
 }

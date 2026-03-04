@@ -6,6 +6,7 @@ const HYPURRSCAN_API = "https://api.hypurrscan.io";
 const BREAKOUTPROP_API = "https://tools.breakoutprop.com/api";
 const REMOTE_ORIGIN = "https://tools.breakoutprop.com";
 const BINANCE_FAPI = "https://fapi.binance.com";
+const YAHOO_FINANCE_CHART = "https://query1.finance.yahoo.com/v8/finance/chart";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const leaderboardTtlMs = DAY_MS;
@@ -85,6 +86,20 @@ const RELATIVE_STRENGTH_BASES = [
   "IP",
 ];
 const RELATIVE_STRENGTH_BASE_SET = new Set(RELATIVE_STRENGTH_BASES);
+const RELATIVE_STRENGTH_SECTOR_ETFS = [
+  "SPY",
+  "XLC",
+  "XLY",
+  "XLP",
+  "XLE",
+  "XLF",
+  "XLV",
+  "XLI",
+  "XLB",
+  "XLRE",
+  "XLK",
+  "XLU",
+];
 const FILLS_PAGE_LIMIT = 2000;
 const DEFAULT_MAX_USER_FILLS = 4000;
 
@@ -1181,6 +1196,69 @@ async function handleMarketDepth(bypassCache) {
   return jsonResponse(data);
 }
 
+function toRelativeStrengthPayloadFromRows(rows) {
+  const sortedRows = (Array.isArray(rows) ? rows : [])
+    .filter(
+      (row) => Number.isFinite(Number(row?.time)) && Number.isFinite(Number(row?.close)),
+    )
+    .sort((a, b) => Number(a.time) - Number(b.time));
+
+  if (sortedRows.length < 2) return null;
+  const trimmed = sortedRows.slice(-96);
+  const first = Number(trimmed[0]?.close);
+  const last = Number(trimmed[trimmed.length - 1]?.close);
+  const changePct =
+    Number.isFinite(first) && Number.isFinite(last) && first !== 0
+      ? ((last - first) / first) * 100
+      : null;
+
+  return {
+    sparkline: trimmed.map((row) => Number(row.close)),
+    times: trimmed.map((row) => Number(row.time)),
+    change_pct: Number.isFinite(changePct) ? changePct : null,
+    last_price: Number.isFinite(last) ? last : null,
+  };
+}
+
+async function fetchRelativeStrengthYahooSymbols() {
+  const results = new Map();
+
+  await Promise.all(
+    RELATIVE_STRENGTH_SECTOR_ETFS.map(async (base) => {
+      try {
+        const payload = await fetchJson(
+          `${YAHOO_FINANCE_CHART}/${encodeURIComponent(
+            base,
+          )}?interval=15m&range=5d&includePrePost=false&events=history`,
+        );
+        const result = payload?.chart?.result?.[0] ?? null;
+        const timestamps = Array.isArray(result?.timestamp) ? result.timestamp : [];
+        const closes = Array.isArray(result?.indicators?.quote?.[0]?.close)
+          ? result.indicators.quote[0].close
+          : [];
+
+        const rows = [];
+        const length = Math.min(timestamps.length, closes.length);
+        for (let index = 0; index < length; index += 1) {
+          const close = Number(closes[index]);
+          const time = Number(timestamps[index]) * 1000;
+          if (!Number.isFinite(close) || !Number.isFinite(time)) continue;
+          rows.push({ close, time });
+        }
+
+        const normalized = toRelativeStrengthPayloadFromRows(rows);
+        if (normalized) {
+          results.set(`${base}/USD`, normalized);
+        }
+      } catch {
+        // Ignore per-symbol errors; keep best-effort dataset.
+      }
+    }),
+  );
+
+  return results;
+}
+
 async function fetchRelativeStrengthBinance() {
   const tickers = await fetchJson(`${BINANCE_FAPI}/fapi/v1/ticker/24hr`);
   const list = Array.isArray(tickers) ? tickers : [];
@@ -1213,7 +1291,7 @@ async function fetchRelativeStrengthBinance() {
   const eligibleMap = new Map(eligible.map((t) => [t.symbol, t]));
 
   const concurrency = 16;
-  const results = new Map();
+  const cryptoResults = new Map();
   let cursor = 0;
 
   async function worker() {
@@ -1238,11 +1316,12 @@ async function fetchRelativeStrengthBinance() {
           : symbol;
         const key = `${base}/USD`;
         const t = eligibleMap.get(symbol);
-        results.set(key, {
-          sparkline: rows.map((r) => r.close),
-          times: rows.map((r) => r.time),
-          change_pct: Number.isFinite(t?.changePct) ? t.changePct : null,
-          last_price: Number.isFinite(t?.lastPrice) ? t.lastPrice : null,
+        const normalized = toRelativeStrengthPayloadFromRows(rows);
+        if (!normalized) continue;
+        cryptoResults.set(key, {
+          ...normalized,
+          change_pct: Number.isFinite(t?.changePct) ? t.changePct : normalized.change_pct,
+          last_price: Number.isFinite(t?.lastPrice) ? t.lastPrice : normalized.last_price,
         });
       } catch {
         // Ignore per-symbol errors; keep best-effort dataset.
@@ -1256,17 +1335,30 @@ async function fetchRelativeStrengthBinance() {
     ),
   );
 
+  const macroResults = await fetchRelativeStrengthYahooSymbols();
+
+  const results = new Map(cryptoResults);
+  for (const [symbol, payload] of macroResults.entries()) {
+    results.set(symbol, payload);
+  }
+
   if (!results.size) {
     throw new Error("No relative-strength symbols available");
   }
 
+  const missingMacroBases = RELATIVE_STRENGTH_SECTOR_ETFS.filter(
+    (base) => !macroResults.has(`${base}/USD`),
+  );
+
   return {
-    source: "binance",
+    source: "binance+yahoo",
     updatedAt: Date.now(),
     interval: "15m",
     count: 96,
     requestedBases: RELATIVE_STRENGTH_BASES,
+    requestedMacroBases: RELATIVE_STRENGTH_SECTOR_ETFS,
     missingBases: missing,
+    missingMacroBases,
     symbols: Object.fromEntries(results.entries()),
   };
 }

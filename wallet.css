@@ -159,6 +159,459 @@
     max-height: 420px;
 }
 
+.tracked-delta-section {
+    display: grid;
+    gap: 18px;
+    margin-top: 10px;
+    padding-top: 18px;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.tracked-delta-header {
+    align-items: flex-start;
+    gap: 20px;
+    flex-wrap: wrap;
+}
+
+.tracked-delta-controls {
+    display: flex;
+    align-items: flex-end;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-left: auto;
+}
+
+.tracked-delta-mode-toggle,
+.tracked-delta-window-toggle {
+    display: inline-flex;
+    align-items: center;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    gap: 2px;
+}
+
+.tracked-delta-mode-toggle button,
+.tracked-delta-window-toggle button {
+    border: 0;
+    border-bottom: 2px solid transparent;
+    background: transparent;
+    color: var(--muted);
+    padding: 9px 10px 8px;
+    border-radius: 0;
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition:
+        border-color 0.2s ease,
+        color 0.2s ease;
+}
+
+.tracked-delta-mode-toggle button:hover,
+.tracked-delta-window-toggle button:hover {
+    color: var(--ink);
+}
+
+.tracked-delta-mode-toggle button.active,
+.tracked-delta-window-toggle button.active {
+    background: transparent;
+    color: var(--ink);
+    border-bottom-color: rgba(46, 207, 208, 0.7);
+}
+
+.tracked-delta-filter {
+    display: grid;
+    gap: 6px;
+}
+
+.tracked-delta-filter span {
+    font-size: 0.68rem;
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+    font-weight: 700;
+    color: var(--muted-2);
+}
+
+.tracked-delta-filter select {
+    min-width: 160px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid var(--panel-border);
+    background: var(--bg-elevated);
+    color: var(--ink);
+    font-family: var(--font-mono);
+    font-size: 0.84rem;
+}
+
+.tracked-delta-refresh {
+    padding: 8px 0;
+    min-width: 0;
+    border: 0;
+    border-bottom: 1px solid transparent;
+    border-radius: 0;
+    background: transparent;
+}
+
+.tracked-delta-refresh:hover {
+    border-bottom-color: rgba(46, 207, 208, 0.45);
+    background: transparent;
+}
+
+.tracked-delta-status-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.tracked-delta-status {
+    margin: 0;
+    font-size: 0.82rem;
+    max-width: 72ch;
+}
+
+.tracked-delta-flags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+}
+
+.tracked-delta-flag {
+    display: inline-block;
+    padding: 0;
+    font-size: 0.74rem;
+    font-weight: 600;
+    border: 0;
+    background: transparent;
+    color: var(--muted);
+}
+
+.tracked-delta-flag + .tracked-delta-flag {
+    position: relative;
+}
+
+.tracked-delta-flag + .tracked-delta-flag::before {
+    content: "";
+    position: absolute;
+    left: -8px;
+    top: 50%;
+    width: 3px;
+    height: 3px;
+    margin-top: -1.5px;
+    border-radius: 999px;
+    background: rgba(144, 165, 195, 0.5);
+}
+
+.tracked-delta-flag.warning {
+    color: var(--loss);
+}
+
+.tracked-delta-cards {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.tracked-delta-card {
+    display: grid;
+    gap: 14px;
+    padding: 16px 0 18px;
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+}
+
+.tracked-delta-card + .tracked-delta-card {
+    margin-left: 18px;
+    padding-left: 18px;
+    border-left: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.tracked-delta-card-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.tracked-delta-card-title {
+    margin: 0;
+    font-size: 0.72rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted-2);
+}
+
+.tracked-delta-card-subtitle {
+    font-size: 0.72rem;
+    color: var(--muted);
+}
+
+.tracked-delta-card-net {
+    display: grid;
+    gap: 3px;
+}
+
+.tracked-delta-card-net-label {
+    font-size: 0.76rem;
+    color: var(--muted);
+}
+
+.tracked-delta-card-net-value {
+    font-size: 2rem;
+    font-weight: 700;
+    line-height: 1.1;
+    font-family: var(--font-mono);
+    letter-spacing: -0.03em;
+}
+
+.tracked-delta-card-net-value.flat {
+    color: var(--muted);
+}
+
+.tracked-delta-card-notional {
+    font-size: 0.82rem;
+    line-height: 1.3;
+}
+
+.tracked-delta-card-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    font-size: 0.8rem;
+    color: var(--muted);
+    padding-top: 10px;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.tracked-delta-card-badge {
+    color: var(--muted);
+}
+
+.tracked-delta-chart-panel {
+    display: grid;
+    gap: 14px;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+}
+
+.tracked-delta-chart-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+}
+
+.tracked-delta-chart-title {
+    margin: 0;
+    font-size: 1.05rem;
+}
+
+.tracked-delta-chart-subtitle {
+    margin: 6px 0 0;
+}
+
+.tracked-delta-chart-meta {
+    display: grid;
+    gap: 12px;
+    padding-top: 10px;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.tracked-delta-chart-legend {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+    font-size: 0.76rem;
+    color: var(--muted);
+}
+
+.tracked-delta-legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.tracked-delta-legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 999px;
+    background: linear-gradient(90deg, var(--profit), var(--loss));
+}
+
+.tracked-delta-legend-line {
+    width: 18px;
+    height: 2px;
+    border-radius: 999px;
+    background: #ff8a1a;
+}
+
+.tracked-delta-chart {
+    position: relative;
+    padding: 0 0 4px;
+    min-height: 360px;
+}
+
+.tracked-delta-chart-bar {
+    cursor: crosshair;
+}
+
+.tracked-delta-chart svg {
+    width: 100%;
+    height: auto;
+    display: block;
+}
+
+.tracked-delta-chart-empty {
+    min-height: 280px;
+    display: grid;
+    place-items: center;
+    color: var(--muted);
+}
+
+.tracked-delta-tooltip {
+    position: absolute;
+    z-index: 3;
+    min-width: 240px;
+    max-width: 320px;
+    padding: 12px 13px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(8, 11, 18, 0.96);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.28);
+    pointer-events: none;
+    backdrop-filter: blur(10px);
+}
+
+.tracked-delta-tooltip[hidden] {
+    display: none;
+}
+
+.tracked-delta-tooltip-time {
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted-2);
+    margin-bottom: 6px;
+}
+
+.tracked-delta-tooltip-value {
+    font-size: 1.05rem;
+    font-weight: 700;
+    font-family: var(--font-mono);
+}
+
+.tracked-delta-tooltip-groups {
+    display: grid;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.tracked-delta-tooltip-group {
+    display: grid;
+    gap: 5px;
+}
+
+.tracked-delta-tooltip-group-title {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+}
+
+.tracked-delta-tooltip-list {
+    display: grid;
+    gap: 4px;
+}
+
+.tracked-delta-tooltip-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    font-size: 0.8rem;
+}
+
+.tracked-delta-tooltip-wallet {
+    color: var(--ink);
+}
+
+.tracked-delta-tooltip-share {
+    color: var(--muted);
+    white-space: nowrap;
+}
+
+.tracked-delta-breakdown {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 18px;
+}
+
+.tracked-delta-breakdown-item {
+    display: grid;
+    gap: 4px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+}
+
+.tracked-delta-breakdown-label {
+    font-size: 0.72rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+.tracked-delta-breakdown-value {
+    font-size: 0.98rem;
+    font-weight: 600;
+}
+
+.tracked-delta-chart-grid {
+    stroke: rgba(255, 255, 255, 0.08);
+    stroke-dasharray: 4 5;
+}
+
+.tracked-delta-chart-axis {
+    fill: var(--muted);
+    font-size: 11px;
+    font-family: var(--font-mono);
+}
+
+.tracked-delta-chart-axis.price {
+    fill: #ff8a1a;
+}
+
+.tracked-delta-chart-zero {
+    stroke: rgba(255, 255, 255, 0.18);
+    stroke-width: 1;
+}
+
+.tracked-delta-chart-bar-positive {
+    fill: var(--profit);
+    opacity: 0.88;
+}
+
+.tracked-delta-chart-bar-negative {
+    fill: var(--loss);
+    opacity: 0.9;
+}
+
+.tracked-delta-chart-price {
+    fill: none;
+    stroke: #ff8a1a;
+    stroke-width: 2.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
 .asset-cell {
     display: inline-flex;
     align-items: center;
@@ -258,6 +711,27 @@
     background: rgba(47, 120, 255, 0.16);
     color: #5aa2ff;
     border-color: rgba(47, 120, 255, 0.28);
+}
+
+@media (max-width: 980px) {
+    .tracked-delta-controls {
+        margin-left: 0;
+    }
+
+    .tracked-delta-cards {
+        grid-template-columns: 1fr;
+    }
+
+    .tracked-delta-card + .tracked-delta-card {
+        margin-left: 0;
+        padding-left: 0;
+        border-left: 0;
+        border-top: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .tracked-delta-breakdown {
+        grid-template-columns: 1fr;
+    }
 }
 
 .type-pill.fill {

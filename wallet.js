@@ -3,22 +3,34 @@
   const TRADES_FETCH_DAYS = 90;
   const TRADES_FETCH_LIMIT = 8000; // total fills to accumulate client-side before stopping
   const TRADES_PAGE_SIZE = 2000; // HL `userFills` page size cap
+  const TRACKED_DELTA_MAX_DAYS = 7;
+  const TRACKED_DELTA_WINDOWS = Object.freeze([
+    { key: "24h", label: "Last 24H", ms: 24 * 60 * 60 * 1000 },
+    { key: "7d", label: "Last 7D", ms: 7 * 24 * 60 * 60 * 1000 },
+  ]);
   // Merge adjacent order-groups within a "trade session" window.
   // HL tends to merge sequential orders that build/close a position over hours.
   const AGGREGATE_MERGE_GAP_MS = 24 * 60 * 60 * 1000; // 24 hours
   const AGGREGATE_MERGE_MAX_PX_DIFF = 0.12; // 12% relative difference guardrail
   const FOLLOWED_WALLETS_KEY = "hl-followed-wallets-v1";
+  const TRACKED_DELTA_CACHE_TTL_MS = 60 * 60 * 1000;
+  const TRACKED_DELTA_WALLET_CACHE_KEY = "hl-tracked-delta-wallet-cache:v1";
+  const TRACKED_DELTA_PRICE_CACHE_KEY = "hl-tracked-delta-price-cache:v1";
   const DEFAULT_FOLLOWED_WALLETS = [
     "0xaf0fdd39e5d92499b0ed9f68693da99c0ec1e92e",
     "0x8def9f50456c6c4e37fa5d3d57f108ed23992dae",
     "0xcb58b8f5ec6d47985f0728465c25a08ef9ad2c7b",
     "0xadd12adbbd5db87674b38af99b6dd34dd2a45e0d",
+    "0x519c721de735f7c9e6146d167852e60d60496a47",
+    "0x9c2a2a966ed8e47f0c8b7e2ec2b91424f229f6a8",
   ];
   const DEFAULT_FOLLOWED_WALLET_LABELS = Object.freeze({
     "0xaf0fdd39e5d92499b0ed9f68693da99c0ec1e92e": "purple surfer",
     "0x8def9f50456c6c4e37fa5d3d57f108ed23992dae": "loracle",
     "0xcb58b8f5ec6d47985f0728465c25a08ef9ad2c7b": "CL",
     "0xadd12adbbd5db87674b38af99b6dd34dd2a45e0d": "nexus",
+    "0x519c721de735f7c9e6146d167852e60d60496a47": "Hyper Longer",
+    "0x9c2a2a966ed8e47f0c8b7e2ec2b91424f229f6a8": "Phantom Yak",
   });
 
   const ui = {
@@ -52,6 +64,17 @@
     holdingsSortableHeaders: Array.from(
       document.querySelectorAll("#panel-holdings th[data-sort]"),
     ),
+    trackedDeltaAsset: document.getElementById("tracked-delta-asset"),
+    trackedDeltaRefresh: document.getElementById("tracked-delta-refresh"),
+    trackedDeltaStatus: document.getElementById("tracked-delta-status"),
+    trackedDeltaFlags: document.getElementById("tracked-delta-flags"),
+    trackedDeltaCards: document.getElementById("tracked-delta-cards"),
+    trackedDeltaModeToggle: document.getElementById("tracked-delta-mode-toggle"),
+    trackedDeltaWindowToggle: document.getElementById("tracked-delta-window-toggle"),
+    trackedDeltaChart: document.getElementById("tracked-delta-chart"),
+    trackedDeltaChartTitle: document.getElementById("tracked-delta-chart-title"),
+    trackedDeltaChartSubtitle: document.getElementById("tracked-delta-chart-subtitle"),
+    trackedDeltaBreakdown: document.getElementById("tracked-delta-breakdown"),
   };
 
   let state = {
@@ -71,7 +94,21 @@
     holdingsSortKey: "usdValue",
     holdingsSortDir: "desc",
     followedWallets: [],
+    trackedDeltaLoading: false,
+    trackedDeltaError: "",
+    trackedDeltaAsset: null,
+    trackedDeltaAssets: [],
+    trackedDeltaFills: [],
+    trackedDeltaLoadId: 0,
+    trackedDeltaUpdatedAt: null,
+    trackedDeltaFailedWallets: [],
+    trackedDeltaViewMode: "all",
+    trackedDeltaChartWindow: "7d",
+    trackedDeltaPriceSeriesByAsset: {},
   };
+
+  let trackedDeltaWalletCacheStore = null;
+  let trackedDeltaPriceCacheStore = null;
 
   function isAddress(value) {
     return typeof value === "string" && /^0x[a-fA-F0-9]{40}$/.test(value.trim());
@@ -105,6 +142,38 @@
     return new Intl.NumberFormat("en-US", {
       maximumFractionDigits: decimals,
     }).format(Number(value));
+  }
+
+  function formatSignedNumber(value, decimals = 2) {
+    if (value == null || !Number.isFinite(Number(value))) return "—";
+    const num = Number(value);
+    const prefix = num > 0 ? "+" : num < 0 ? "-" : "";
+    return `${prefix}${formatNumber(Math.abs(num), decimals)}`;
+  }
+
+  function formatSignedUsd(value) {
+    if (value == null || !Number.isFinite(Number(value))) return "—";
+    const num = Number(value);
+    const prefix = num > 0 ? "+" : num < 0 ? "-" : "";
+    return `${prefix}${formatUsd(Math.abs(num))}`;
+  }
+
+  function formatCompactUsd(value) {
+    if (value == null || !Number.isFinite(Number(value))) return "—";
+    return new Intl.NumberFormat("en-US", {
+      notation: "compact",
+      compactDisplay: "short",
+      maximumFractionDigits: 2,
+      style: "currency",
+      currency: "USD",
+    }).format(Number(value));
+  }
+
+  function formatSignedCompactUsd(value) {
+    if (value == null || !Number.isFinite(Number(value))) return "—";
+    const num = Number(value);
+    const prefix = num > 0 ? "+" : num < 0 ? "-" : "";
+    return `${prefix}${formatCompactUsd(Math.abs(num))}`;
   }
 
   function formatPrice(value) {
@@ -152,6 +221,16 @@
     return new Date(t).toLocaleString();
   }
 
+  function formatShortTime(ts, opts) {
+    const t = toTimeMs(ts);
+    if (!Number.isFinite(t)) return "—";
+    return new Intl.DateTimeFormat("en-US", opts ?? {
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+    }).format(new Date(t));
+  }
+
   function formatAddressShort(address) {
     if (!isAddress(address)) return address ?? "—";
     return `${address.slice(0, 6)}...${address.slice(-4)}`;
@@ -175,6 +254,129 @@
       localStorage.setItem(FOLLOWED_WALLETS_KEY, JSON.stringify(state.followedWallets));
     } catch {
       // Ignore storage failures (private mode/quota/etc).
+    }
+  }
+
+  function loadTrackedDeltaCacheStore(storageKey) {
+    try {
+      const raw = localStorage.getItem(storageKey);
+      if (!raw) return {};
+      const parsed = JSON.parse(raw);
+      return parsed && typeof parsed === "object" ? parsed : {};
+    } catch {
+      return {};
+    }
+  }
+
+  function saveTrackedDeltaCacheStore(storageKey, value) {
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(value));
+    } catch {
+      // Ignore storage failures.
+    }
+  }
+
+  function getTrackedDeltaCacheStore(kind) {
+    const storageKey =
+      kind === "wallet" ? TRACKED_DELTA_WALLET_CACHE_KEY : TRACKED_DELTA_PRICE_CACHE_KEY;
+
+    if (kind === "wallet" && trackedDeltaWalletCacheStore == null) {
+      trackedDeltaWalletCacheStore = loadTrackedDeltaCacheStore(storageKey);
+    }
+    if (kind === "price" && trackedDeltaPriceCacheStore == null) {
+      trackedDeltaPriceCacheStore = loadTrackedDeltaCacheStore(storageKey);
+    }
+
+    const store = kind === "wallet" ? trackedDeltaWalletCacheStore : trackedDeltaPriceCacheStore;
+    let changed = false;
+    const now = Date.now();
+    for (const [key, entry] of Object.entries(store ?? {})) {
+      const cachedAt = Number(entry?.cachedAt ?? NaN);
+      if (!Number.isFinite(cachedAt) || now - cachedAt > TRACKED_DELTA_CACHE_TTL_MS) {
+        delete store[key];
+        changed = true;
+      }
+    }
+    if (changed) saveTrackedDeltaCacheStore(storageKey, store);
+    return store;
+  }
+
+  function getTrackedDeltaCacheEntry(kind, entryKey) {
+    const store = getTrackedDeltaCacheStore(kind);
+    const entry = store?.[entryKey];
+    if (!entry || typeof entry !== "object") return null;
+    const cachedAt = Number(entry.cachedAt ?? NaN);
+    if (!Number.isFinite(cachedAt) || Date.now() - cachedAt > TRACKED_DELTA_CACHE_TTL_MS) {
+      delete store[entryKey];
+      const storageKey =
+        kind === "wallet" ? TRACKED_DELTA_WALLET_CACHE_KEY : TRACKED_DELTA_PRICE_CACHE_KEY;
+      saveTrackedDeltaCacheStore(storageKey, store);
+      return null;
+    }
+    return entry;
+  }
+
+  function setTrackedDeltaCacheEntry(kind, entryKey, value) {
+    const store = getTrackedDeltaCacheStore(kind);
+    store[entryKey] = {
+      cachedAt: Date.now(),
+      value,
+    };
+    const storageKey =
+      kind === "wallet" ? TRACKED_DELTA_WALLET_CACHE_KEY : TRACKED_DELTA_PRICE_CACHE_KEY;
+    saveTrackedDeltaCacheStore(storageKey, store);
+  }
+
+  function getTrackedDeltaCachedSnapshot(wallets) {
+    const fills = [];
+    let cachedWalletCount = 0;
+    let latestCachedAt = 0;
+
+    for (const wallet of wallets ?? []) {
+      const cacheKey = normalizeAddress(wallet) || wallet;
+      const entry = getTrackedDeltaCacheEntry("wallet", cacheKey);
+      if (!Array.isArray(entry?.value)) continue;
+      cachedWalletCount += 1;
+      latestCachedAt = Math.max(latestCachedAt, Number(entry.cachedAt) || 0);
+      fills.push(...entry.value);
+    }
+
+    fills.sort((a, b) => b.time - a.time);
+    const assets = Array.from(new Set(fills.map((fill) => fill.asset))).sort((a, b) =>
+      a.localeCompare(b),
+    );
+    const asset =
+      state.trackedDeltaAsset && assets.includes(state.trackedDeltaAsset)
+        ? state.trackedDeltaAsset
+        : chooseTrackedDeltaDefaultAsset(assets, fills);
+
+    let priceCached = false;
+    if (asset) {
+      const assetKey = normalizeCoin(asset);
+      const priceEntry = getTrackedDeltaCacheEntry("price", assetKey);
+      if (Array.isArray(priceEntry?.value)) {
+        state.trackedDeltaPriceSeriesByAsset[assetKey] = priceEntry.value;
+        latestCachedAt = Math.max(latestCachedAt, Number(priceEntry.cachedAt) || 0);
+        priceCached = true;
+      }
+    }
+
+    return {
+      fills,
+      assets,
+      asset,
+      cachedWalletCount,
+      updatedAt: latestCachedAt || null,
+      priceCached,
+    };
+  }
+
+  function applyTrackedDeltaSnapshot(snapshot) {
+    state.trackedDeltaFills = snapshot?.fills ?? [];
+    state.trackedDeltaAssets = snapshot?.assets ?? [];
+    state.trackedDeltaAsset = snapshot?.asset ?? null;
+    if (snapshot?.updatedAt) {
+      state.trackedDeltaUpdatedAt = snapshot.updatedAt;
     }
   }
 
@@ -520,6 +722,890 @@
     // Most recent group first.
     merged.sort((a, b) => (Number(b.endTime) || 0) - (Number(a.endTime) || 0));
     return merged;
+  }
+
+  function classifyTrackedDeltaFill(fill) {
+    const rawSize = Number(fill?.sz ?? 0);
+    const size = Math.abs(rawSize);
+    if (!Number.isFinite(size) || size <= 0) return null;
+
+    const price = Number(fill?.px ?? 0);
+    const notional = Number.isFinite(price) && price > 0 ? size * price : 0;
+    const dir = String(fill?.dir ?? "").trim().toLowerCase();
+    const side = String(fill?.side ?? "").trim().toLowerCase();
+
+    if (dir === "open long") {
+      return { bucket: "longed", signedDelta: size, signedNotional: notional, marketType: "perp" };
+    }
+    if (dir === "close long") {
+      return { bucket: "longClosed", signedDelta: -size, signedNotional: -notional, marketType: "perp" };
+    }
+    if (dir === "open short") {
+      return { bucket: "shorted", signedDelta: -size, signedNotional: -notional, marketType: "perp" };
+    }
+    if (dir === "close short") {
+      return { bucket: "shortCovered", signedDelta: size, signedNotional: notional, marketType: "perp" };
+    }
+    if (side === "b") {
+      return { bucket: "bought", signedDelta: size, signedNotional: notional, marketType: "spot" };
+    }
+    if (side === "a") {
+      return { bucket: "sold", signedDelta: -size, signedNotional: -notional, marketType: "spot" };
+    }
+    return null;
+  }
+
+  function normalizeTrackedDeltaFill(fill, wallet) {
+    const time = toTimeMs(fill?.time ?? 0);
+    if (!Number.isFinite(time) || time <= 0) return null;
+
+    const asset = normalizeCoin(fill?.coin);
+    if (!asset) return null;
+
+    const classification = classifyTrackedDeltaFill(fill);
+    if (!classification) return null;
+
+    return {
+      wallet,
+      asset,
+      time,
+      bucket: classification.bucket,
+      marketType: classification.marketType,
+      signedDelta: classification.signedDelta,
+      signedNotional: classification.signedNotional,
+    };
+  }
+
+  function chooseTrackedDeltaDefaultAsset(assets, fills) {
+    if (assets.includes("HYPE")) return "HYPE";
+    if (!assets.length) return null;
+
+    const scoreByAsset = new Map();
+    for (const fill of fills ?? []) {
+      if (!fill?.asset) continue;
+      const prev = scoreByAsset.get(fill.asset) ?? 0;
+      scoreByAsset.set(fill.asset, prev + Math.abs(Number(fill.signedNotional) || 0));
+    }
+
+    return assets
+      .slice()
+      .sort((a, b) => {
+        const scoreDiff = (scoreByAsset.get(b) ?? 0) - (scoreByAsset.get(a) ?? 0);
+        if (scoreDiff !== 0) return scoreDiff;
+        return a.localeCompare(b);
+      })[0];
+  }
+
+  function renderTrackedDeltaAssetOptions() {
+    const select = ui.trackedDeltaAsset;
+    if (!select) return;
+
+    const assets = state.trackedDeltaAssets ?? [];
+    select.innerHTML = "";
+
+    if (!assets.length) {
+      const option = document.createElement("option");
+      option.value = "";
+      option.textContent = state.trackedDeltaLoading ? "Loading assets..." : "No assets";
+      select.appendChild(option);
+      select.disabled = true;
+      state.trackedDeltaAsset = null;
+      return;
+    }
+
+    if (!state.trackedDeltaAsset || !assets.includes(state.trackedDeltaAsset)) {
+      state.trackedDeltaAsset = chooseTrackedDeltaDefaultAsset(assets, state.trackedDeltaFills);
+    }
+
+    assets.forEach((asset) => {
+      const option = document.createElement("option");
+      option.value = asset;
+      option.textContent = asset;
+      option.selected = asset === state.trackedDeltaAsset;
+      select.appendChild(option);
+    });
+    select.disabled = false;
+  }
+
+  function trackedDeltaModeLabel(mode, asset) {
+    if (mode === "perp") return `${asset} Perp`;
+    if (mode === "spot") return `${asset} Spot`;
+    return "All Flow";
+  }
+
+  function trackedDeltaFillsFor(asset, mode, windowMs = Infinity) {
+    const assetKey = normalizeCoin(asset);
+    const now = Date.now();
+    return (state.trackedDeltaFills ?? []).filter((fill) => {
+      if (fill.asset !== assetKey) return false;
+      if (windowMs !== Infinity && now - fill.time > windowMs) return false;
+      if (mode === "perp") return fill.marketType === "perp";
+      if (mode === "spot") return fill.marketType === "spot";
+      return true;
+    });
+  }
+
+  function summarizeTrackedDelta(asset, mode) {
+    return TRACKED_DELTA_WINDOWS.map((window) => {
+      const summary = {
+        ...window,
+        netDelta: 0,
+        netNotional: 0,
+        longed: 0,
+        shorted: 0,
+        bought: 0,
+        sold: 0,
+        longClosed: 0,
+        shortCovered: 0,
+        fills: 0,
+        wallets: new Set(),
+      };
+
+      for (const fill of trackedDeltaFillsFor(asset, mode, window.ms)) {
+        summary.netDelta += Number(fill.signedDelta) || 0;
+        summary.netNotional += Number(fill.signedNotional) || 0;
+        summary.fills += 1;
+        summary.wallets.add(fill.wallet);
+
+        if (fill.bucket === "longed") summary.longed += Number(fill.signedDelta) || 0;
+        else if (fill.bucket === "shorted") summary.shorted += Math.abs(Number(fill.signedDelta) || 0);
+        else if (fill.bucket === "bought") summary.bought += Number(fill.signedDelta) || 0;
+        else if (fill.bucket === "sold") summary.sold += Math.abs(Number(fill.signedDelta) || 0);
+        else if (fill.bucket === "longClosed") summary.longClosed += Math.abs(Number(fill.signedDelta) || 0);
+        else if (fill.bucket === "shortCovered") summary.shortCovered += Number(fill.signedDelta) || 0;
+      }
+
+      return summary;
+    });
+  }
+
+  function renderTrackedDeltaModeToggle() {
+    const root = ui.trackedDeltaModeToggle;
+    if (!root) return;
+    const asset = state.trackedDeltaAsset || "Asset";
+    root.querySelectorAll("button[data-mode]").forEach((button) => {
+      const mode = button.dataset.mode || "all";
+      const isActive = mode === state.trackedDeltaViewMode;
+      button.textContent = trackedDeltaModeLabel(mode, asset);
+      button.classList.toggle("active", isActive);
+      button.setAttribute("aria-selected", isActive ? "true" : "false");
+      button.tabIndex = isActive ? 0 : -1;
+    });
+  }
+
+  function renderTrackedDeltaWindowToggle() {
+    const root = ui.trackedDeltaWindowToggle;
+    if (!root) return;
+    root.querySelectorAll("button[data-window]").forEach((button) => {
+      const windowKey = button.dataset.window || "7d";
+      const isActive = windowKey === state.trackedDeltaChartWindow;
+      button.classList.toggle("active", isActive);
+      button.setAttribute("aria-selected", isActive ? "true" : "false");
+      button.tabIndex = isActive ? 0 : -1;
+    });
+  }
+
+  function renderTrackedDeltaFlags() {
+    const root = ui.trackedDeltaFlags;
+    if (!root) return;
+    root.innerHTML = "";
+
+    const total = normalizeWalletList(state.followedWallets).length;
+    if (!total) return;
+
+    const loaded = Math.max(0, total - state.trackedDeltaFailedWallets.length);
+    const loadedFlag = document.createElement("span");
+    loadedFlag.className = "tracked-delta-flag";
+    loadedFlag.textContent = `${loaded}/${total} wallets loaded`;
+    root.appendChild(loadedFlag);
+
+    const cacheFlag = document.createElement("span");
+    cacheFlag.className = "tracked-delta-flag";
+    cacheFlag.textContent = "1h cache";
+    root.appendChild(cacheFlag);
+
+    if (state.trackedDeltaFailedWallets.length) {
+      const failedFlag = document.createElement("span");
+      failedFlag.className = "tracked-delta-flag warning";
+      failedFlag.textContent = `${state.trackedDeltaFailedWallets.length} failed`;
+      failedFlag.title = state.trackedDeltaFailedWallets.join(", ");
+      root.appendChild(failedFlag);
+    }
+  }
+
+  function createTrackedDeltaSummaryCard(summary, asset, mode) {
+    const card = document.createElement("article");
+    card.className = "tracked-delta-card";
+    if (summary.netNotional > 0) card.classList.add("positive");
+    else if (summary.netNotional < 0) card.classList.add("negative");
+
+    const header = document.createElement("div");
+    header.className = "tracked-delta-card-header";
+
+    const title = document.createElement("h4");
+    title.className = "tracked-delta-card-title";
+    title.textContent = `Net Flow ${String(summary.key || summary.label).toUpperCase()}`;
+
+    const subtitle = document.createElement("span");
+    subtitle.className = "tracked-delta-card-subtitle";
+    subtitle.textContent = trackedDeltaModeLabel(mode, asset);
+
+    header.appendChild(title);
+    header.appendChild(subtitle);
+
+    const netWrap = document.createElement("div");
+    netWrap.className = "tracked-delta-card-net";
+
+    const netLabel = document.createElement("span");
+    netLabel.className = "tracked-delta-card-net-label";
+    netLabel.textContent = "Net notional";
+
+    const netValue = document.createElement("span");
+    netValue.className = "tracked-delta-card-net-value";
+    netValue.textContent = formatSignedCompactUsd(summary.netNotional);
+    if (summary.netNotional > 0) netValue.classList.add("positive");
+    else if (summary.netNotional < 0) netValue.classList.add("negative");
+    else netValue.classList.add("flat");
+
+    const units = document.createElement("span");
+    units.className = "tracked-delta-card-notional muted";
+    units.textContent = `Net ${formatSignedNumber(summary.netDelta, 4)} ${asset}`;
+
+    netWrap.appendChild(netLabel);
+    netWrap.appendChild(netValue);
+    netWrap.appendChild(units);
+
+    const meta = document.createElement("div");
+    meta.className = "tracked-delta-card-meta";
+
+    const fills = document.createElement("span");
+    fills.textContent = `${summary.fills} fill${summary.fills === 1 ? "" : "s"}`;
+
+    const badge = document.createElement("span");
+    badge.className = "tracked-delta-card-badge";
+    badge.textContent = `${summary.wallets.size} wallet${summary.wallets.size === 1 ? "" : "s"}`;
+
+    meta.appendChild(fills);
+    meta.appendChild(badge);
+
+    card.appendChild(header);
+    card.appendChild(netWrap);
+    card.appendChild(meta);
+    return card;
+  }
+
+  function createTrackedDeltaBreakdownItem(label, value, className = "") {
+    const item = document.createElement("div");
+    item.className = "tracked-delta-breakdown-item";
+
+    const title = document.createElement("span");
+    title.className = "tracked-delta-breakdown-label";
+    title.textContent = label;
+
+    const amount = document.createElement("span");
+    amount.className = `tracked-delta-breakdown-value ${className}`.trim();
+    amount.textContent = value;
+
+    item.appendChild(title);
+    item.appendChild(amount);
+    return item;
+  }
+
+  function bucketTrackedDeltaSeries(asset, mode, windowKey) {
+    const window = TRACKED_DELTA_WINDOWS.find((entry) => entry.key === windowKey) ?? TRACKED_DELTA_WINDOWS[1];
+    const bucketMs = 60 * 60 * 1000;
+    const now = Date.now();
+    const end = Math.floor(now / bucketMs) * bucketMs;
+    const start = end - window.ms + bucketMs;
+    const count = Math.max(1, Math.round(window.ms / bucketMs));
+    const buckets = Array.from({ length: count }, (_, index) => ({
+      time: start + index * bucketMs,
+      netNotional: 0,
+    }));
+
+    for (const fill of trackedDeltaFillsFor(asset, mode, window.ms)) {
+      const idx = Math.floor((fill.time - start) / bucketMs);
+      if (idx < 0 || idx >= buckets.length) continue;
+      buckets[idx].netNotional += Number(fill.signedNotional) || 0;
+    }
+
+    return { window, buckets };
+  }
+
+  function chartAxisMax(values) {
+    const maxAbs = Math.max(...values.map((value) => Math.abs(Number(value) || 0)), 0);
+    if (!Number.isFinite(maxAbs) || maxAbs <= 0) return 1;
+    const exponent = Math.floor(Math.log10(maxAbs));
+    const scale = 10 ** exponent;
+    return Math.ceil(maxAbs / scale) * scale;
+  }
+
+  function trackedDeltaChartSvg(buckets, priceSeries) {
+    const width = 1120;
+    const height = 360;
+    const padTop = 18;
+    const padBottom = 34;
+    const padLeft = 64;
+    const padRight = 68;
+    const chartW = width - padLeft - padRight;
+    const chartH = height - padTop - padBottom;
+    const zeroY = padTop + chartH / 2;
+    const maxAbs = chartAxisMax(buckets.map((bucket) => bucket.netNotional));
+    const barWidth = Math.max(3, (chartW / Math.max(1, buckets.length)) * 0.58);
+
+    const gridLines = [-maxAbs, -maxAbs / 2, 0, maxAbs / 2, maxAbs].map((value) => {
+      const y = padTop + ((maxAbs - value) / (maxAbs * 2)) * chartH;
+      return { y, label: formatCompactUsd(value) };
+    });
+
+    const xLabels = [];
+    const step = Math.max(1, Math.floor(buckets.length / 6));
+    for (let i = 0; i < buckets.length; i += step) {
+      const bucket = buckets[i];
+      xLabels.push({
+        x: padLeft + (i + 0.5) * (chartW / buckets.length),
+        label: formatShortTime(
+          bucket.time,
+          buckets.length <= 24
+            ? { hour: "2-digit", minute: "2-digit" }
+            : { month: "2-digit", day: "2-digit", hour: "2-digit" },
+        ),
+      });
+    }
+
+    const bars = buckets.map((bucket, index) => {
+      const value = Number(bucket.netNotional) || 0;
+      const x = padLeft + index * (chartW / buckets.length) + (chartW / buckets.length - barWidth) / 2;
+      const y = value >= 0 ? zeroY - (Math.abs(value) / maxAbs) * (chartH / 2) : zeroY;
+      const h = Math.max(2, (Math.abs(value) / maxAbs) * (chartH / 2));
+      return {
+        index,
+        x,
+        y,
+        h,
+        cls: value >= 0 ? "tracked-delta-chart-bar-positive" : "tracked-delta-chart-bar-negative",
+      };
+    });
+
+    let pricePath = "";
+    let priceLabels = "";
+    if (Array.isArray(priceSeries) && priceSeries.length > 1) {
+      const visiblePrices = priceSeries
+        .filter((row) => Number.isFinite(Number(row?.time)) && Number.isFinite(Number(row?.close)))
+        .slice(-buckets.length)
+        .map((row) => ({ time: Number(row.time), close: Number(row.close) }));
+      if (visiblePrices.length > 1) {
+        const minPrice = Math.min(...visiblePrices.map((row) => row.close));
+        const maxPrice = Math.max(...visiblePrices.map((row) => row.close));
+        const range = maxPrice - minPrice || Math.max(maxPrice, 1);
+        pricePath = visiblePrices
+          .map((row, index) => {
+            const x = padLeft + (index / Math.max(1, visiblePrices.length - 1)) * chartW;
+            const y = padTop + (1 - (row.close - minPrice) / range) * chartH;
+            return `${index === 0 ? "M" : "L"}${x.toFixed(2)} ${y.toFixed(2)}`;
+          })
+          .join(" ");
+
+        const labels = [maxPrice, (maxPrice + minPrice) / 2, minPrice];
+        priceLabels = labels
+          .map((value, index) => {
+            const y = padTop + (index / Math.max(1, labels.length - 1)) * chartH;
+            return `<text class="tracked-delta-chart-axis price" x="${width - 4}" y="${y + 4}" text-anchor="end">${formatPrice(value)}</text>`;
+          })
+          .join("");
+      }
+    }
+
+    return `
+      <svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" aria-hidden="true">
+        ${gridLines
+          .map(
+            (line) => `<line class="tracked-delta-chart-grid" x1="${padLeft}" x2="${width - padRight}" y1="${line.y}" y2="${line.y}" />
+              <text class="tracked-delta-chart-axis" x="8" y="${line.y + 4}">${line.label}</text>`,
+          )
+          .join("")}
+        <line class="tracked-delta-chart-zero" x1="${padLeft}" x2="${width - padRight}" y1="${zeroY}" y2="${zeroY}" />
+        ${bars
+          .map((bar) => `<rect class="tracked-delta-chart-bar ${bar.cls}" data-bucket-index="${bar.index}" x="${bar.x}" y="${bar.y}" width="${barWidth}" height="${bar.h}" rx="2" />`)
+          .join("")}
+        ${pricePath ? `<path class="tracked-delta-chart-price" d="${pricePath}" />` : ""}
+        ${xLabels
+          .map((label) => `<text class="tracked-delta-chart-axis" x="${label.x}" y="${height - 8}" text-anchor="middle">${label.label}</text>`)
+          .join("")}
+        ${priceLabels}
+      </svg>
+    `;
+  }
+
+  function bucketTrackedDeltaWalletDetails(selectedFills, buckets) {
+    const bucketMs = 60 * 60 * 1000;
+    const start = Number(buckets?.[0]?.time ?? 0);
+    const details = (buckets ?? []).map((bucket) => ({
+      time: bucket.time,
+      netNotional: Number(bucket.netNotional) || 0,
+      fills: 0,
+      positiveTotal: 0,
+      negativeTotal: 0,
+      positiveByWallet: new Map(),
+      negativeByWallet: new Map(),
+    }));
+
+    for (const fill of selectedFills ?? []) {
+      const idx = Math.floor((Number(fill.time) - start) / bucketMs);
+      if (!Number.isFinite(idx) || idx < 0 || idx >= details.length) continue;
+
+      const detail = details[idx];
+      const wallet = fill.wallet;
+      const label = formatFollowedWalletLabel(wallet);
+      const signedNotional = Number(fill.signedNotional) || 0;
+      detail.fills += 1;
+
+      if (signedNotional > 0) {
+        detail.positiveTotal += signedNotional;
+        const prev =
+          detail.positiveByWallet.get(wallet) ?? { wallet, label, notional: 0 };
+        prev.notional += signedNotional;
+        detail.positiveByWallet.set(wallet, prev);
+      } else if (signedNotional < 0) {
+        const abs = Math.abs(signedNotional);
+        detail.negativeTotal += abs;
+        const prev =
+          detail.negativeByWallet.get(wallet) ?? { wallet, label, notional: 0 };
+        prev.notional += abs;
+        detail.negativeByWallet.set(wallet, prev);
+      }
+    }
+
+    return details.map((detail) => ({
+      ...detail,
+      positiveWallets: Array.from(detail.positiveByWallet.values())
+        .sort((a, b) => b.notional - a.notional)
+        .map((entry) => ({
+          ...entry,
+          pct: detail.positiveTotal > 0 ? entry.notional / detail.positiveTotal : 0,
+        })),
+      negativeWallets: Array.from(detail.negativeByWallet.values())
+        .sort((a, b) => b.notional - a.notional)
+        .map((entry) => ({
+          ...entry,
+          pct: detail.negativeTotal > 0 ? entry.notional / detail.negativeTotal : 0,
+        })),
+    }));
+  }
+
+  function createTrackedDeltaTooltip(chartRoot) {
+    let tooltip = chartRoot.querySelector(".tracked-delta-tooltip");
+    if (tooltip) return tooltip;
+    tooltip = document.createElement("div");
+    tooltip.className = "tracked-delta-tooltip";
+    tooltip.hidden = true;
+    chartRoot.appendChild(tooltip);
+    return tooltip;
+  }
+
+  function tooltipWalletGroupTitle(mode, positive) {
+    if (mode === "spot") return positive ? "Buyers" : "Sellers";
+    return positive ? "Buying-style wallets" : "Selling-style wallets";
+  }
+
+  function renderTrackedDeltaTooltip(tooltip, detail, mode) {
+    const positive = detail.netNotional >= 0;
+    const rowsFor = positive ? detail.positiveWallets : detail.negativeWallets;
+    const secondaryRows = positive ? detail.negativeWallets : detail.positiveWallets;
+
+    tooltip.innerHTML = "";
+
+    const time = document.createElement("div");
+    time.className = "tracked-delta-tooltip-time";
+    time.textContent = formatShortTime(detail.time, {
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+
+    const value = document.createElement("div");
+    value.className = `tracked-delta-tooltip-value ${positive ? "positive" : "negative"}`;
+    value.textContent = `${positive ? "Net inflow" : "Net outflow"} ${formatSignedCompactUsd(
+      detail.netNotional,
+    )}`;
+
+    tooltip.appendChild(time);
+    tooltip.appendChild(value);
+
+    const groups = document.createElement("div");
+    groups.className = "tracked-delta-tooltip-groups";
+
+    function appendGroup(titleText, rows) {
+      if (!rows.length) return;
+      const group = document.createElement("div");
+      group.className = "tracked-delta-tooltip-group";
+      const title = document.createElement("div");
+      title.className = "tracked-delta-tooltip-group-title";
+      title.textContent = titleText;
+      const list = document.createElement("div");
+      list.className = "tracked-delta-tooltip-list";
+      rows.forEach((entry) => {
+        const row = document.createElement("div");
+        row.className = "tracked-delta-tooltip-row";
+        const wallet = document.createElement("span");
+        wallet.className = "tracked-delta-tooltip-wallet";
+        wallet.textContent = entry.label;
+        const share = document.createElement("span");
+        share.className = "tracked-delta-tooltip-share";
+        share.textContent = `${(entry.pct * 100).toFixed(1)}% · ${formatCompactUsd(
+          entry.notional,
+        )}`;
+        row.appendChild(wallet);
+        row.appendChild(share);
+        list.appendChild(row);
+      });
+      group.appendChild(title);
+      group.appendChild(list);
+      groups.appendChild(group);
+    }
+
+    appendGroup(tooltipWalletGroupTitle(mode, positive), rowsFor);
+    appendGroup(
+      positive ? "Offsetting sellers" : "Offsetting buyers",
+      secondaryRows,
+    );
+
+    if (!groups.childNodes.length) {
+      const empty = document.createElement("div");
+      empty.className = "tracked-delta-tooltip-group-title";
+      empty.textContent = "No contributing wallets";
+      groups.appendChild(empty);
+    }
+
+    tooltip.appendChild(groups);
+  }
+
+  function positionTrackedDeltaTooltip(chartRoot, tooltip, event) {
+    const bounds = chartRoot.getBoundingClientRect();
+    const tooltipRect = tooltip.getBoundingClientRect();
+    const offset = 14;
+    let left = event.clientX - bounds.left + offset;
+    let top = event.clientY - bounds.top - tooltipRect.height - offset;
+
+    if (left + tooltipRect.width > bounds.width - 8) {
+      left = bounds.width - tooltipRect.width - 8;
+    }
+    if (left < 8) left = 8;
+    if (top < 8) {
+      top = event.clientY - bounds.top + offset;
+    }
+    if (top + tooltipRect.height > bounds.height - 8) {
+      top = bounds.height - tooltipRect.height - 8;
+    }
+
+    tooltip.style.left = `${left}px`;
+    tooltip.style.top = `${top}px`;
+  }
+
+  function bindTrackedDeltaChartHover(chartRoot, bucketDetails, mode) {
+    const tooltip = createTrackedDeltaTooltip(chartRoot);
+
+    chartRoot.onmousemove = (event) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      const bar = target.closest("rect[data-bucket-index]");
+      if (!bar) {
+        tooltip.hidden = true;
+        return;
+      }
+
+      const index = Number(bar.getAttribute("data-bucket-index"));
+      if (!Number.isFinite(index) || !bucketDetails[index]) {
+        tooltip.hidden = true;
+        return;
+      }
+
+      renderTrackedDeltaTooltip(tooltip, bucketDetails[index], mode);
+      tooltip.hidden = false;
+      positionTrackedDeltaTooltip(chartRoot, tooltip, event);
+    };
+
+    chartRoot.onmouseleave = () => {
+      tooltip.hidden = true;
+    };
+  }
+
+  function renderTrackedDeltaChart(asset, mode) {
+    const chartRoot = ui.trackedDeltaChart;
+    const chartTitle = ui.trackedDeltaChartTitle;
+    const chartSubtitle = ui.trackedDeltaChartSubtitle;
+    const breakdownRoot = ui.trackedDeltaBreakdown;
+    if (!chartRoot || !chartTitle || !chartSubtitle || !breakdownRoot) return;
+
+    const windowKey = state.trackedDeltaChartWindow;
+    const { window, buckets } = bucketTrackedDeltaSeries(asset, mode, windowKey);
+    const selectedFills = trackedDeltaFillsFor(asset, mode, window.ms);
+    const summary = summarizeTrackedDelta(asset, mode).find((entry) => entry.key === window.key);
+    const priceSeries = state.trackedDeltaPriceSeriesByAsset[asset] ?? [];
+
+    chartTitle.textContent = `Net Flow Per Hour`;
+    chartSubtitle.textContent = `${trackedDeltaModeLabel(mode, asset)} · ${window.label} window · orange line = price`;
+
+    if (!selectedFills.length) {
+      chartRoot.innerHTML = `<div class="tracked-delta-chart-empty">No ${trackedDeltaModeLabel(mode, asset).toLowerCase()} fills in ${window.label.toLowerCase()}.</div>`;
+      breakdownRoot.innerHTML = "";
+      chartRoot.onmousemove = null;
+      chartRoot.onmouseleave = null;
+      return;
+    }
+
+    chartRoot.innerHTML = trackedDeltaChartSvg(buckets, priceSeries);
+    const bucketDetails = bucketTrackedDeltaWalletDetails(selectedFills, buckets);
+    bindTrackedDeltaChartHover(chartRoot, bucketDetails, mode);
+
+    breakdownRoot.innerHTML = "";
+    breakdownRoot.appendChild(
+      createTrackedDeltaBreakdownItem("Opened Long", formatNumber(summary?.longed ?? 0, 4), "positive"),
+    );
+    breakdownRoot.appendChild(
+      createTrackedDeltaBreakdownItem("Closed Long", formatNumber(summary?.longClosed ?? 0, 4), "negative"),
+    );
+    breakdownRoot.appendChild(
+      createTrackedDeltaBreakdownItem(
+        mode === "spot" ? "Spot Buys / Sells" : "Opened Short / Covered Short",
+        mode === "spot"
+          ? `${formatNumber(summary?.bought ?? 0, 4)} / ${formatNumber(summary?.sold ?? 0, 4)}`
+          : `${formatNumber(summary?.shorted ?? 0, 4)} / ${formatNumber(summary?.shortCovered ?? 0, 4)}`,
+        mode === "spot" ? "" : "negative",
+      ),
+    );
+  }
+
+  async function loadTrackedDeltaPriceSeries(asset, opts) {
+    const assetKey = normalizeCoin(asset);
+    if (!assetKey) return;
+    if (!opts?.refresh) {
+      const cached = getTrackedDeltaCacheEntry("price", assetKey);
+      if (Array.isArray(cached?.value)) {
+        state.trackedDeltaPriceSeriesByAsset[assetKey] = cached.value;
+        return;
+      }
+    }
+
+    const params = new URLSearchParams({ interval: "1h", limit: "168" });
+    if (opts?.refresh) params.set("refresh", "1");
+
+    try {
+      const response = await fetch(`/api/klines/${encodeURIComponent(assetKey)}?${params.toString()}`);
+      if (!response.ok) throw new Error("price");
+      const payload = await response.json();
+      const candles = Array.isArray(payload?.candles) ? payload.candles : [];
+      state.trackedDeltaPriceSeriesByAsset[assetKey] = candles;
+      setTrackedDeltaCacheEntry("price", assetKey, candles);
+    } catch {
+      state.trackedDeltaPriceSeriesByAsset[assetKey] = [];
+    }
+  }
+
+  function renderTrackedDelta() {
+    renderTrackedDeltaAssetOptions();
+    renderTrackedDeltaModeToggle();
+    renderTrackedDeltaWindowToggle();
+    renderTrackedDeltaFlags();
+
+    const statusEl = ui.trackedDeltaStatus;
+    const cardsRoot = ui.trackedDeltaCards;
+    const chartRoot = ui.trackedDeltaChart;
+    const breakdownRoot = ui.trackedDeltaBreakdown;
+    if (!statusEl || !cardsRoot || !chartRoot || !breakdownRoot) return;
+    const clearFlowUi = () => {
+      cardsRoot.innerHTML = "";
+      chartRoot.innerHTML = "";
+      breakdownRoot.innerHTML = "";
+    };
+
+    if (!state.followedWallets.length) {
+      clearFlowUi();
+      statusEl.textContent = "Follow wallets to see aggregate asset flow.";
+      return;
+    }
+
+    const hasRenderableData =
+      Boolean(state.trackedDeltaAsset) && Array.isArray(state.trackedDeltaAssets) && state.trackedDeltaAssets.length > 0;
+
+    if (state.trackedDeltaError && !hasRenderableData) {
+      clearFlowUi();
+      statusEl.textContent = state.trackedDeltaError;
+      return;
+    }
+
+    if (!state.trackedDeltaAssets.length) {
+      clearFlowUi();
+      if (state.trackedDeltaLoading) {
+        statusEl.textContent = `Loading recent fills across ${state.followedWallets.length} followed wallets...`;
+        return;
+      }
+      statusEl.textContent = `No fills found across followed wallets in the last ${TRACKED_DELTA_MAX_DAYS} days.`;
+      return;
+    }
+
+    const asset = state.trackedDeltaAsset;
+    if (!asset) {
+      clearFlowUi();
+      statusEl.textContent = "Select an asset to view tracked-wallet flow.";
+      return;
+    }
+
+    const mode = state.trackedDeltaViewMode;
+    const updatedSuffix = state.trackedDeltaUpdatedAt
+      ? ` Last updated ${new Date(state.trackedDeltaUpdatedAt).toLocaleTimeString()}.`
+      : "";
+    statusEl.textContent = state.trackedDeltaLoading
+      ? `Showing cached tracked-wallet flow while refreshing.${updatedSuffix}`
+      : "Best-effort aggregate from recent followed-wallet fills." + updatedSuffix;
+
+    cardsRoot.innerHTML = "";
+    chartRoot.innerHTML = "";
+    breakdownRoot.innerHTML = "";
+    const summaries = summarizeTrackedDelta(asset, mode);
+    summaries.forEach((summary) => {
+      cardsRoot.appendChild(createTrackedDeltaSummaryCard(summary, asset, mode));
+    });
+
+    renderTrackedDeltaChart(asset, mode);
+  }
+
+  async function fetchTrackedDeltaFillsForWallet(wallet, opts) {
+    const refresh = opts?.refresh ?? false;
+    const cacheKey = normalizeAddress(wallet) || wallet;
+    if (!refresh) {
+      const cached = getTrackedDeltaCacheEntry("wallet", cacheKey);
+      if (Array.isArray(cached?.value)) {
+        return cached.value;
+      }
+    }
+
+    const fills = [];
+    const seen = new Set();
+    let nextCursorEnd = null;
+    let pageCount = 0;
+
+    do {
+      const params = new URLSearchParams({
+        days: String(TRACKED_DELTA_MAX_DAYS),
+        includeTwaps: "0",
+      });
+      if (nextCursorEnd != null) params.set("cursorEnd", String(nextCursorEnd));
+      if (refresh) params.set("refresh", "1");
+
+      const response = await fetch(
+        `/api/userFills/${encodeURIComponent(wallet)}?${params.toString()}`,
+      );
+      if (!response.ok) {
+        throw new Error(`Failed to load tracked fills for ${formatFollowedWalletLabel(wallet)}.`);
+      }
+
+      const payload = await response.json();
+      for (const fill of payload?.items ?? []) {
+        const key = tradeKey(fill);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        const normalized = normalizeTrackedDeltaFill(fill, wallet);
+        if (normalized) fills.push(normalized);
+      }
+
+      nextCursorEnd = payload?.done ? null : payload?.nextCursorEnd ?? null;
+      pageCount += 1;
+      if (nextCursorEnd != null && fills.length < TRADES_FETCH_LIMIT) {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+    } while (nextCursorEnd != null && fills.length < TRADES_FETCH_LIMIT && pageCount < 12);
+
+    setTrackedDeltaCacheEntry("wallet", cacheKey, fills);
+    return fills;
+  }
+
+  async function loadTrackedDelta(opts) {
+    const wallets = normalizeWalletList(state.followedWallets);
+    const refresh = opts?.refresh ?? false;
+    const loadId = ++state.trackedDeltaLoadId;
+
+    if (!wallets.length) {
+      state.trackedDeltaLoading = false;
+      state.trackedDeltaError = "";
+      state.trackedDeltaAssets = [];
+      state.trackedDeltaAsset = null;
+      state.trackedDeltaFills = [];
+      state.trackedDeltaUpdatedAt = Date.now();
+      state.trackedDeltaFailedWallets = [];
+      renderTrackedDelta();
+      return;
+    }
+
+    if (!refresh) {
+      const cachedSnapshot = getTrackedDeltaCachedSnapshot(wallets);
+      if (cachedSnapshot.cachedWalletCount > 0) {
+        applyTrackedDeltaSnapshot(cachedSnapshot);
+        state.trackedDeltaError = "";
+        state.trackedDeltaFailedWallets = [];
+        if (cachedSnapshot.cachedWalletCount === wallets.length) {
+          state.trackedDeltaLoading = false;
+          renderTrackedDelta();
+          if (cachedSnapshot.asset && !cachedSnapshot.priceCached) {
+            loadTrackedDeltaPriceSeries(cachedSnapshot.asset, { refresh: false })
+              .then(() => {
+                if (loadId === state.trackedDeltaLoadId) renderTrackedDelta();
+              })
+              .catch(() => {});
+          }
+          return;
+        }
+      }
+    }
+
+    state.trackedDeltaLoading = true;
+    state.trackedDeltaError = "";
+    state.trackedDeltaFailedWallets = [];
+    renderTrackedDelta();
+
+    try {
+      const results = await Promise.allSettled(
+        wallets.map((wallet) => fetchTrackedDeltaFillsForWallet(wallet, { refresh })),
+      );
+      if (loadId !== state.trackedDeltaLoadId) return;
+
+      const fills = [];
+      const failedWallets = [];
+      results.forEach((result, index) => {
+        if (result.status === "fulfilled") {
+          fills.push(...result.value);
+          return;
+        }
+        failedWallets.push(formatFollowedWalletLabel(wallets[index]));
+      });
+      fills.sort((a, b) => b.time - a.time);
+      const assets = Array.from(new Set(fills.map((fill) => fill.asset))).sort((a, b) =>
+        a.localeCompare(b),
+      );
+
+      state.trackedDeltaFills = fills;
+      state.trackedDeltaAssets = assets;
+      state.trackedDeltaFailedWallets = failedWallets;
+      if (!state.trackedDeltaAsset || !assets.includes(state.trackedDeltaAsset)) {
+        state.trackedDeltaAsset = chooseTrackedDeltaDefaultAsset(assets, fills);
+      }
+      await loadTrackedDeltaPriceSeries(state.trackedDeltaAsset, { refresh });
+      state.trackedDeltaUpdatedAt = Date.now();
+    } catch (error) {
+      if (loadId !== state.trackedDeltaLoadId) return;
+      state.trackedDeltaError =
+        error?.message || "Failed to load tracked-wallet delta.";
+      state.trackedDeltaFills = [];
+      state.trackedDeltaAssets = [];
+      state.trackedDeltaAsset = null;
+      state.trackedDeltaFailedWallets = [];
+    } finally {
+      if (loadId === state.trackedDeltaLoadId) {
+        state.trackedDeltaLoading = false;
+        renderTrackedDelta();
+      }
+    }
   }
 
   function renderPositions() {
@@ -919,6 +2005,7 @@
     if (!ui.walletMain.hidden) {
       updateMetrics();
       renderPositions();
+      renderTrackedDelta();
       switchTab(ui.tabPositions);
     }
 
@@ -1080,6 +2167,7 @@
     state.followedWallets = loadFollowedWallets();
     saveFollowedWallets();
     renderFollowedWallets();
+    loadTrackedDelta({ refresh: false });
   }
 
   function initFollowedWalletsInteractions() {
@@ -1091,6 +2179,7 @@
           return;
         }
         clearError();
+        loadTrackedDelta({ refresh: false });
       });
     }
 
@@ -1106,6 +2195,7 @@
 
         if (button.dataset.role === "remove") {
           removeFollowedWallet(address);
+          loadTrackedDelta({ refresh: false });
           return;
         }
 
@@ -1138,6 +2228,42 @@
       if (ui.addressInput) ui.addressInput.value = address;
       loadWallet(address);
     }
+  }
+
+  function initSegmentedToggleKeyboard(root, selector, onSelect) {
+    if (!root) return;
+    root.addEventListener("keydown", (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) return;
+      const current = target.closest(selector);
+      if (!(current instanceof HTMLButtonElement)) return;
+
+      const buttons = Array.from(root.querySelectorAll(selector)).filter(
+        (button) => button instanceof HTMLButtonElement,
+      );
+      if (!buttons.length) return;
+
+      const index = buttons.indexOf(current);
+      if (index === -1) return;
+
+      let nextIndex = index;
+      if (event.key === "ArrowRight" || event.key === "ArrowDown") {
+        nextIndex = (index + 1) % buttons.length;
+      } else if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
+        nextIndex = (index - 1 + buttons.length) % buttons.length;
+      } else if (event.key === "Home") {
+        nextIndex = 0;
+      } else if (event.key === "End") {
+        nextIndex = buttons.length - 1;
+      } else {
+        return;
+      }
+
+      event.preventDefault();
+      const next = buttons[nextIndex];
+      next.focus();
+      onSelect(next);
+    });
   }
 
   function init() {
@@ -1212,6 +2338,54 @@
           renderTrades();
         }
       });
+    }
+    if (ui.trackedDeltaAsset) {
+      ui.trackedDeltaAsset.addEventListener("change", async () => {
+        state.trackedDeltaAsset = normalizeCoin(ui.trackedDeltaAsset.value) || null;
+        await loadTrackedDeltaPriceSeries(state.trackedDeltaAsset, { refresh: false });
+        renderTrackedDelta();
+      });
+    }
+    if (ui.trackedDeltaRefresh) {
+      ui.trackedDeltaRefresh.addEventListener("click", () => {
+        loadTrackedDelta({ refresh: true });
+      });
+    }
+    if (ui.trackedDeltaModeToggle) {
+      const applyModeSelection = (button) => {
+        state.trackedDeltaViewMode = button?.dataset.mode || "all";
+        renderTrackedDelta();
+      };
+      ui.trackedDeltaModeToggle.addEventListener("click", (event) => {
+        const target = event.target;
+        if (!(target instanceof HTMLElement)) return;
+        const button = target.closest("button[data-mode]");
+        if (!button) return;
+        applyModeSelection(button);
+      });
+      initSegmentedToggleKeyboard(
+        ui.trackedDeltaModeToggle,
+        "button[data-mode]",
+        applyModeSelection,
+      );
+    }
+    if (ui.trackedDeltaWindowToggle) {
+      const applyWindowSelection = (button) => {
+        state.trackedDeltaChartWindow = button?.dataset.window || "7d";
+        renderTrackedDelta();
+      };
+      ui.trackedDeltaWindowToggle.addEventListener("click", (event) => {
+        const target = event.target;
+        if (!(target instanceof HTMLElement)) return;
+        const button = target.closest("button[data-window]");
+        if (!button) return;
+        applyWindowSelection(button);
+      });
+      initSegmentedToggleKeyboard(
+        ui.trackedDeltaWindowToggle,
+        "button[data-window]",
+        applyWindowSelection,
+      );
     }
     initTabs();
     initHoldingsSort();

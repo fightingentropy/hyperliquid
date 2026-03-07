@@ -136,6 +136,67 @@
                             </table>
                         </div>
                     </div>
+                    <div class="detail-section tracked-delta-section">
+                        <div class="section-header tracked-delta-header">
+                            <div>
+                                <h3>Tracked Wallet Flow</h3>
+                                <p class="muted">
+                                    Aggregate tracked-wallet perp and spot flow for one asset.
+                                </p>
+                            </div>
+                            <div class="tracked-delta-controls">
+                                <label class="tracked-delta-filter" for="tracked-delta-asset">
+                                    <span>Asset</span>
+                                    <select id="tracked-delta-asset">
+                                        <option value="">Loading assets...</option>
+                                    </select>
+                                </label>
+                                <div id="tracked-delta-mode-toggle" class="tracked-delta-mode-toggle" role="tablist" aria-label="Flow mode">
+                                    <button type="button" role="tab" aria-selected="true" data-mode="all" class="active">All Flow</button>
+                                    <button type="button" role="tab" aria-selected="false" data-mode="perp">Perp</button>
+                                    <button type="button" role="tab" aria-selected="false" data-mode="spot">Spot</button>
+                                </div>
+                                <button id="tracked-delta-refresh" class="ghost tracked-delta-refresh" type="button">
+                                    Refresh
+                                </button>
+                            </div>
+                        </div>
+                        <div class="tracked-delta-status-row">
+                            <p id="tracked-delta-status" class="tracked-delta-status muted">
+                                Loading tracked-wallet asset flow...
+                            </p>
+                            <div id="tracked-delta-flags" class="tracked-delta-flags" aria-live="polite"></div>
+                        </div>
+                        <div id="tracked-delta-cards" class="tracked-delta-cards"></div>
+                        <div class="tracked-delta-chart-panel">
+                            <div class="tracked-delta-chart-header">
+                                <div>
+                                    <h4 id="tracked-delta-chart-title" class="tracked-delta-chart-title">
+                                        Net flow per hour
+                                    </h4>
+                                    <p id="tracked-delta-chart-subtitle" class="tracked-delta-chart-subtitle muted"></p>
+                                </div>
+                                <div id="tracked-delta-window-toggle" class="tracked-delta-window-toggle" role="tablist" aria-label="Flow timeframe">
+                                    <button type="button" role="tab" aria-selected="false" data-window="24h">24H</button>
+                                    <button type="button" role="tab" aria-selected="true" data-window="7d" class="active">7D</button>
+                                </div>
+                            </div>
+                            <div class="tracked-delta-chart-meta">
+                                <div class="tracked-delta-chart-legend" aria-hidden="true">
+                                    <span class="tracked-delta-legend-item flow">
+                                        <span class="tracked-delta-legend-dot"></span>
+                                        Net flow
+                                    </span>
+                                    <span class="tracked-delta-legend-item price">
+                                        <span class="tracked-delta-legend-line"></span>
+                                        Price
+                                    </span>
+                                </div>
+                                <div id="tracked-delta-breakdown" class="tracked-delta-breakdown"></div>
+                            </div>
+                            <div id="tracked-delta-chart" class="tracked-delta-chart" aria-label="Tracked wallet flow chart"></div>
+                        </div>
+                    </div>
                 </div>
 
                 <div id="panel-holdings" role="tabpanel" class="wallet-tabpanel" hidden>

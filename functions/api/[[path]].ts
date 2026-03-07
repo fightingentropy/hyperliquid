@@ -11,7 +11,7 @@ const YAHOO_FINANCE_CHART = "https://query1.finance.yahoo.com/v8/finance/chart";
 const DAY_MS = 24 * 60 * 60 * 1000;
 const leaderboardTtlMs = DAY_MS;
 const positionsTtlMs = DAY_MS;
-const fillsTtlMs = DAY_MS;
+const fillsTtlMs = 60 * 60 * 1000; // 1 hour
 const midsTtlMs = DAY_MS;
 const unstakingTtlMs = 5 * 60 * 1000; // 5 minutes
 const fees24hTtlMs = 5 * 60 * 1000; // 5 minutes
@@ -122,6 +122,21 @@ const BINANCE_KLINE_INTERVALS = new Set([
   "1d",
   "1w",
 ]);
+const RELATIVE_STRENGTH_DEFAULT_LIMIT = 96;
+const RELATIVE_STRENGTH_MAX_LIMIT = 220;
+const RELATIVE_STRENGTH_YAHOO_CONFIG: Record<
+  string,
+  { interval: string; range: string; bucketMs?: number }
+> = {
+  "1m": { interval: "1m", range: "5d" },
+  "5m": { interval: "5m", range: "1mo" },
+  "15m": { interval: "15m", range: "1mo" },
+  "30m": { interval: "30m", range: "1mo" },
+  "1h": { interval: "60m", range: "3mo" },
+  "4h": { interval: "60m", range: "6mo", bucketMs: 4 * 60 * 60 * 1000 },
+  "1d": { interval: "1d", range: "1y" },
+  "1w": { interval: "1wk", range: "5y" },
+};
 
 function jsonResponse(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -1035,6 +1050,25 @@ function normalizePositiveInt(rawValue, fallback, min, max) {
   return Math.min(max, Math.max(min, Math.floor(parsed)));
 }
 
+function bucketRowsByTime(rows, bucketMs) {
+  if (!Number.isFinite(bucketMs) || bucketMs <= 0) {
+    return Array.isArray(rows) ? rows : [];
+  }
+
+  const buckets = new Map();
+  for (const row of Array.isArray(rows) ? rows : []) {
+    const close = Number(row?.close);
+    const time = Number(row?.time);
+    if (!Number.isFinite(close) || !Number.isFinite(time)) continue;
+    const bucket = Math.floor(time / bucketMs) * bucketMs;
+    buckets.set(bucket, { close, time });
+  }
+
+  return Array.from(buckets.entries())
+    .sort((a, b) => a[0] - b[0])
+    .map(([, value]) => value);
+}
+
 async function handleSymbolKlines(symbol, url, bypassCache) {
   const normalized = normalizeMarketSymbol(symbol);
   const interval = normalizeKlineInterval(url.searchParams.get("interval"));
@@ -1196,7 +1230,7 @@ async function handleMarketDepth(bypassCache) {
   return jsonResponse(data);
 }
 
-function toRelativeStrengthPayloadFromRows(rows) {
+function toRelativeStrengthPayloadFromRows(rows, limit = RELATIVE_STRENGTH_DEFAULT_LIMIT) {
   const sortedRows = (Array.isArray(rows) ? rows : [])
     .filter(
       (row) => Number.isFinite(Number(row?.time)) && Number.isFinite(Number(row?.close)),
@@ -1204,7 +1238,7 @@ function toRelativeStrengthPayloadFromRows(rows) {
     .sort((a, b) => Number(a.time) - Number(b.time));
 
   if (sortedRows.length < 2) return null;
-  const trimmed = sortedRows.slice(-96);
+  const trimmed = sortedRows.slice(-limit);
   const first = Number(trimmed[0]?.close);
   const last = Number(trimmed[trimmed.length - 1]?.close);
   const changePct =
@@ -1220,7 +1254,10 @@ function toRelativeStrengthPayloadFromRows(rows) {
   };
 }
 
-async function fetchRelativeStrengthYahooSymbols() {
+async function fetchRelativeStrengthYahooSymbols(interval, limit) {
+  const config =
+    RELATIVE_STRENGTH_YAHOO_CONFIG[interval] ??
+    RELATIVE_STRENGTH_YAHOO_CONFIG["15m"];
   const results = new Map();
 
   await Promise.all(
@@ -1229,7 +1266,7 @@ async function fetchRelativeStrengthYahooSymbols() {
         const payload = await fetchJson(
           `${YAHOO_FINANCE_CHART}/${encodeURIComponent(
             base,
-          )}?interval=15m&range=5d&includePrePost=false&events=history`,
+          )}?interval=${config.interval}&range=${config.range}&includePrePost=false&events=history`,
         );
         const result = payload?.chart?.result?.[0] ?? null;
         const timestamps = Array.isArray(result?.timestamp) ? result.timestamp : [];
@@ -1246,7 +1283,10 @@ async function fetchRelativeStrengthYahooSymbols() {
           rows.push({ close, time });
         }
 
-        const normalized = toRelativeStrengthPayloadFromRows(rows);
+        const normalizedRows = config.bucketMs
+          ? bucketRowsByTime(rows, config.bucketMs)
+          : rows;
+        const normalized = toRelativeStrengthPayloadFromRows(normalizedRows, limit);
         if (normalized) {
           results.set(`${base}/USD`, normalized);
         }
@@ -1259,7 +1299,7 @@ async function fetchRelativeStrengthYahooSymbols() {
   return results;
 }
 
-async function fetchRelativeStrengthBinance() {
+async function fetchRelativeStrengthBinance(interval, limit) {
   const tickers = await fetchJson(`${BINANCE_FAPI}/fapi/v1/ticker/24hr`);
   const list = Array.isArray(tickers) ? tickers : [];
 
@@ -1300,7 +1340,7 @@ async function fetchRelativeStrengthBinance() {
       const symbol = symbols[idx];
       try {
         const klines = await fetchJson(
-          `${BINANCE_FAPI}/fapi/v1/klines?symbol=${symbol}&interval=15m&limit=96`,
+          `${BINANCE_FAPI}/fapi/v1/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`,
         );
         const rows = (Array.isArray(klines) ? klines : [])
           .map((k) => ({
@@ -1316,7 +1356,7 @@ async function fetchRelativeStrengthBinance() {
           : symbol;
         const key = `${base}/USD`;
         const t = eligibleMap.get(symbol);
-        const normalized = toRelativeStrengthPayloadFromRows(rows);
+        const normalized = toRelativeStrengthPayloadFromRows(rows, limit);
         if (!normalized) continue;
         cryptoResults.set(key, {
           ...normalized,
@@ -1335,7 +1375,7 @@ async function fetchRelativeStrengthBinance() {
     ),
   );
 
-  const macroResults = await fetchRelativeStrengthYahooSymbols();
+  const macroResults = await fetchRelativeStrengthYahooSymbols(interval, limit);
 
   const results = new Map(cryptoResults);
   for (const [symbol, payload] of macroResults.entries()) {
@@ -1353,8 +1393,8 @@ async function fetchRelativeStrengthBinance() {
   return {
     source: "binance+yahoo",
     updatedAt: Date.now(),
-    interval: "15m",
-    count: 96,
+    interval,
+    count: limit,
     requestedBases: RELATIVE_STRENGTH_BASES,
     requestedMacroBases: RELATIVE_STRENGTH_SECTOR_ETFS,
     missingBases: missing,
@@ -1363,20 +1403,27 @@ async function fetchRelativeStrengthBinance() {
   };
 }
 
-async function handleMarketRelativeStrength(bypassCache) {
-  const key = "market:relative-strength";
+async function handleMarketRelativeStrength(url, bypassCache) {
+  const interval = normalizeKlineInterval(url.searchParams.get("interval"));
+  const limit = normalizePositiveInt(
+    url.searchParams.get("limit"),
+    RELATIVE_STRENGTH_DEFAULT_LIMIT,
+    32,
+    RELATIVE_STRENGTH_MAX_LIMIT,
+  );
+  const key = `market:relative-strength:${interval}:${limit}`;
   const data = bypassCache
     ? await cachedWithBypass(
         key,
         relativeStrengthTtlMs,
-        async () => fetchRelativeStrengthBinance(),
+        async () => fetchRelativeStrengthBinance(interval, limit),
         true,
       )
     : await cachedWithStaleRevalidate(
         key,
         relativeStrengthTtlMs,
         10 * 60 * 1000, // serve stale up to 10m while refreshing
-        async () => fetchRelativeStrengthBinance(),
+        async () => fetchRelativeStrengthBinance(interval, limit),
       );
   return jsonResponse(data);
 }
@@ -1642,7 +1689,7 @@ async function handleApi(req, url, chain) {
 
   if (url.pathname === "/api/market/relative-strength") {
     try {
-      return await handleMarketRelativeStrength(bypassCache);
+      return await handleMarketRelativeStrength(url, bypassCache);
     } catch (error) {
       return jsonResponse({ error: String(error) }, 502);
     }

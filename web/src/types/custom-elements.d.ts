@@ -1,11 +1,16 @@
 import type { DetailedHTMLProps, HTMLAttributes } from "react";
 
-declare global {
+type HLNavbarElementProps = DetailedHTMLProps<
+  HTMLAttributes<HTMLElement>,
+  HTMLElement
+> & {
+  mode?: string;
+};
+
+declare module "react/jsx-runtime" {
   namespace JSX {
     interface IntrinsicElements {
-      "hl-navbar": DetailedHTMLProps<HTMLAttributes<HTMLElement>, HTMLElement> & {
-        mode?: string;
-      };
+      "hl-navbar": HLNavbarElementProps;
     }
   }
 }

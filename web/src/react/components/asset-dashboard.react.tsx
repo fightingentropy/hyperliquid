@@ -1,3 +1,4 @@
+/** @jsxImportSource react */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import {
@@ -18,10 +19,10 @@ import {
   type IChartApi,
   type UTCTimestamp,
 } from "lightweight-charts";
-import { Activity, ChevronDown, Search } from "lucide-react";
+import { Activity, ChevronDown, Minus, Plus, Search } from "lucide-react";
 
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/react/components/ui/badge.react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/react/components/ui/card.react";
 import { cn } from "@/lib/utils";
 
 type Timeframe = "1m" | "5m" | "15m" | "30m" | "1h" | "4h" | "1d" | "1w";
@@ -189,7 +190,10 @@ const DEFAULT_RELATIVE_STRENGTH_SYMBOLS = DEFAULT_RELATIVE_STRENGTH_BASES.map(
 const DEFAULT_RELATIVE_STRENGTH_BASE_SET = new Set(DEFAULT_RELATIVE_STRENGTH_BASES);
 const RELATIVE_Y_MIN = -10;
 const RELATIVE_Y_MAX = 25;
-const THREE_HOURS_MS = 3 * 60 * 60 * 1000;
+const MINUTE_MS = 60 * 1000;
+const HOUR_MS = 60 * MINUTE_MS;
+const DAY_MS = 24 * HOUR_MS;
+const WEEK_MS = 7 * DAY_MS;
 const RELATIVE_LIST_MAX_SYMBOLS = 32;
 const RELATIVE_SETTINGS_MAX_SYMBOLS = 128;
 const DEPTH_LEVELS_PER_SIDE = 160;
@@ -203,6 +207,17 @@ const RELATIVE_ZOOM_DELTA_NORMALIZER = 120;
 const RELATIVE_ZOOM_MIN_DELTA_SCALE = 0.16;
 const RELATIVE_ZOOM_MIN_POINTS = 8;
 const RELATIVE_CHART_MARGIN = { top: 8, right: 14, left: 8, bottom: 0 } as const;
+const DEFAULT_RELATIVE_TIMEFRAME: Timeframe = "15m";
+const RELATIVE_TICK_STEP_BY_TIMEFRAME: Record<Timeframe, number> = {
+  "1m": 15 * MINUTE_MS,
+  "5m": HOUR_MS,
+  "15m": 3 * HOUR_MS,
+  "30m": 6 * HOUR_MS,
+  "1h": 12 * HOUR_MS,
+  "4h": DAY_MS,
+  "1d": WEEK_MS,
+  "1w": 4 * WEEK_MS,
+};
 
 function clampNumber(value: number, min: number, max: number) {
   if (value < min) return min;
@@ -305,6 +320,38 @@ function formatCompact(value: number | null | undefined) {
   if (abs >= 1_000_000) return `${(amount / 1_000_000).toFixed(2)}M`;
   if (abs >= 1_000) return `${(amount / 1_000).toFixed(2)}K`;
   return amount.toFixed(2);
+}
+
+function formatRelativeTick(time: number, timeframe: Timeframe) {
+  const value = Number(time);
+  if (!Number.isFinite(value)) return "";
+
+  const date = new Date(value);
+  if (timeframe === "1d" || timeframe === "1w") {
+    return date.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+    });
+  }
+
+  const hours = date.getHours();
+  const minutes = date.getMinutes();
+  const isDayBoundary = hours === 0 && minutes === 0;
+  if (isDayBoundary) {
+    return date.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+    });
+  }
+
+  return date.toLocaleTimeString("en-US", {
+    hour: "2-digit",
+    minute:
+      timeframe === "1m" || timeframe === "5m" || timeframe === "15m"
+        ? "2-digit"
+        : undefined,
+    hour12: false,
+  });
 }
 
 function toAssetContext(rawParam: string | undefined) {
@@ -707,7 +754,7 @@ function LongShortBar({
   );
 }
 
-export function AssetDashboardPage() {
+export function AssetDashboardPage(props: { embedded?: boolean } = {}) {
   const location = useLocation();
   const [assetPair, setAssetPair] = useState(() => {
     const params = new URLSearchParams(
@@ -717,6 +764,8 @@ export function AssetDashboardPage() {
   });
   const asset = useMemo(() => toAssetContext(assetPair), [assetPair]);
   const [timeframe, setTimeframe] = useState<Timeframe>("1h");
+  const [relativeTimeframe, setRelativeTimeframe] =
+    useState<Timeframe>(DEFAULT_RELATIVE_TIMEFRAME);
   const [candles, setCandles] = useState<Candle[]>([]);
   const [ratios, setRatios] = useState<RatiosResponse | null>(null);
   const [openInterest, setOpenInterest] = useState<OpenInterestResponse | null>(null);
@@ -745,11 +794,13 @@ export function AssetDashboardPage() {
   const [error, setError] = useState<string | null>(null);
   const [symbolMenuOpen, setSymbolMenuOpen] = useState(false);
   const [timeframeMenuOpen, setTimeframeMenuOpen] = useState(false);
+  const [relativeTimeframeMenuOpen, setRelativeTimeframeMenuOpen] = useState(false);
   const [symbolSearch, setSymbolSearch] = useState("");
   const relativePanAnchorRef = useRef<RelativePanAnchor | null>(null);
   const relativeContextMenuRef = useRef<HTMLDivElement | null>(null);
   const symbolDropdownRef = useRef<HTMLDivElement | null>(null);
   const timeframeDropdownRef = useRef<HTMLDivElement | null>(null);
+  const relativeTimeframeDropdownRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const syncRelativeDefaults = () => {
@@ -787,9 +838,17 @@ export function AssetDashboardPage() {
     if (!active) return TIMEFRAMES;
     return [active, ...TIMEFRAMES.filter((item) => item.key !== timeframe)];
   }, [timeframe]);
+  const orderedRelativeTimeframes = useMemo(() => {
+    const active = TIMEFRAMES.find((item) => item.key === relativeTimeframe);
+    if (!active) return TIMEFRAMES;
+    return [active, ...TIMEFRAMES.filter((item) => item.key !== relativeTimeframe)];
+  }, [relativeTimeframe]);
 
   const timeframeLabel =
     TIMEFRAMES.find((item) => item.key === timeframe)?.label ?? timeframe.toUpperCase();
+  const relativeTimeframeLabel =
+    TIMEFRAMES.find((item) => item.key === relativeTimeframe)?.label ??
+    relativeTimeframe.toUpperCase();
 
   useEffect(() => {
     if (!symbolMenuOpen) {
@@ -811,6 +870,12 @@ export function AssetDashboardPage() {
         !timeframeDropdownRef.current.contains(target)
       ) {
         setTimeframeMenuOpen(false);
+      }
+      if (
+        relativeTimeframeDropdownRef.current &&
+        !relativeTimeframeDropdownRef.current.contains(target)
+      ) {
+        setRelativeTimeframeMenuOpen(false);
       }
     };
 
@@ -966,7 +1031,7 @@ export function AssetDashboardPage() {
       if (isDocumentHidden()) return;
       try {
         const payload = await fetchJson<RelativeStrengthResponse>(
-          "/api/market/relative-strength",
+          `/api/market/relative-strength?interval=${encodeURIComponent(relativeTimeframe)}`,
         );
         if (!cancelled) {
           setRelativeStrength(payload);
@@ -989,7 +1054,7 @@ export function AssetDashboardPage() {
       cancelled = true;
       window.clearInterval(intervalId);
     };
-  }, []);
+  }, [relativeTimeframe]);
 
   const lastCandle = candles[candles.length - 1];
   const prevCandle = candles[candles.length - 2];
@@ -1132,13 +1197,14 @@ export function AssetDashboardPage() {
       return [] as number[];
     }
 
-    const alignedStart = Math.ceil(firstTime / THREE_HOURS_MS) * THREE_HOURS_MS;
+    const tickStep = RELATIVE_TICK_STEP_BY_TIMEFRAME[relativeTimeframe];
+    const alignedStart = Math.ceil(firstTime / tickStep) * tickStep;
     const ticks: number[] = [];
-    for (let tick = alignedStart; tick <= lastTime; tick += THREE_HOURS_MS) {
+    for (let tick = alignedStart; tick <= lastTime; tick += tickStep) {
       ticks.push(tick);
     }
     return ticks;
-  }, [relative.chartRows]);
+  }, [relative.chartRows, relativeTimeframe]);
   const relativeTimeBounds = useMemo(() => {
     if (!relative.chartRows.length) {
       return null;
@@ -1245,37 +1311,20 @@ export function AssetDashboardPage() {
     };
   }, [relativePanActive, relativeChartSize.height, relativeChartSize.width, relativeTimeBounds]);
 
-  const handleRelativeWheel = useCallback((event: WheelEvent) => {
-    if (relativePanActive) return;
+  const applyRelativeZoom = useCallback((
+    direction: number,
+    {
+      xRatio = 0.5,
+      yRatio = 0.5,
+      deltaScale = 1,
+    }: {
+      xRatio?: number;
+      yRatio?: number;
+      deltaScale?: number;
+    } = {},
+  ) => {
     if (!relativeTimeBounds) return;
-    if (!relativeChartRef.current) return;
-
-    if (relativeContextMenu) {
-      setRelativeContextMenu(null);
-    }
-
-    const wheelDelta = Number(event.deltaY ?? 0);
-    const direction = Math.sign(wheelDelta);
     if (direction === 0) return;
-    if (event.cancelable) {
-      event.preventDefault();
-    }
-    event.stopPropagation();
-
-    const rect = relativeChartRef.current.getBoundingClientRect();
-    const plotWidth = Math.max(
-      1,
-      relativeChartSize.width - RELATIVE_CHART_MARGIN.left - RELATIVE_CHART_MARGIN.right,
-    );
-    const plotHeight = Math.max(
-      1,
-      relativeChartSize.height - RELATIVE_CHART_MARGIN.top - RELATIVE_CHART_MARGIN.bottom,
-    );
-
-    const pointerX = event.clientX - rect.left - RELATIVE_CHART_MARGIN.left;
-    const pointerY = event.clientY - rect.top - RELATIVE_CHART_MARGIN.top;
-    const xRatio = clampNumber(pointerX / plotWidth, 0, 1);
-    const yRatio = clampNumber(pointerY / plotHeight, 0, 1);
 
     const currentLeft = relativeZoomDomain?.left ?? relativeTimeBounds.first;
     const currentRight = relativeZoomDomain?.right ?? relativeTimeBounds.last;
@@ -1286,12 +1335,9 @@ export function AssetDashboardPage() {
     const ySpan = currentYMax - currentYMin;
     if (xSpan <= 0 || ySpan <= 0) return;
 
-    const deltaScale = clampNumber(
-      Math.abs(wheelDelta) / RELATIVE_ZOOM_DELTA_NORMALIZER,
-      RELATIVE_ZOOM_MIN_DELTA_SCALE,
-      1,
-    );
-    const zoomStep = RELATIVE_ZOOM_BASE_STEP * deltaScale;
+    const zoomStep =
+      RELATIVE_ZOOM_BASE_STEP *
+      clampNumber(deltaScale, RELATIVE_ZOOM_MIN_DELTA_SCALE, 1);
     const zoomFactor = direction < 0 ? 1 - zoomStep : 1 + zoomStep;
 
     const minXSpan = Math.max(
@@ -1356,13 +1402,55 @@ export function AssetDashboardPage() {
       yMax: nextYMax,
     });
   }, [
+    relativeTimeBounds,
+    relativeZoomDomain,
+  ]);
+  const handleRelativeWheel = useCallback((event: WheelEvent) => {
+    if (relativePanActive) return;
+    if (!relativeTimeBounds) return;
+    if (!relativeChartRef.current) return;
+
+    if (relativeContextMenu) {
+      setRelativeContextMenu(null);
+    }
+
+    const wheelDelta = Number(event.deltaY ?? 0);
+    const direction = Math.sign(wheelDelta);
+    if (direction === 0) return;
+    if (event.cancelable) {
+      event.preventDefault();
+    }
+    event.stopPropagation();
+
+    const rect = relativeChartRef.current.getBoundingClientRect();
+    const plotWidth = Math.max(
+      1,
+      relativeChartSize.width - RELATIVE_CHART_MARGIN.left - RELATIVE_CHART_MARGIN.right,
+    );
+    const plotHeight = Math.max(
+      1,
+      relativeChartSize.height - RELATIVE_CHART_MARGIN.top - RELATIVE_CHART_MARGIN.bottom,
+    );
+
+    const pointerX = event.clientX - rect.left - RELATIVE_CHART_MARGIN.left;
+    const pointerY = event.clientY - rect.top - RELATIVE_CHART_MARGIN.top;
+    const xRatio = clampNumber(pointerX / plotWidth, 0, 1);
+    const yRatio = clampNumber(pointerY / plotHeight, 0, 1);
+    const deltaScale = clampNumber(
+      Math.abs(wheelDelta) / RELATIVE_ZOOM_DELTA_NORMALIZER,
+      RELATIVE_ZOOM_MIN_DELTA_SCALE,
+      1,
+    );
+
+    applyRelativeZoom(direction, { xRatio, yRatio, deltaScale });
+  }, [
+    applyRelativeZoom,
     relativeChartRef,
     relativeChartSize.height,
     relativeChartSize.width,
     relativeContextMenu,
     relativePanActive,
     relativeTimeBounds,
-    relativeZoomDomain,
   ]);
   useEffect(() => {
     const container = relativeChartRef.current;
@@ -1390,6 +1478,8 @@ export function AssetDashboardPage() {
       container.removeEventListener("gestureend", blockGestureZoom);
     };
   }, [handleRelativeWheel, relativeChartRef]);
+  const canZoomRelative = Boolean(relativeTimeBounds);
+  const canResetRelativeZoom = Boolean(relativeZoomDomain);
   const relativeContextMenuPosition = relativeContextMenu
     ? {
         left: clampNumber(
@@ -1429,10 +1519,7 @@ export function AssetDashboardPage() {
       </div>
     );
   };
-  return (
-    <main className="asset-page-shell h-screen overflow-hidden bg-transparent text-[#a0adbe]">
-      <hl-navbar mode="asset" />
-
+  const content = (
       <div className="asset-page-content">
         <div className="asset-grid grid h-full min-h-0 gap-2">
         <Card className="asset-panel flex min-h-0 flex-col overflow-hidden">
@@ -1446,7 +1533,10 @@ export function AssetDashboardPage() {
                     onClick={() => {
                       setSymbolMenuOpen((prev) => {
                         const next = !prev;
-                        if (next) setTimeframeMenuOpen(false);
+                        if (next) {
+                          setTimeframeMenuOpen(false);
+                          setRelativeTimeframeMenuOpen(false);
+                        }
                         return next;
                       });
                     }}
@@ -1508,7 +1598,10 @@ export function AssetDashboardPage() {
                     onClick={() => {
                       setTimeframeMenuOpen((prev) => {
                         const next = !prev;
-                        if (next) setSymbolMenuOpen(false);
+                        if (next) {
+                          setSymbolMenuOpen(false);
+                          setRelativeTimeframeMenuOpen(false);
+                        }
                         return next;
                       });
                     }}
@@ -1675,10 +1768,111 @@ export function AssetDashboardPage() {
 
         <Card className="asset-panel asset-panel-relative flex min-h-0 flex-col overflow-hidden">
           <CardHeader className="px-2.5 pb-2 pt-2.5">
-            <CardTitle className="flex items-center gap-2 text-sm uppercase tracking-[0.14em] text-[#a1afbe]">
-              <Activity className="h-3.5 w-3.5 text-[#2ecfd0]" />
-              Relative Strength
-            </CardTitle>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <CardTitle className="flex items-center gap-2 text-sm uppercase tracking-[0.14em] text-[#a1afbe]">
+                <Activity className="h-3.5 w-3.5 text-[#2ecfd0]" />
+                Relative Strength
+              </CardTitle>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <div
+                  ref={relativeTimeframeDropdownRef}
+                  className="asset-inline-dropdown asset-inline-market"
+                >
+                  <button
+                    type="button"
+                    className="asset-inline-trigger asset-inline-trigger-market"
+                    onClick={() => {
+                      setRelativeTimeframeMenuOpen((prev) => {
+                        const next = !prev;
+                        if (next) {
+                          setSymbolMenuOpen(false);
+                          setTimeframeMenuOpen(false);
+                        }
+                        return next;
+                      });
+                    }}
+                    aria-haspopup="listbox"
+                    aria-expanded={relativeTimeframeMenuOpen}
+                  >
+                    <span className="asset-inline-text-sub">
+                      Relative · {relativeTimeframeLabel}
+                    </span>
+                    <ChevronDown
+                      className={cn(
+                        "h-4 w-4 text-[#9ab0c7] transition-transform",
+                        relativeTimeframeMenuOpen ? "rotate-180" : "",
+                      )}
+                    />
+                  </button>
+
+                  {relativeTimeframeMenuOpen ? (
+                    <div className="asset-inline-menu asset-market-menu">
+                      {orderedRelativeTimeframes.map((item) => (
+                        <button
+                          key={item.key}
+                          type="button"
+                          className={cn(
+                            "asset-market-option",
+                            item.key === relativeTimeframe ? "active" : undefined,
+                          )}
+                          onClick={() => {
+                            setRelativeTimeframe(item.key);
+                            setRelativeTimeframeMenuOpen(false);
+                            setRelativeContextMenu(null);
+                            setHoveredRelativeRow(null);
+                            relativePanAnchorRef.current = null;
+                            setRelativePanActive(false);
+                            setRelativeZoomDomain(null);
+                          }}
+                        >
+                          Relative · {item.label}
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    aria-label="Zoom out relative strength"
+                    disabled={!canResetRelativeZoom}
+                    className={cn(
+                      "inline-flex h-8 w-8 items-center justify-center rounded border border-[#2b3f54] bg-[#111a27] text-[#9ab0c7] transition-colors",
+                      canResetRelativeZoom
+                        ? "hover:bg-[#1a2430] hover:text-[#d8e1ec]"
+                        : "cursor-not-allowed opacity-40",
+                    )}
+                    onClick={() => {
+                      setRelativeContextMenu(null);
+                      setHoveredRelativeRow(null);
+                      applyRelativeZoom(1);
+                    }}
+                  >
+                    <Minus className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="Zoom in relative strength"
+                    disabled={!canZoomRelative}
+                    className={cn(
+                      "inline-flex h-8 w-8 items-center justify-center rounded border border-[#2b3f54] bg-[#111a27] text-[#9ab0c7] transition-colors",
+                      canZoomRelative
+                        ? "hover:bg-[#1a2430] hover:text-[#d8e1ec]"
+                        : "cursor-not-allowed opacity-40",
+                    )}
+                    onClick={() => {
+                      setRelativeContextMenu(null);
+                      setHoveredRelativeRow(null);
+                      applyRelativeZoom(-1);
+                    }}
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </div>
+            </div>
           </CardHeader>
           <CardContent className="relative h-full min-h-[260px] p-0">
             <div
@@ -1734,15 +1928,9 @@ export function AssetDashboardPage() {
                     domain={relativeXAxisDomain}
                     allowDataOverflow
                     tick={{ fill: "#95a2b2", fontSize: 11 }}
-                    tickFormatter={(time) => {
-                      const date = new Date(Number(time));
-                      const hours = date.getHours();
-                      const minutes = date.getMinutes();
-                      if (hours === 0 && minutes === 0) {
-                        return String(date.getDate());
-                      }
-                      return `${String(hours).padStart(2, "0")}:00`;
-                    }}
+                    tickFormatter={(time) =>
+                      formatRelativeTick(Number(time), relativeTimeframe)
+                    }
                   />
                   <YAxis
                     orientation="right"
@@ -1916,6 +2104,14 @@ export function AssetDashboardPage() {
 
         </div>
       </div>
+  );
+
+  if (props.embedded) return content;
+
+  return (
+    <main className="asset-page-shell h-screen overflow-hidden bg-transparent text-[#a0adbe]">
+      <hl-navbar mode="asset" />
+      {content}
     </main>
   );
 }

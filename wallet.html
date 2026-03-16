@@ -3,7 +3,7 @@
     <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <title>Wallet Lookup · HL Stats</title>
+        <title>Wallet Notional Delta · HL Stats</title>
         <meta name="theme-color" content="#09090b" />
         <script src="/theme.js"></script>
         <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
@@ -11,7 +11,7 @@
         <link rel="stylesheet" href="/styles.css" />
         <link rel="stylesheet" href="/wallet.css" />
         <script src="/wallet.js" defer></script>
-            <script src="/navbar.js" defer></script>
+        <script src="/navbar.js" defer></script>
     </head>
     <body class="app-shell-page">
         <div class="orb orb-1"></div>
@@ -22,255 +22,110 @@
 
         <header class="hero wallet-hero">
             <div class="hero-content">
-                <p class="eyebrow">Hyperliquid Intelligence</p>
-                <h1>Wallet Lookup</h1>
+                <p class="eyebrow">Qwantify Flow</p>
+                <h1>Wallet Notional Delta</h1>
                 <p class="lede">
-                    Enter an Ethereum address to view open positions, spot
-                    holdings, and recent trades.
+                    Resolve an EVM wallet to Qwantify&apos;s internal wallet ID,
+                    then load the live net notional delta table from
+                    `/notional-deltas`.
                 </p>
                 <div class="wallet-search">
                     <input
                         id="address-input"
                         type="text"
-                        placeholder="0x..."
+                        placeholder="0xadD12ADBbD5Db87674b38Af99b6dD34Dd2A45e0d"
                         spellcheck="false"
                         autocomplete="off"
                     />
-                    <button id="lookup-button" class="primary">
-                        Look up
+                    <button id="lookup-button" class="primary" type="button">
+                        Load Wallet
                     </button>
                     <button id="follow-wallet-button" class="ghost" type="button">
-                        Follow
+                        Track
                     </button>
                 </div>
                 <p id="address-error" class="address-error" aria-live="polite"></p>
+                <p id="wallet-status" class="wallet-status muted">
+                    Enter a wallet address or open a `/wallets/0x...` route.
+                </p>
                 <div class="followed-wallets">
                     <div class="followed-wallets-header">
-                        <span>Followed wallets</span>
+                        <span>Tracked wallets</span>
                     </div>
                     <div id="followed-wallets-list" class="followed-wallets-list"></div>
                 </div>
             </div>
-            <div class="hero-metrics" id="wallet-metrics">
+            <div class="hero-metrics wallet-meta-cards">
                 <div class="metric">
-                    <span class="label">Account value</span>
-                    <span id="metric-account-value" class="value">—</span>
+                    <span class="label">Wallet ID</span>
+                    <span id="metric-wallet-id" class="value mono">—</span>
                 </div>
                 <div class="metric">
-                    <span class="label">Margin used</span>
-                    <span id="metric-margin" class="value">—</span>
+                    <span class="label">Generated</span>
+                    <span id="metric-generated-at" class="value">—</span>
                 </div>
                 <div class="metric">
-                    <span class="label">Withdrawable</span>
-                    <span id="metric-withdrawable" class="value">—</span>
+                    <span class="label">Assets</span>
+                    <span id="metric-asset-count" class="value">—</span>
                 </div>
             </div>
         </header>
 
-        <main class="layout wallet-layout" id="wallet-main" hidden>
+        <main class="layout wallet-layout">
             <section class="panel wallet-panel">
-                <div class="panel-header">
+                <div class="panel-header wallet-panel-header">
                     <div>
-                        <h2 id="wallet-address-title" class="mono">—</h2>
-                        <a
-                            id="explorer-link"
-                            class="link"
-                            href="#"
-                            target="_blank"
-                            rel="noreferrer"
-                        >
-                            Open in Explorer
-                        </a>
+                        <h2 id="wallet-address-title" class="mono">
+                            No wallet loaded
+                        </h2>
+                        <p class="muted">
+                            Live values come from Qwantify&apos;s resolve and
+                            `notional-deltas` endpoints.
+                        </p>
                     </div>
-                </div>
-
-                <div class="wallet-tabs" role="tablist">
-                    <button
-                        type="button"
-                        role="tab"
-                        id="tab-positions"
-                        aria-selected="true"
-                        aria-controls="panel-positions"
-                    >
-                        Positions
-                    </button>
-                    <button
-                        type="button"
-                        role="tab"
-                        id="tab-holdings"
-                        aria-selected="false"
-                        aria-controls="panel-holdings"
-                    >
-                        Holdings
-                    </button>
-                    <button
-                        type="button"
-                        role="tab"
-                        id="tab-trades"
-                        aria-selected="false"
-                        aria-controls="panel-trades"
-                    >
-                        Trades
+                    <button id="refresh-button" class="ghost" type="button">
+                        Refresh
                     </button>
                 </div>
 
-                <div id="panel-positions" role="tabpanel" class="wallet-tabpanel">
-                    <div class="detail-section">
-                        <div class="section-header">
-                            <h3>Open positions</h3>
-                        </div>
-                        <div class="table-wrap wallet-table">
-                            <table>
-                                <thead>
-                                    <tr>
-                                        <th>Market</th>
-                                        <th>Side</th>
-                                        <th>Size</th>
-                                        <th>Entry</th>
-                                        <th>Value</th>
-                                        <th>Liq Px</th>
-                                        <th>uPnL</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="positions-body"></tbody>
-                            </table>
-                        </div>
+                <div class="wallet-flow">
+                    <div class="wallet-flow-step">
+                        <span class="wallet-flow-label">Resolve</span>
+                        <span id="flow-resolve" class="wallet-flow-value mono">
+                            https://api.qwantify.io/api/wallets/resolve?address=0x...
+                        </span>
                     </div>
-                    <div class="detail-section tracked-delta-section">
-                        <div class="section-header tracked-delta-header">
-                            <div>
-                                <h3>Tracked Wallet Flow</h3>
-                                <p class="muted">
-                                    Aggregate tracked-wallet perp and spot flow for one asset.
-                                </p>
-                            </div>
-                            <div class="tracked-delta-controls">
-                                <label class="tracked-delta-filter" for="tracked-delta-asset">
-                                    <span>Asset</span>
-                                    <select id="tracked-delta-asset">
-                                        <option value="">Loading assets...</option>
-                                    </select>
-                                </label>
-                                <div id="tracked-delta-mode-toggle" class="tracked-delta-mode-toggle" role="tablist" aria-label="Flow mode">
-                                    <button type="button" role="tab" aria-selected="true" data-mode="all" class="active">All Flow</button>
-                                    <button type="button" role="tab" aria-selected="false" data-mode="perp">Perp</button>
-                                    <button type="button" role="tab" aria-selected="false" data-mode="spot">Spot</button>
-                                </div>
-                                <button id="tracked-delta-refresh" class="ghost tracked-delta-refresh" type="button">
-                                    Refresh
-                                </button>
-                            </div>
-                        </div>
-                        <div class="tracked-delta-status-row">
-                            <p id="tracked-delta-status" class="tracked-delta-status muted">
-                                Loading tracked-wallet asset flow...
-                            </p>
-                            <div id="tracked-delta-flags" class="tracked-delta-flags" aria-live="polite"></div>
-                        </div>
-                        <div id="tracked-delta-cards" class="tracked-delta-cards"></div>
-                        <div class="tracked-delta-chart-panel">
-                            <div class="tracked-delta-chart-header">
-                                <div>
-                                    <h4 id="tracked-delta-chart-title" class="tracked-delta-chart-title">
-                                        Net flow per hour
-                                    </h4>
-                                    <p id="tracked-delta-chart-subtitle" class="tracked-delta-chart-subtitle muted"></p>
-                                </div>
-                                <div id="tracked-delta-window-toggle" class="tracked-delta-window-toggle" role="tablist" aria-label="Flow timeframe">
-                                    <button type="button" role="tab" aria-selected="false" data-window="24h">24H</button>
-                                    <button type="button" role="tab" aria-selected="true" data-window="7d" class="active">7D</button>
-                                </div>
-                            </div>
-                            <div class="tracked-delta-chart-meta">
-                                <div class="tracked-delta-chart-legend" aria-hidden="true">
-                                    <span class="tracked-delta-legend-item flow">
-                                        <span class="tracked-delta-legend-dot"></span>
-                                        Net flow
-                                    </span>
-                                    <span class="tracked-delta-legend-item price">
-                                        <span class="tracked-delta-legend-line"></span>
-                                        Price
-                                    </span>
-                                </div>
-                                <div id="tracked-delta-breakdown" class="tracked-delta-breakdown"></div>
-                            </div>
-                            <div id="tracked-delta-chart" class="tracked-delta-chart" aria-label="Tracked wallet flow chart"></div>
-                        </div>
+                    <div class="wallet-flow-step">
+                        <span class="wallet-flow-label">Fetch</span>
+                        <span id="flow-deltas" class="wallet-flow-value mono">
+                            https://api.qwantify.io/api/wallets/:walletId/notional-deltas
+                        </span>
                     </div>
                 </div>
 
-                <div id="panel-holdings" role="tabpanel" class="wallet-tabpanel" hidden>
-                    <div class="detail-section">
-                        <div class="section-header">
-                            <div>
-                                <h3>Holdings &amp; Staking</h3>
-                                <p class="muted">
-                                    Spot holdings aggregated across wallet + subaccounts, plus staking.
-                                </p>
-                            </div>
-                        </div>
-                        <div class="table-wrap wallet-table">
-                            <table>
-                                <thead>
-                                    <tr>
-                                        <th>Asset</th>
-                                        <th>Total</th>
-                                        <th data-sort="usdValue">Value (USD)</th>
-                                        <th>Hold</th>
-                                        <th>Available</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="holdings-body"></tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-
-                <div id="panel-trades" role="tabpanel" class="wallet-tabpanel" hidden>
-                    <div class="detail-section">
-                        <div class="section-header trades-header">
-                            <div>
-                                <h3>Recent trades</h3>
-                                <p id="trades-summary" class="trades-summary muted"></p>
-                            </div>
-                            <div class="trades-controls">
-                                <label class="filter-toggle aggregate-toggle">
-                                    <input id="aggregate-fills" type="checkbox" />
-                                    Aggregate fills
-                                </label>
-                                <button id="trades-refresh" class="ghost" type="button">Refresh</button>
-                            </div>
-                        </div>
-                        <div class="table-wrap wallet-table trades-scroll">
-                            <table>
-                                <thead>
-                                    <tr>
-                                        <th>Time</th>
-                                        <th>Type</th>
-                                        <th>Coin</th>
-                                        <th>Dir</th>
-                                        <th>Price</th>
-                                        <th>Size</th>
-                                        <th>Notional</th>
-                                        <th>Fee</th>
-                                        <th>PnL/Status</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="trades-body"></tbody>
-                            </table>
-                        </div>
-                        <div id="trades-pagination" class="trades-pagination" hidden>
-                            <button id="trades-prev" class="ghost" type="button">Previous</button>
-                            <span id="trades-page-info" class="trades-page-info muted"></span>
-                            <button id="trades-next" class="ghost" type="button">Next</button>
-                        </div>
-                    </div>
+                <div class="table-wrap wallet-table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Symbol</th>
+                                <th>Δ1H</th>
+                                <th>Δ4H</th>
+                                <th>Δ12H</th>
+                                <th>Δ1D</th>
+                                <th>Δ7D</th>
+                            </tr>
+                        </thead>
+                        <tbody id="notional-deltas-body">
+                            <tr class="wallet-empty-row">
+                                <td colspan="6">
+                                    Load a wallet to see net notional delta
+                                    data.
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
             </section>
         </main>
-
-        <footer class="footer">
-            <p>Data: stats-data.hyperliquid.xyz + api.hyperliquid.xyz</p>
-        </footer>
     </body>
 </html>

@@ -46,6 +46,13 @@ body {
   min-height: 100vh;
 }
 
+.asset-dashboard-host {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
 .asset-page-shell {
   display: flex;
   height: 100vh;

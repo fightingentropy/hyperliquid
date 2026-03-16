@@ -1,14 +1,14 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import react from "@vitejs/plugin-react-swc";
+import solid from "vite-plugin-solid";
 import { defineConfig } from "vite";
 
 const rootDir = fileURLToPath(new URL(".", import.meta.url));
 
 export default defineConfig({
   root: rootDir,
-  plugins: [react()],
+  plugins: [solid()],
   base: "/web/dist/",
   resolve: {
     alias: {
@@ -23,13 +23,8 @@ export default defineConfig({
         manualChunks(id) {
           if (!id.includes("node_modules")) return;
           if (id.includes("lightweight-charts")) return "lightweight-charts";
-          if (id.includes("recharts")) return "recharts";
-          if (
-            id.includes("/react/") ||
-            id.includes("/react-dom/") ||
-            id.includes("/react-router-dom/")
-          ) {
-            return "react-vendor";
+          if (id.includes("/solid-js/") || id.includes("/@solidjs/router/")) {
+            return "solid-vendor";
           }
           if (
             id.includes("@radix-ui/") ||

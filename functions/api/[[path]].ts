@@ -6,7 +6,9 @@ const HYPURRSCAN_API = "https://api.hypurrscan.io";
 const BREAKOUTPROP_API = "https://tools.breakoutprop.com/api";
 const REMOTE_ORIGIN = "https://tools.breakoutprop.com";
 const BINANCE_FAPI = "https://fapi.binance.com";
+const OKX_PUBLIC_API = "https://www.okx.com/api/v5";
 const YAHOO_FINANCE_CHART = "https://query1.finance.yahoo.com/v8/finance/chart";
+const QWANTIFY_API = "https://api.qwantify.io/api";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const leaderboardTtlMs = DAY_MS;
@@ -21,6 +23,8 @@ const klineTtlMs = 5 * 1000; // 5 seconds
 const assetHeaderTtlMs = 1000; // 1 second
 const relativeStrengthTtlMs = 60 * 1000; // 60 seconds
 const imageProxyTtlSeconds = 300;
+const qwantifyWalletTtlMs = 60 * 1000; // 1 minute
+const qwantifyMarketFlowTtlMs = 60 * 1000; // 1 minute
 
 const RELATIVE_STRENGTH_BASES = [
   "HYPE",
@@ -836,13 +840,13 @@ async function handleFees24h(bypassCache) {
   });
 }
 
-async function handleBreakoutRatios(symbol, bypassCache) {
+async function fetchBreakoutRatiosData(symbol, bypassCache) {
   const normalized = String(symbol ?? "").trim().toUpperCase();
   if (!normalized) {
     throw new Error("Missing symbol");
   }
   const key = `market:ratios:${normalized}`;
-  const data = await cachedWithBypass(
+  return cachedWithBypass(
     key,
     breakoutpropTtlMs,
     async () => {
@@ -850,16 +854,20 @@ async function handleBreakoutRatios(symbol, bypassCache) {
     },
     bypassCache,
   );
+}
+
+async function handleBreakoutRatios(symbol, bypassCache) {
+  const data = await fetchBreakoutRatiosData(symbol, bypassCache);
   return jsonResponse(data);
 }
 
-async function handleBreakoutOpenInterest(symbol, bypassCache) {
+async function fetchBreakoutOpenInterestData(symbol, bypassCache) {
   const normalized = String(symbol ?? "").trim().toUpperCase();
   if (!normalized) {
     throw new Error("Missing symbol");
   }
   const key = `market:open-interest:${normalized}`;
-  const data = await cachedWithBypass(
+  return cachedWithBypass(
     key,
     breakoutpropTtlMs,
     async () => {
@@ -869,12 +877,16 @@ async function handleBreakoutOpenInterest(symbol, bypassCache) {
     },
     bypassCache,
   );
+}
+
+async function handleBreakoutOpenInterest(symbol, bypassCache) {
+  const data = await fetchBreakoutOpenInterestData(symbol, bypassCache);
   return jsonResponse(data);
 }
 
-async function handleBreakoutSnapshot(bypassCache) {
+async function fetchBreakoutSnapshotData(bypassCache) {
   const key = "market:snapshot";
-  const data = await cachedWithBypass(
+  return cachedWithBypass(
     key,
     breakoutpropTtlMs,
     async () => {
@@ -882,6 +894,10 @@ async function handleBreakoutSnapshot(bypassCache) {
     },
     bypassCache,
   );
+}
+
+async function handleBreakoutSnapshot(bypassCache) {
+  const data = await fetchBreakoutSnapshotData(bypassCache);
   return jsonResponse(data);
 }
 
@@ -984,14 +1000,18 @@ async function fetchMarketBinance24h() {
   };
 }
 
-async function handleMarketBinance24h(bypassCache) {
+async function fetchMarketBinance24hData(bypassCache) {
   const key = "market:binance-24h";
-  const data = await cachedWithBypass(
+  return cachedWithBypass(
     key,
     5 * 1000,
     async () => fetchMarketBinance24h(),
     bypassCache,
   );
+}
+
+async function handleMarketBinance24h(bypassCache) {
+  const data = await fetchMarketBinance24hData(bypassCache);
   return jsonResponse(data);
 }
 
@@ -1119,10 +1139,10 @@ async function handleSymbolKlines(symbol, url, bypassCache) {
   return jsonResponse(data);
 }
 
-async function handleAssetHeader(symbol, bypassCache) {
+async function fetchAssetHeaderData(symbol, bypassCache) {
   const normalized = normalizeMarketSymbol(symbol);
   const key = `asset:header:binance:${normalized.binance}`;
-  const data = await cachedWithBypass(
+  return cachedWithBypass(
     key,
     assetHeaderTtlMs,
     async () => {
@@ -1162,16 +1182,50 @@ async function handleAssetHeader(symbol, bypassCache) {
     },
     bypassCache,
   );
+}
+
+async function handleAssetHeader(symbol, bypassCache) {
+  const data = await fetchAssetHeaderData(symbol, bypassCache);
   return jsonResponse(data);
 }
 
-function normalizeDepthLevels(levels, bidSide) {
+async function handleAssetOverview(symbol, bypassCache) {
+  const normalized = normalizeMarketSymbol(symbol);
+  const key = `asset:overview:${normalized.binance}`;
+  const data = await cachedWithBypass(
+    key,
+    1000,
+    async () => {
+      const [assetHeader, ratios, openInterest] = await Promise.all([
+        fetchAssetHeaderData(normalized.breakout, bypassCache),
+        fetchBreakoutRatiosData(normalized.breakout, bypassCache),
+        fetchBreakoutOpenInterestData(normalized.breakout, bypassCache),
+      ]);
+
+      return {
+        symbol: normalized.breakout,
+        pair: normalized.pair,
+        updatedAt: Date.now(),
+        assetHeader,
+        ratios,
+        openInterest,
+      };
+    },
+    bypassCache,
+  );
+  return jsonResponse(data);
+}
+
+function normalizeDepthLevels(levels, bidSide, sizeMultiplier = 1) {
   const out = (Array.isArray(levels) ? levels : [])
     .map((row) => {
       const price = Number(row?.price ?? row?.px ?? row?.[0]);
       const size = Number(row?.size ?? row?.sz ?? row?.[1]);
       if (!Number.isFinite(price) || !Number.isFinite(size)) return null;
-      return { price, size: Math.max(0, size) };
+      return {
+        price,
+        size: Math.max(0, size * (Number.isFinite(sizeMultiplier) ? sizeMultiplier : 1)),
+      };
     })
     .filter(Boolean);
 
@@ -1197,14 +1251,75 @@ async function fetchDepthBinance(symbol = "HYPEUSDT") {
   };
 }
 
+function toOkxSwapInstId(base) {
+  return `${String(base ?? "").trim().toUpperCase()}-USDT-SWAP`;
+}
+
+async function fetchOkxSwapInstrument(base = "HYPE") {
+  const instId = toOkxSwapInstId(base);
+  const key = `okx:instrument:${instId}`;
+
+  return cached(key, DAY_MS, async () => {
+    const raw = await fetchJson(
+      `${OKX_PUBLIC_API}/public/instruments?instType=SWAP&instId=${encodeURIComponent(instId)}`,
+    );
+    const instrument =
+      (Array.isArray(raw?.data) ? raw.data : []).find((row) => row?.instId === instId) ?? null;
+
+    if (!instrument) {
+      throw new Error(`OKX instrument not found for ${instId}`);
+    }
+
+    const ctVal = Number(instrument?.ctVal ?? NaN);
+    const ctMult = Number(instrument?.ctMult ?? NaN);
+    const contractSizeBase =
+      Number.isFinite(ctVal) && Number.isFinite(ctMult) && ctVal > 0 && ctMult > 0
+        ? ctVal * ctMult
+        : 1;
+
+    return {
+      instId,
+      contractSizeBase,
+    };
+  });
+}
+
+async function fetchDepthOkx(base = "HYPE") {
+  const instrument = await fetchOkxSwapInstrument(base);
+  const raw = await fetchJson(
+    `${OKX_PUBLIC_API}/market/books-full?instId=${encodeURIComponent(
+      instrument.instId,
+    )}&sz=400`,
+  );
+  const snapshot = Array.isArray(raw?.data) ? raw.data[0] : null;
+  const bids = normalizeDepthLevels(snapshot?.bids, true, instrument.contractSizeBase);
+  const asks = normalizeDepthLevels(snapshot?.asks, false, instrument.contractSizeBase);
+  if (!bids.length || !asks.length) {
+    throw new Error("OKX depth empty");
+  }
+  return {
+    source: "okx",
+    symbol: `${String(base ?? "").trim().toUpperCase()}USD`,
+    instId: instrument.instId,
+    updatedAt: Date.now(),
+    bids,
+    asks,
+  };
+}
+
 async function handleSymbolDepth(symbol, bypassCache) {
   const normalized = normalizeMarketSymbol(symbol);
-  const key = `market:depth:${normalized.binance}`;
+  const key = `market:depth:${normalized.base}`;
   const data = await cachedWithBypass(
     key,
     depthTtlMs,
     async () => {
-      const depth = await fetchDepthBinance(normalized.binance);
+      let depth;
+      try {
+        depth = await fetchDepthOkx(normalized.base);
+      } catch {
+        depth = await fetchDepthBinance(normalized.binance);
+      }
       return {
         ...depth,
         symbol: normalized.breakout,
@@ -1223,7 +1338,11 @@ async function handleMarketDepth(bypassCache) {
     key,
     depthTtlMs,
     async () => {
-      return fetchDepthBinance("HYPEUSDT");
+      try {
+        return await fetchDepthOkx("HYPE");
+      } catch {
+        return fetchDepthBinance("HYPEUSDT");
+      }
     },
     bypassCache,
   );
@@ -1411,8 +1530,13 @@ async function handleMarketRelativeStrength(url, bypassCache) {
     32,
     RELATIVE_STRENGTH_MAX_LIMIT,
   );
+  const data = await fetchMarketRelativeStrengthData(interval, limit, bypassCache);
+  return jsonResponse(data);
+}
+
+async function fetchMarketRelativeStrengthData(interval, limit, bypassCache) {
   const key = `market:relative-strength:${interval}:${limit}`;
-  const data = bypassCache
+  return bypassCache
     ? await cachedWithBypass(
         key,
         relativeStrengthTtlMs,
@@ -1425,6 +1549,78 @@ async function handleMarketRelativeStrength(url, bypassCache) {
         10 * 60 * 1000, // serve stale up to 10m while refreshing
         async () => fetchRelativeStrengthBinance(interval, limit),
       );
+}
+
+async function handleMarketOverview(url, bypassCache) {
+  const interval = normalizeKlineInterval(url.searchParams.get("interval"));
+  const limit = normalizePositiveInt(
+    url.searchParams.get("limit"),
+    RELATIVE_STRENGTH_DEFAULT_LIMIT,
+    32,
+    RELATIVE_STRENGTH_MAX_LIMIT,
+  );
+  const key = `market:overview:${interval}:${limit}`;
+  const build = async () => {
+    const [snapshotResult, relativeStrengthResult, binance24hResult] =
+      await Promise.allSettled([
+        fetchBreakoutSnapshotData(bypassCache),
+        fetchMarketRelativeStrengthData(interval, limit, bypassCache),
+        fetchMarketBinance24hData(bypassCache),
+      ]);
+
+    if (
+      snapshotResult.status !== "fulfilled" &&
+      relativeStrengthResult.status !== "fulfilled" &&
+      binance24hResult.status !== "fulfilled"
+    ) {
+      throw new Error("Failed to load market overview");
+    }
+
+    return {
+      updatedAt: Date.now(),
+      interval,
+      count: limit,
+      snapshot:
+        snapshotResult.status === "fulfilled"
+          ? snapshotResult.value
+          : { source: "breakoutprop", updatedAt: Date.now(), symbols: {} },
+      relativeStrength:
+        relativeStrengthResult.status === "fulfilled"
+          ? relativeStrengthResult.value
+          : {
+              source: "binance+yahoo",
+              updatedAt: Date.now(),
+              interval,
+              count: limit,
+              requestedBases: RELATIVE_STRENGTH_BASES,
+              requestedMacroBases: RELATIVE_STRENGTH_SECTOR_ETFS,
+              missingBases: [],
+              missingMacroBases: [],
+              symbols: {},
+            },
+      binance24h:
+        binance24hResult.status === "fulfilled"
+          ? binance24hResult.value
+          : { source: "binance", updatedAt: Date.now(), symbols: {} },
+      errors: {
+        snapshot:
+          snapshotResult.status === "rejected"
+            ? String(snapshotResult.reason)
+            : null,
+        relativeStrength:
+          relativeStrengthResult.status === "rejected"
+            ? String(relativeStrengthResult.reason)
+            : null,
+        binance24h:
+          binance24hResult.status === "rejected"
+            ? String(binance24hResult.reason)
+            : null,
+      },
+    };
+  };
+  const data = bypassCache
+    ? await cachedWithBypass(key, 5 * 1000, build, true)
+    : await cachedWithStaleRevalidate(key, 5 * 1000, 60 * 1000, build);
   return jsonResponse(data);
 }
 
@@ -1551,6 +1747,15 @@ async function handleApi(req, url, chain) {
     }
   }
 
+  if (url.pathname.startsWith("/api/asset-overview/")) {
+    const symbol = decodeURIComponent(url.pathname.split("/")[3] ?? "");
+    try {
+      return await handleAssetOverview(symbol, bypassCache);
+    } catch (error) {
+      return jsonResponse({ error: String(error) }, 502);
+    }
+  }
+
   if (url.pathname === "/api/snapshot") {
     try {
       return await handleBreakoutSnapshot(bypassCache);
@@ -1655,6 +1860,35 @@ async function handleApi(req, url, chain) {
     }
   }
 
+  if (url.pathname.startsWith("/api/qwantify/wallet-notional-deltas/")) {
+    const address = decodeURIComponent(url.pathname.split("/")[4] ?? "");
+    if (!isAddress(address)) {
+      return jsonResponse({ error: "Invalid address" }, 400);
+    }
+
+    try {
+      return await handleQwantifyWalletNotionalDeltas(address, bypassCache);
+    } catch (error) {
+      return jsonResponse({ error: String(error) }, 502);
+    }
+  }
+
+  if (url.pathname === "/api/qwantify/market-flow/batch") {
+    try {
+      return await handleQwantifyMarketFlowBatch(url, bypassCache);
+    } catch (error) {
+      return jsonResponse({ error: String(error) }, 502);
+    }
+  }
+
+  if (url.pathname === "/api/qwantify/market-flow/candles") {
+    try {
+      return await handleQwantifyMarketFlowCandles(url, bypassCache);
+    } catch (error) {
+      return jsonResponse({ error: String(error) }, 502);
+    }
+  }
+
   if (url.pathname === "/api/market/ratios") {
     try {
       return await handleMarketRatios(bypassCache);
@@ -1695,6 +1929,14 @@ async function handleApi(req, url, chain) {
     }
   }
 
+  if (url.pathname === "/api/market/overview") {
+    try {
+      return await handleMarketOverview(url, bypassCache);
+    } catch (error) {
+      return jsonResponse({ error: String(error) }, 502);
+    }
+  }
+
   if (url.pathname === "/api/market/binance-24h") {
     try {
       return await handleMarketBinance24h(bypassCache);
@@ -1704,6 +1946,185 @@ async function handleApi(req, url, chain) {
   }
 
   return null;
+}
+
+async function handleQwantifyWalletNotionalDeltas(address, bypassCache) {
+  const normalizedAddress = address.trim();
+  const payload = await cachedWithBypass(
+    `qwantify:notional-deltas:${normalizedAddress}`,
+    qwantifyWalletTtlMs,
+    async () => {
+      const resolved = await fetchJson(
+        `${QWANTIFY_API}/wallets/resolve?address=${encodeURIComponent(address)}`,
+        undefined,
+      );
+      const walletId = resolved?.systemWallet?.id;
+      if (typeof walletId !== "string" || !walletId.trim()) {
+        return {
+          resolved: false,
+          walletId: null,
+          walletAddress: address,
+          generatedAt: null,
+          deltas: [],
+          message: "This wallet is not indexed in Qwantify yet.",
+        };
+      }
+
+      const deltasPayload = await fetchJson(
+        `${QWANTIFY_API}/wallets/${encodeURIComponent(walletId)}/notional-deltas`,
+        undefined,
+      );
+
+      return {
+        resolved: true,
+        ...deltasPayload,
+      };
+    },
+    bypassCache,
+  );
+
+  return jsonResponse(payload);
+}
+
+async function handleQwantifyMarketFlowBatch(url, bypassCache) {
+  const marketId = url.searchParams.get("marketId")?.trim() || "HYPE-PERP";
+  const chartWindow = url.searchParams.get("chartWindow")?.trim() || "24h";
+  const participantsWindow =
+    url.searchParams.get("participantsWindow")?.trim() || chartWindow;
+  const rawLimit = Number(url.searchParams.get("limit") ?? 25);
+  const limit = Number.isFinite(rawLimit)
+    ? Math.max(1, Math.min(100, Math.floor(rawLimit)))
+    : 25;
+
+  const query = new URLSearchParams({
+    marketId,
+    chartWindow,
+    participantsWindow,
+    limit: String(limit),
+  });
+
+  const payload = await cachedWithBypass(
+    `qwantify:market-flow:${query.toString()}`,
+    qwantifyMarketFlowTtlMs,
+    () =>
+      fetchJson(
+        `${QWANTIFY_API}/analytics/market-flow/batch?${query.toString()}`,
+        undefined,
+      ),
+    bypassCache,
+  );
+
+  return jsonResponse(payload);
+}
+
+function qwantifyMarketFlowWindowMs(windowKey) {
+  switch (windowKey) {
+    case "24h":
+      return 24 * 60 * 60 * 1000;
+    case "7d":
+      return 7 * 24 * 60 * 60 * 1000;
+    case "30d":
+      return 30 * 24 * 60 * 60 * 1000;
+    default:
+      return 7 * 24 * 60 * 60 * 1000;
+  }
+}
+
+function qwantifyMarketFlowCoinForMarket(marketId) {
+  switch (marketId) {
+    case "HYPE-PERP":
+      return { coin: "HYPE" };
+    case "HYPE-SPOT":
+      return { spotBase: "HYPE" };
+    case "LIT-PERP":
+      return { coin: "LIT" };
+    case "XYZ100-PERP":
+      return { coin: "xyz:XYZ100" };
+    case "US500-PERP":
+      return { coin: "km:US500" };
+    case "USTECH-PERP":
+      return { coin: "km:USTECH" };
+    default:
+      throw new Error(`Unsupported marketId: ${marketId}`);
+  }
+}
+
+async function resolveHyperliquidSpotPairName(baseToken, bypassCache) {
+  const payload = await cachedWithBypass(
+    "hyperliquid:spot-meta",
+    qwantifyMarketFlowTtlMs,
+    () => fetchInfo({ type: "spotMeta" }),
+    bypassCache,
+  );
+
+  const tokens = Array.isArray(payload?.tokens) ? payload.tokens : [];
+  const universe = Array.isArray(payload?.universe) ? payload.universe : [];
+  const match = universe.find((entry) => {
+    if (!Array.isArray(entry?.tokens) || entry.tokens.length < 2) return false;
+    const [baseIndex, quoteIndex] = entry.tokens;
+    return tokens[baseIndex]?.name === baseToken && tokens[quoteIndex]?.name === "USDC";
+  });
+
+  if (typeof match?.name === "string" && match.name.trim()) {
+    return match.name.trim();
+  }
+
+  throw new Error(`Unable to resolve Hyperliquid spot pair for ${baseToken}/USDC`);
+}
+
+async function handleQwantifyMarketFlowCandles(url, bypassCache) {
+  const marketId = url.searchParams.get("marketId")?.trim() || "HYPE-PERP";
+  const windowKey = url.searchParams.get("window")?.trim() || "7d";
+  const durationMs = qwantifyMarketFlowWindowMs(windowKey);
+  const endTime = Date.now();
+  const startTime = endTime - durationMs;
+  const marketCoin = qwantifyMarketFlowCoinForMarket(marketId);
+  const coin = marketCoin.coin
+    ? marketCoin.coin
+    : await resolveHyperliquidSpotPairName(marketCoin.spotBase, bypassCache);
+
+  const raw = await cachedWithBypass(
+    `qwantify:market-flow:candles:${marketId}:${windowKey}:${coin}`,
+    qwantifyMarketFlowTtlMs,
+    () =>
+      fetchInfo({
+        type: "candleSnapshot",
+        req: {
+          coin,
+          interval: "1h",
+          startTime,
+          endTime,
+        },
+      }),
+    bypassCache,
+  );
+
+  const candles = (Array.isArray(raw) ? raw : [])
+    .map((row) => ({
+      time: Number(row?.t),
+      closeTime: Number(row?.T),
+      open: Number(row?.o),
+      high: Number(row?.h),
+      low: Number(row?.l),
+      close: Number(row?.c),
+      volume: Number(row?.v),
+      trades: Number(row?.n),
+    }))
+    .filter(
+      (row) =>
+        Number.isFinite(row.time) &&
+        Number.isFinite(row.close) &&
+        Number.isFinite(row.high) &&
+        Number.isFinite(row.low),
+    );
+
+  return jsonResponse({
+    marketId,
+    coin,
+    window: windowKey,
+    generatedAt: new Date(endTime).toISOString(),
+    candles,
+  });
 }
 
 export async function onRequest(context) {

@@ -168,6 +168,7 @@ export default function RelativeStrengthChart({
   }, {});
 
   const renderEndLabel = buildEndLabelRenderer({ focusSymbol, lastIndexes });
+  const initialDimension = { width: -1, height };
 
   return (
     <section className="qf-rs-panel rounded-sm border border-border bg-card">
@@ -213,7 +214,12 @@ export default function RelativeStrengthChart({
         </div>
 
         <div className="qf-rs-panel__chart" style={{ height }}>
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer
+            width="100%"
+            height="100%"
+            minHeight={height}
+            initialDimension={initialDimension}
+          >
             <LineChart data={data} margin={{ top: 18, right: 140, left: 16, bottom: 18 }}>
               <CartesianGrid stroke="var(--border)" strokeOpacity={0.4} />
               <XAxis

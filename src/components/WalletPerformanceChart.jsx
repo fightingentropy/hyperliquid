@@ -74,10 +74,16 @@ export default function WalletPerformanceChart({ data, metric, loading, height =
 
   const stroke = metric === "pnl" ? "var(--primary)" : "var(--foreground)";
   const fill = metric === "pnl" ? "rgba(249, 115, 22, 0.16)" : "rgba(255, 255, 255, 0.08)";
+  const initialDimension = { width: -1, height };
 
   return (
     <div className="w-full" style={{ height }}>
-      <ResponsiveContainer width="100%" height="100%">
+      <ResponsiveContainer
+        width="100%"
+        height="100%"
+        minHeight={height}
+        initialDimension={initialDimension}
+      >
         <AreaChart data={data} margin={{ top: 12, right: 8, left: 0, bottom: 0 }}>
           <defs>
             <linearGradient id="wallet-performance-fill" x1="0" y1="0" x2="0" y2="1">

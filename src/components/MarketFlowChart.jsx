@@ -212,10 +212,16 @@ export default function MarketFlowChart({
   height = 360,
 }) {
   const tickInterval = getTickInterval(chartWindow, data.length);
+  const initialDimension = { width: -1, height };
 
   return (
     <div className="w-full" style={{ height }}>
-      <ResponsiveContainer width="100%" height="100%">
+      <ResponsiveContainer
+        width="100%"
+        height="100%"
+        minHeight={height}
+        initialDimension={initialDimension}
+      >
         <ComposedChart data={data} margin={{ top: 12, right: 0, left: 0, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
           <XAxis

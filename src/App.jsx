@@ -18,7 +18,6 @@ export default function App() {
         <Route path="relative-strength" element={<RelativeStrengthPage />} />
         <Route path="wallets" element={<WalletLookupPage />} />
         <Route path="wallets/:address" element={<WalletPage />} />
-        <Route path="wallets/id/:id" element={<Navigate to="/app/wallets" replace />} />
         <Route path="*" element={<Navigate to="/app/market-flow" replace />} />
       </Route>
 

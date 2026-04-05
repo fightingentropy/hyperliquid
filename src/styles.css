@@ -300,11 +300,81 @@ body {
   gap: 1rem;
 }
 
+.qf-topbar__heading {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 0.9rem;
+}
+
 .qf-topbar__title {
   min-width: 0;
   font-size: 2rem;
   font-weight: 300;
   letter-spacing: -0.045em;
+  color: var(--foreground);
+}
+
+.qf-topbar__meta {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--muted-foreground);
+}
+
+.qf-topbar__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+}
+
+.qf-topbar__icon-button {
+  display: inline-flex;
+  height: 2.35rem;
+  width: 2.35rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid color-mix(in oklab, var(--border) 92%, transparent);
+  border-radius: 0.55rem;
+  background: color-mix(in oklab, var(--card) 14%, transparent);
+  color: var(--muted-foreground);
+  transition:
+    border-color 0.15s ease,
+    background-color 0.15s ease,
+    color 0.15s ease,
+    transform 0.15s ease;
+}
+
+.qf-topbar__icon-button:hover {
+  border-color: color-mix(in oklab, var(--ring) 34%, var(--border));
+  background: color-mix(in oklab, var(--muted) 72%, transparent);
+  color: var(--foreground);
+}
+
+.qf-topbar__icon-button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--ring) 72%, transparent);
+}
+
+.qf-topbar__icon-button:active {
+  transform: translateY(1px);
+}
+
+.qf-wallet-chip,
+.qf-wallet-chip:visited {
+  color: var(--muted-foreground);
+  text-decoration: none;
+}
+
+.qf-wallet-chip:hover {
+  color: var(--foreground);
+}
+
+.qf-wallet-chip.is-active,
+.qf-wallet-chip.is-active:visited {
   color: var(--foreground);
 }
 
@@ -556,7 +626,8 @@ body {
     padding: 0 1rem;
   }
 
-  .qf-topbar__title,
+  .qf-topbar__heading,
+  .qf-topbar__actions,
   .qf-sidebar__header--collapsed,
   .qf-sidebar-toggle--desktop {
     display: none;

@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { fetchRelativeStrengthUniverse } from "../api/hyperliquid";
 import ButtonGroup from "../components/ButtonGroup";
+import DeferredMount from "../components/DeferredMount";
 import MetricCard from "../components/MetricCard";
-import RelativeStrengthChart from "../components/RelativeStrengthChart";
 import { usePollingResource } from "../hooks/usePollingResource";
 import { formatPercent, formatSignedPercent } from "../lib/formatters";
 import {
@@ -13,6 +13,8 @@ import {
   buildRelativeStrengthSnapshot,
   resolveRelativeStrengthFocus,
 } from "../lib/relativeStrength";
+
+const RelativeStrengthChart = lazy(() => import("../components/RelativeStrengthChart"));
 
 function metricTone(value) {
   if (!Number.isFinite(value) || value === 0) {
@@ -45,6 +47,17 @@ function formatRefreshLabel(asOf) {
   })}`;
 }
 
+function ChartLoadingState({ height = 640 }) {
+  return (
+    <div
+      className="flex items-center justify-center rounded-sm border border-border bg-card p-6 text-sm text-muted-foreground"
+      style={{ height }}
+    >
+      Loading relative-strength chart…
+    </div>
+  );
+}
+
 export default function RelativeStrengthPage() {
   const [chartWindow, setChartWindow] = useState("24h");
   const [universeSize, setUniverseSize] = useState(24);
@@ -57,7 +70,11 @@ export default function RelativeStrengthPage() {
         limit: universeSize,
       }),
     [chartWindow, universeSize],
-    { intervalMs: 300_000 },
+    {
+      intervalMs: 300_000,
+      cacheKey: `relative-strength:${chartWindow}:${universeSize}`,
+      staleTimeMs: 60_000,
+    },
   );
 
   const model = useMemo(
@@ -168,13 +185,17 @@ export default function RelativeStrengthPage() {
         ) : null}
 
         {!resource.error && model.assets.length ? (
-          <RelativeStrengthChart
-            data={model.chartData}
-            assets={model.assets}
-            focusSymbol={focusSymbol}
-            onFocusChange={setFocusSymbol}
-            domain={model.domain}
-          />
+          <DeferredMount fallback={<ChartLoadingState />}>
+            <Suspense fallback={<ChartLoadingState />}>
+              <RelativeStrengthChart
+                data={model.chartData}
+                assets={model.assets}
+                focusSymbol={focusSymbol}
+                onFocusChange={setFocusSymbol}
+                domain={model.domain}
+              />
+            </Suspense>
+          </DeferredMount>
         ) : null}
       </section>
     </div>

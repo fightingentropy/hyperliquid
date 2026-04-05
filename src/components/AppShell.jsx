@@ -1,6 +1,9 @@
 import { Suspense, useEffect, useMemo, useState } from "react";
 import {
   Activity,
+  Check,
+  Copy,
+  ExternalLink,
   Menu,
   PanelLeftClose,
   PanelLeftOpen,
@@ -11,6 +14,15 @@ import { Link, NavLink, Outlet, matchPath, useLocation } from "react-router-dom"
 import { cx } from "../lib/cx";
 
 const SIDEBAR_COLLAPSE_STORAGE_KEY = "qf-sidebar-collapsed";
+const HYPURRSCAN_URL = "https://hypurrscan.io/address";
+
+function decodePathParam(value) {
+  try {
+    return decodeURIComponent(value ?? "");
+  } catch {
+    return value ?? "";
+  }
+}
 
 function MarketFlowIcon(props) {
   return (
@@ -49,21 +61,40 @@ const NAV_SECTIONS = [
   },
 ];
 
-function resolvePageTitle(pathname) {
+function resolvePageHeader(pathname) {
+  const walletMatch = matchPath("/app/wallets/:address", pathname);
+
+  if (walletMatch) {
+    const walletAddress = decodePathParam(walletMatch.params.address);
+
+    return {
+      title: "Wallet",
+      meta: walletAddress,
+      walletAddress,
+    };
+  }
+
   const routeTitles = [
     { pattern: "/app/market-flow", title: "Market Flow" },
     { pattern: "/app/relative-strength", title: "Relative Strength" },
-    { pattern: "/app/wallets/:address", title: "Wallet" },
     { pattern: "/app/wallets", title: "Wallets" },
   ];
 
   for (const route of routeTitles) {
     if (matchPath(route.pattern, pathname)) {
-      return route.title;
+      return {
+        title: route.title,
+        meta: null,
+        walletAddress: null,
+      };
     }
   }
 
-  return "Qwantify";
+  return {
+    title: "Qwantify",
+    meta: null,
+    walletAddress: null,
+  };
 }
 
 function Brand({ className, onNavigate }) {
@@ -138,11 +169,16 @@ export default function AppShell() {
 
     return window.localStorage.getItem(SIDEBAR_COLLAPSE_STORAGE_KEY) === "1";
   });
-  const pageTitle = useMemo(() => resolvePageTitle(location.pathname), [location.pathname]);
+  const [copiedWalletAddress, setCopiedWalletAddress] = useState("");
+  const pageHeader = useMemo(() => resolvePageHeader(location.pathname), [location.pathname]);
 
   useEffect(() => {
     setSidebarOpen(false);
   }, [location.pathname]);
+
+  useEffect(() => {
+    setCopiedWalletAddress("");
+  }, [pageHeader.walletAddress]);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -156,6 +192,28 @@ export default function AppShell() {
   }, [sidebarCollapsed]);
 
   const sidebarToggleLabel = sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar";
+  const walletCopyLabel =
+    copiedWalletAddress && copiedWalletAddress === pageHeader.walletAddress
+      ? "Copied wallet address"
+      : "Copy wallet address";
+
+  const handleCopyWalletAddress = async () => {
+    if (!pageHeader.walletAddress) {
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(pageHeader.walletAddress);
+      setCopiedWalletAddress(pageHeader.walletAddress);
+      window.setTimeout(() => {
+        setCopiedWalletAddress((current) =>
+          current === pageHeader.walletAddress ? "" : current,
+        );
+      }, 1200);
+    } catch {
+      setCopiedWalletAddress("");
+    }
+  };
 
   return (
     <div className={cx("qf-app", sidebarCollapsed && "is-sidebar-collapsed")}>
@@ -250,8 +308,44 @@ export default function AppShell() {
               <Brand onNavigate={() => setSidebarOpen(false)} />
             </div>
 
-            <h1 className="qf-topbar__title">{pageTitle}</h1>
+            <div className="qf-topbar__heading">
+              <h1 className="qf-topbar__title">{pageHeader.title}</h1>
+              {pageHeader.meta ? (
+                <span className="qf-topbar__meta" title={pageHeader.meta}>
+                  {pageHeader.meta}
+                </span>
+              ) : null}
+            </div>
           </div>
+
+          {pageHeader.walletAddress ? (
+            <div className="qf-topbar__actions">
+              <button
+                type="button"
+                className="qf-topbar__icon-button"
+                onClick={handleCopyWalletAddress}
+                aria-label={walletCopyLabel}
+                title={walletCopyLabel}
+              >
+                {copiedWalletAddress === pageHeader.walletAddress ? (
+                  <Check className="size-4" />
+                ) : (
+                  <Copy className="size-4" />
+                )}
+              </button>
+
+              <a
+                href={`${HYPURRSCAN_URL}/${pageHeader.walletAddress}`}
+                target="_blank"
+                rel="noreferrer noopener"
+                className="qf-topbar__icon-button"
+                aria-label="Open wallet on HypurrScan"
+                title="Open wallet on HypurrScan"
+              >
+                <ExternalLink className="size-4" />
+              </a>
+            </div>
+          ) : null}
         </header>
 
         <main className="qf-page">

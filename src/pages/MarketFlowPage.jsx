@@ -1,9 +1,9 @@
-import { useMemo, useState } from "react";
+import { lazy, Suspense, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { fetchHourlyCandles } from "../api/hyperliquid";
 import { fetchMarketFlowBatch, fetchMarketFlowSummaries } from "../api/marketFlow";
 import ButtonGroup from "../components/ButtonGroup";
-import MarketFlowChart from "../components/MarketFlowChart";
+import DeferredMount from "../components/DeferredMount";
 import MetricCard from "../components/MetricCard";
 import ParticipantListCard from "../components/ParticipantListCard";
 import { usePollingResource } from "../hooks/usePollingResource";
@@ -23,6 +23,8 @@ import {
 } from "../lib/marketFlow";
 import { formatSignedCurrency } from "../lib/formatters";
 
+const MarketFlowChart = lazy(() => import("../components/MarketFlowChart"));
+
 function metricTone(value) {
   if (!Number.isFinite(value) || value === 0) {
     return "neutral";
@@ -33,6 +35,17 @@ function metricTone(value) {
 
 function routeErrorMessage(error, fallback) {
   return error instanceof Error ? error.message : fallback;
+}
+
+function ChartLoadingState({ height = 360 }) {
+  return (
+    <div
+      className="flex items-center justify-center rounded-sm border border-border/60 bg-card text-sm text-muted-foreground"
+      style={{ height }}
+    >
+      Loading chart...
+    </div>
+  );
 }
 
 export default function MarketFlowPage() {
@@ -62,7 +75,11 @@ export default function MarketFlowPage() {
         limit: state.topLimit,
       }),
     [selectedMarket.marketId, state.chartWindow, state.participantWindow, state.topLimit],
-    { intervalMs: 60_000 },
+    {
+      intervalMs: 60_000,
+      cacheKey: `market-flow:batch:${selectedMarket.marketId}:${state.chartWindow}:${state.participantWindow}:${state.topLimit}`,
+      staleTimeMs: 30_000,
+    },
   );
 
   const candlesResource = usePollingResource(
@@ -72,7 +89,12 @@ export default function MarketFlowPage() {
         chartWindow: state.chartWindow,
       }),
     [selectedMarket.candleCoin, state.chartWindow],
-    { intervalMs: 600_000, initialData: [] },
+    {
+      intervalMs: 600_000,
+      initialData: [],
+      cacheKey: `market-flow:candles:${selectedMarket.candleCoin}:${state.chartWindow}`,
+      staleTimeMs: 60_000,
+    },
   );
 
   const hypeSummariesResource = usePollingResource(
@@ -86,6 +108,8 @@ export default function MarketFlowPage() {
       enabled: state.asset === "HYPE" && state.chartMode === "cumulative",
       intervalMs: 60_000,
       initialData: null,
+      cacheKey: `market-flow:summaries:${state.chartWindow}`,
+      staleTimeMs: 30_000,
     },
   );
 
@@ -305,14 +329,18 @@ export default function MarketFlowPage() {
             <div className="text-sm text-muted-foreground">No chart data is available.</div>
           ) : null}
           {!chartLoading && !chartError && chartData.length ? (
-            <MarketFlowChart
-              data={chartData}
-              chartWindow={state.chartWindow}
-              mode={chartVariant}
-              assetLabel={selectedMarket.assetLabel}
-              seriesVisibility={seriesVisibility}
-              onLegendClick={handleLegendClick}
-            />
+            <DeferredMount fallback={<ChartLoadingState />}>
+              <Suspense fallback={<ChartLoadingState />}>
+                <MarketFlowChart
+                  data={chartData}
+                  chartWindow={state.chartWindow}
+                  mode={chartVariant}
+                  assetLabel={selectedMarket.assetLabel}
+                  seriesVisibility={seriesVisibility}
+                  onLegendClick={handleLegendClick}
+                />
+              </Suspense>
+            </DeferredMount>
           ) : null}
         </div>
       </section>

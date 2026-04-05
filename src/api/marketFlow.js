@@ -8,6 +8,8 @@ export function fetchMarketFlowBatch({ marketId, chartWindow, participantsWindow
       participantsWindow,
       limit,
     }),
+    undefined,
+    { cacheTtlMs: 30_000 },
   );
 }
 
@@ -17,5 +19,7 @@ export function fetchMarketFlowSummaries({ marketIds, window }) {
       marketIds: marketIds.join(","),
       window,
     }),
+    undefined,
+    { cacheTtlMs: 30_000 },
   );
 }

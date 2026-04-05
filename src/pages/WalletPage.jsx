@@ -1,6 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Copy, ExternalLink } from "lucide-react";
-import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import {
   fetchAllClearinghouseStates,
   fetchAllOpenOrders,
@@ -15,9 +14,9 @@ import {
 } from "../api/hyperliquid";
 import { fetchWalletNotionalDeltas, fetchWalletResolve } from "../api/qwantify";
 import ButtonGroup from "../components/ButtonGroup";
-import WalletPerformanceChart from "../components/WalletPerformanceChart";
+import DeferredMount from "../components/DeferredMount";
+import WalletPickerPanel from "../components/WalletPickerPanel";
 import {
-  WalletCompositionCard,
   WalletHoldingsPanel,
   WalletNotionalDeltasPanel,
   WalletOrdersPanel,
@@ -51,17 +50,31 @@ import {
 } from "../lib/wallet";
 import { formatCurrency, shortAddress } from "../lib/formatters";
 
-const HYPURRSCAN_URL = "https://hypurrscan.io/address";
-const HYPEREVMSCAN_URL = "https://hyperevmscan.io/address";
+const WalletPerformanceChart = lazy(() => import("../components/WalletPerformanceChart"));
+const WalletCompositionCard = lazy(() => import("../components/WalletCompositionCard"));
 
 function errorMessage(error, fallback) {
   return error instanceof Error ? error.message : fallback;
 }
 
+function ChartLoadingState({ height = 340 }) {
+  return (
+    <div
+      className="flex items-center justify-center rounded-sm border border-border/60 bg-card text-sm text-muted-foreground"
+      style={{ height }}
+    >
+      Loading chart...
+    </div>
+  );
+}
+
+function CompositionLoadingState() {
+  return <ChartLoadingState height={304} />;
+}
+
 export default function WalletPage() {
   const { address: routeAddress = "" } = useParams();
   const walletAddress = routeAddress.trim();
-  const location = useLocation();
   const navigate = useNavigate();
 
   const [selectedTab, setSelectedTab] = useState("positions");
@@ -70,10 +83,11 @@ export default function WalletPage() {
   const [performanceRange, setPerformanceRange] = useState("all");
   const [positionsView, setPositionsView] = useState("table");
   const [deltaView, setDeltaView] = useState("table");
-  const [copyLabel, setCopyLabel] = useState("Copy");
+  const [walletInput, setWalletInput] = useState(walletAddress);
 
   const validAddress = isValidEvmAddress(walletAddress);
-  const origin = location.state?.origin || "/app/wallets";
+  const normalizedWalletAddress = walletAddress.toLowerCase();
+  const walletCachePrefix = normalizedWalletAddress || "wallet";
 
   useEffect(() => {
     const previousTitle = document.title;
@@ -84,42 +98,43 @@ export default function WalletPage() {
     };
   }, []);
 
-  const handleBack = () => {
-    if ((window.history.state?.idx ?? 0) > 0) {
-      navigate(-1);
-      return;
-    }
+  useEffect(() => {
+    setWalletInput(walletAddress);
+  }, [walletAddress]);
 
-    navigate(origin);
-  };
-
-  const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(walletAddress);
-      setCopyLabel("Copied");
-      window.setTimeout(() => setCopyLabel("Copy"), 1200);
-    } catch {
-      setCopyLabel("Failed");
-      window.setTimeout(() => setCopyLabel("Copy"), 1200);
-    }
+  const handleWalletJump = (nextWalletAddress) => {
+    navigate(`/app/wallets/${encodeURIComponent(nextWalletAddress)}`);
   };
 
   const resolveResource = usePollingResource(
     () => fetchWalletResolve(walletAddress),
     [walletAddress],
-    { enabled: validAddress },
+    {
+      enabled: validAddress,
+      cacheKey: `${walletCachePrefix}:resolve`,
+      staleTimeMs: 300_000,
+    },
   );
 
   const positionsResource = usePollingResource(
     () => fetchAllClearinghouseStates({ user: walletAddress }),
     [walletAddress],
-    { enabled: validAddress, initialData: [] },
+    {
+      enabled: validAddress,
+      initialData: [],
+      cacheKey: `${walletCachePrefix}:positions`,
+      staleTimeMs: 15_000,
+    },
   );
 
   const portfolioResource = usePollingResource(
     () => fetchPortfolio({ user: walletAddress }),
     [walletAddress],
-    { enabled: validAddress },
+    {
+      enabled: validAddress,
+      cacheKey: `${walletCachePrefix}:portfolio`,
+      staleTimeMs: 15_000,
+    },
   );
 
   const holdingsBundleResource = usePollingResource(
@@ -139,13 +154,22 @@ export default function WalletPage() {
       };
     },
     [walletAddress],
-    { enabled: validAddress },
+    {
+      enabled: validAddress,
+      cacheKey: `${walletCachePrefix}:holdings-bundle`,
+      staleTimeMs: 15_000,
+    },
   );
 
   const hypePriceResource = usePollingResource(
     () => fetchHourlyCandles({ coin: "HYPE", chartWindow: "24h" }),
     [walletAddress],
-    { enabled: validAddress, initialData: [] },
+    {
+      enabled: validAddress,
+      initialData: [],
+      cacheKey: "wallet:hype-candles:24h",
+      staleTimeMs: 60_000,
+    },
   );
 
   const openOrdersResource = usePollingResource(
@@ -154,6 +178,8 @@ export default function WalletPage() {
     {
       enabled: validAddress && selectedTab === "orders",
       initialData: [],
+      cacheKey: `${walletCachePrefix}:orders`,
+      staleTimeMs: 15_000,
     },
   );
 
@@ -163,6 +189,8 @@ export default function WalletPage() {
     {
       enabled: validAddress && ["trades", "performance", "statistics"].includes(selectedTab),
       initialData: [],
+      cacheKey: `${walletCachePrefix}:fills`,
+      staleTimeMs: 15_000,
     },
   );
 
@@ -177,6 +205,8 @@ export default function WalletPage() {
     {
       enabled: validAddress && selectedTab === "transactions",
       initialData: [],
+      cacheKey: `${walletCachePrefix}:transactions`,
+      staleTimeMs: 15_000,
     },
   );
 
@@ -188,6 +218,8 @@ export default function WalletPage() {
     [walletId],
     {
       enabled: Boolean(walletId),
+      cacheKey: walletId ? `wallet:${walletId}:notional-deltas` : "",
+      staleTimeMs: 30_000,
     },
   );
 
@@ -262,7 +294,6 @@ export default function WalletPage() {
     [transactionsResource.data, walletAddress],
   );
 
-  const walletLabel = resolvedWallet?.globalLabel ?? "Wallet";
   const tabStrip = (
     <div className="rounded-sm border border-border bg-card">
       <div className="relative">
@@ -291,15 +322,13 @@ export default function WalletPage() {
 
   if (!validAddress) {
     return (
-      <div className="space-y-4">
-        <button
-          type="button"
-          onClick={handleBack}
-          className="inline-flex items-center gap-2 rounded-sm border border-border px-3 py-2 text-sm text-muted-foreground transition hover:text-foreground"
-        >
-          <ArrowLeft className="size-4" />
-          Back
-        </button>
+      <div className="space-y-6">
+        <WalletPickerPanel
+          value={walletInput}
+          onChange={setWalletInput}
+          onSubmit={handleWalletJump}
+        />
+
         <div className="rounded-sm border border-border bg-card px-4 py-6 text-sm text-muted-foreground">
           Invalid EVM wallet address.
         </div>
@@ -309,52 +338,12 @@ export default function WalletPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex flex-wrap items-center gap-3">
-          <button
-            type="button"
-            onClick={handleBack}
-            className="inline-flex items-center gap-2 rounded-sm border border-border px-3 py-2 text-sm text-muted-foreground transition hover:text-foreground"
-          >
-            <ArrowLeft className="size-4" />
-            Back
-          </button>
-
-          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-            <span className="text-foreground">{walletLabel}</span>
-            <span className="break-all font-mono text-sm text-muted-foreground">{walletAddress}</span>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={handleCopy}
-            className="inline-flex items-center gap-2 rounded-sm border border-border px-3 py-2 text-sm text-muted-foreground transition hover:text-foreground"
-          >
-            <Copy className="size-4" />
-            {copyLabel}
-          </button>
-          <a
-            href={`${HYPURRSCAN_URL}/${walletAddress}`}
-            target="_blank"
-            rel="noreferrer noopener"
-            className="inline-flex items-center gap-2 rounded-sm border border-border px-3 py-2 text-sm text-muted-foreground transition hover:text-foreground"
-          >
-            HypurrScan
-            <ExternalLink className="size-4" />
-          </a>
-          <a
-            href={`${HYPEREVMSCAN_URL}/${walletAddress}`}
-            target="_blank"
-            rel="noreferrer noopener"
-            className="inline-flex items-center gap-2 rounded-sm border border-border px-3 py-2 text-sm text-muted-foreground transition hover:text-foreground"
-          >
-            HyperEVMScan
-            <ExternalLink className="size-4" />
-          </a>
-        </div>
-      </div>
+      <WalletPickerPanel
+        value={walletInput}
+        onChange={setWalletInput}
+        onSubmit={handleWalletJump}
+        activeAddress={normalizedWalletAddress}
+      />
 
       {resolveResource.error ? (
         <div className="rounded-sm border border-border bg-card px-4 py-3 text-sm text-muted-foreground">
@@ -368,7 +357,11 @@ export default function WalletPage() {
       </div>
 
       <div className="lg:hidden">
-        <WalletCompositionCard slices={compositionSlices} />
+        <DeferredMount fallback={<CompositionLoadingState />}>
+          <Suspense fallback={<CompositionLoadingState />}>
+            <WalletCompositionCard slices={compositionSlices} />
+          </Suspense>
+        </DeferredMount>
       </div>
 
       <WalletOverviewGrid metrics={walletMetrics} slices={compositionSlices} />
@@ -414,16 +407,24 @@ export default function WalletPage() {
             </div>
 
             <div className="p-4">
-              <WalletPerformanceChart
-                data={performanceSeries}
-                metric={performanceMetric}
-                loading={portfolioResource.isLoading}
-              />
+              <DeferredMount fallback={<ChartLoadingState />}>
+                <Suspense fallback={<ChartLoadingState />}>
+                  <WalletPerformanceChart
+                    data={performanceSeries}
+                    metric={performanceMetric}
+                    loading={portfolioResource.isLoading}
+                  />
+                </Suspense>
+              </DeferredMount>
             </div>
           </div>
 
           <div className="hidden lg:block">
-            <WalletCompositionCard slices={compositionSlices} />
+            <DeferredMount fallback={<CompositionLoadingState />}>
+              <Suspense fallback={<CompositionLoadingState />}>
+                <WalletCompositionCard slices={compositionSlices} />
+              </Suspense>
+            </DeferredMount>
           </div>
         </div>
       </div>

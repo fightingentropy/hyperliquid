@@ -1,26 +1,27 @@
 import { getChartLookbackHours } from "../lib/marketFlow";
+import { requestJson } from "./request";
 
 const HYPERLIQUID_INFO_URL = "https://api.hyperliquid.xyz/info";
 const PERP_DEXES = ["", "xyz", "flx", "vntl", "hyna", "km"];
+const LIVE_CACHE_TTL_MS = 15_000;
+const CHART_CACHE_TTL_MS = 60_000;
+const STATIC_CACHE_TTL_MS = 300_000;
 
 let perpMetaAndAssetCtxsPromise = null;
 let spotMetaAndAssetCtxsPromise = null;
 
-async function requestHyperliquidInfo(payload) {
-  const response = await fetch(HYPERLIQUID_INFO_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
+async function requestHyperliquidInfo(payload, options = {}) {
+  return requestJson(
+    HYPERLIQUID_INFO_URL,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
     },
-    body: JSON.stringify(payload),
-  });
-
-  if (!response.ok) {
-    const body = await response.text();
-    throw new Error(body || `Hyperliquid request failed: ${response.status} ${response.statusText}`);
-  }
-
-  return response.json();
+    options,
+  );
 }
 
 function parseCandle(item) {
@@ -43,7 +44,7 @@ export async function fetchHourlyCandles({ coin, chartWindow }) {
       interval: "1h",
       startTime,
     },
-  });
+  }, { cacheTtlMs: CHART_CACHE_TTL_MS });
 
   if (!Array.isArray(payload)) {
     return [];
@@ -56,7 +57,7 @@ export async function fetchPerpMetaAndAssetCtxs() {
   if (!perpMetaAndAssetCtxsPromise) {
     perpMetaAndAssetCtxsPromise = requestHyperliquidInfo({
       type: "metaAndAssetCtxs",
-    }).catch((error) => {
+    }, { cacheTtlMs: STATIC_CACHE_TTL_MS }).catch((error) => {
       perpMetaAndAssetCtxsPromise = null;
       throw error;
     });
@@ -99,7 +100,7 @@ async function fetchAssetCandles({ coin, startTime }) {
       interval: "1h",
       startTime,
     },
-  });
+  }, { cacheTtlMs: CHART_CACHE_TTL_MS });
 
   if (!Array.isArray(payload)) {
     return [];
@@ -169,7 +170,7 @@ export async function fetchPortfolio({ user }) {
   return requestHyperliquidInfo({
     type: "portfolio",
     user,
-  });
+  }, { cacheTtlMs: LIVE_CACHE_TTL_MS });
 }
 
 export async function fetchClearinghouseState({ user, dex = "" }) {
@@ -177,7 +178,7 @@ export async function fetchClearinghouseState({ user, dex = "" }) {
     type: "clearinghouseState",
     user,
     dex,
-  });
+  }, { cacheTtlMs: LIVE_CACHE_TTL_MS });
 }
 
 export async function fetchAllClearinghouseStates({ user }) {
@@ -198,7 +199,7 @@ export async function fetchOpenOrders({ user, dex = "" }) {
     type: "openOrders",
     user,
     dex,
-  });
+  }, { cacheTtlMs: LIVE_CACHE_TTL_MS });
 }
 
 export async function fetchAllOpenOrders({ user }) {
@@ -226,14 +227,14 @@ export async function fetchSpotClearinghouseState({ user }) {
   return requestHyperliquidInfo({
     type: "spotClearinghouseState",
     user,
-  });
+  }, { cacheTtlMs: LIVE_CACHE_TTL_MS });
 }
 
 export async function fetchSpotMetaAndAssetCtxs() {
   if (!spotMetaAndAssetCtxsPromise) {
     spotMetaAndAssetCtxsPromise = requestHyperliquidInfo({
       type: "spotMetaAndAssetCtxs",
-    }).catch((error) => {
+    }, { cacheTtlMs: STATIC_CACHE_TTL_MS }).catch((error) => {
       spotMetaAndAssetCtxsPromise = null;
       throw error;
     });
@@ -246,14 +247,14 @@ export async function fetchSubAccounts({ user }) {
   return requestHyperliquidInfo({
     type: "subAccounts",
     user,
-  });
+  }, { cacheTtlMs: LIVE_CACHE_TTL_MS });
 }
 
 export async function fetchDelegatorSummary({ user }) {
   return requestHyperliquidInfo({
     type: "delegatorSummary",
     user,
-  });
+  }, { cacheTtlMs: LIVE_CACHE_TTL_MS });
 }
 
 export async function fetchUserFills({ user, aggregateByTime = true }) {
@@ -261,14 +262,14 @@ export async function fetchUserFills({ user, aggregateByTime = true }) {
     type: "userFills",
     user,
     aggregateByTime,
-  });
+  }, { cacheTtlMs: LIVE_CACHE_TTL_MS });
 }
 
 export async function fetchTwapHistory({ user }) {
   return requestHyperliquidInfo({
     type: "twapHistory",
     user,
-  });
+  }, { cacheTtlMs: LIVE_CACHE_TTL_MS });
 }
 
 export async function fetchUserNonFundingLedgerUpdates({ user, startTime, endTime }) {
@@ -277,5 +278,5 @@ export async function fetchUserNonFundingLedgerUpdates({ user, startTime, endTim
     user,
     startTime,
     endTime,
-  });
+  }, { cacheTtlMs: LIVE_CACHE_TTL_MS });
 }

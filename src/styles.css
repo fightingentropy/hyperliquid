@@ -1,0 +1,524 @@
+@import "./vendor/live-index.css";
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+}
+
+:root {
+  --qf-sidebar-width: 18.75rem;
+  --qf-sidebar-collapsed-width: 4.2rem;
+}
+
+.qf-app {
+  display: flex;
+  min-height: 100vh;
+  background: var(--background);
+  color: var(--foreground);
+}
+
+.qf-sidebar {
+  position: relative;
+  width: var(--qf-sidebar-width);
+  flex-shrink: 0;
+  overflow: hidden;
+  border-right: 1px solid color-mix(in oklab, var(--border) 92%, transparent);
+  background:
+    linear-gradient(180deg, color-mix(in oklab, var(--sidebar) 100%, #000 0%) 0%, var(--sidebar) 100%);
+  transition:
+    width 0.22s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 0.15s ease;
+}
+
+.qf-sidebar__inner {
+  position: sticky;
+  top: 0;
+  display: flex;
+  height: 100vh;
+  flex-direction: column;
+}
+
+.qf-sidebar__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 1rem 1rem 0.9rem;
+}
+
+.qf-sidebar__header--collapsed {
+  display: none;
+  justify-content: center;
+  padding-inline: 0;
+}
+
+.qf-sidebar__header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.qf-sidebar__divider {
+  height: 1px;
+  margin: 0 0.9rem 0.9rem;
+  background: color-mix(in oklab, var(--border) 92%, transparent);
+}
+
+.qf-brand {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.8rem;
+  color: var(--foreground);
+  transition: color 0.15s ease;
+}
+
+.qf-brand:hover {
+  color: var(--foreground);
+}
+
+.qf-brand__mark {
+  display: flex;
+  height: 3rem;
+  width: 3rem;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 0.95rem;
+  background: color-mix(in oklab, var(--card) 80%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--border) 92%, transparent);
+}
+
+.qf-brand__wordmark {
+  white-space: nowrap;
+  font-size: 1.15rem;
+  font-weight: 500;
+  letter-spacing: -0.045em;
+  color: var(--foreground);
+}
+
+.qf-sidebar__nav {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-bottom: 1rem;
+}
+
+.qf-sidebar__sections {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  padding: 0 0.9rem 1rem;
+}
+
+.qf-sidebar__section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.qf-sidebar__section-title {
+  padding: 0 0.8rem 0.25rem;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+
+.qf-sidebar__items {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.qf-sidebar__section-divider {
+  height: 1px;
+  margin-top: 0.8rem;
+  background: color-mix(in oklab, var(--border) 92%, transparent);
+}
+
+.qf-nav-link {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  border: 1px solid transparent;
+  border-radius: 0.95rem;
+  padding: 0.78rem 0.9rem;
+  color: var(--foreground);
+  transition:
+    border-color 0.15s ease,
+    background-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.qf-nav-icon-wrap {
+  display: flex;
+  height: 2.5rem;
+  width: 2.5rem;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.85rem;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.qf-nav-icon {
+  width: 1.45rem;
+  height: 1.45rem;
+  transition:
+    color 0.15s ease,
+    opacity 0.15s ease;
+}
+
+.qf-nav-copy {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.qf-nav-icon.is-active {
+  color: var(--primary);
+}
+
+.qf-nav-icon.is-inactive {
+  color: #a1a1aa;
+  opacity: 1;
+}
+
+.qf-nav-link:hover {
+  border-color: color-mix(in oklab, var(--border) 92%, transparent);
+  background: color-mix(in oklab, var(--muted) 72%, transparent);
+}
+
+.qf-nav-link.is-active {
+  border-color: color-mix(in oklab, var(--border) 94%, transparent);
+  background: #202024;
+}
+
+.qf-nav-link.is-active .qf-nav-icon-wrap {
+  background: #242428;
+}
+
+.qf-main {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.qf-topbar {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-sticky);
+  display: flex;
+  min-height: 5.25rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border-bottom: 1px solid var(--border);
+  background: rgba(18, 18, 21, 0.95);
+  padding: 0 1.35rem;
+  backdrop-filter: blur(16px);
+}
+
+.qf-topbar__leading {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: center;
+  gap: 1rem;
+}
+
+.qf-topbar__title {
+  min-width: 0;
+  font-size: 2rem;
+  font-weight: 300;
+  letter-spacing: -0.045em;
+  color: var(--foreground);
+}
+
+.qf-sidebar-toggle {
+  display: inline-flex;
+  height: 3rem;
+  width: 3rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid color-mix(in oklab, var(--border) 92%, transparent);
+  border-radius: 0.85rem;
+  background: color-mix(in oklab, var(--card) 14%, transparent);
+  color: var(--muted-foreground);
+  transition:
+    border-color 0.15s ease,
+    background-color 0.15s ease,
+    color 0.15s ease,
+    transform 0.15s ease;
+}
+
+.qf-sidebar-toggle:hover {
+  border-color: color-mix(in oklab, var(--ring) 34%, var(--border));
+  background: color-mix(in oklab, var(--muted) 72%, transparent);
+  color: var(--foreground);
+}
+
+.qf-sidebar-toggle:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--ring) 72%, transparent);
+}
+
+.qf-sidebar-toggle:active {
+  transform: translateY(1px);
+}
+
+.qf-sidebar-toggle--desktop {
+  display: inline-flex;
+}
+
+.qf-page {
+  flex: 1;
+  min-width: 0;
+  padding: 1.25rem;
+}
+
+.qf-rs-panel {
+  overflow: hidden;
+}
+
+.qf-rs-panel__surface {
+  position: relative;
+  overflow: hidden;
+  background: var(--card);
+}
+
+.qf-rs-panel__surface::before {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: min(22rem, 48%);
+  background: linear-gradient(
+    90deg,
+    color-mix(in oklab, var(--card) 100%, transparent),
+    color-mix(in oklab, var(--card) 96%, transparent) 70%,
+    transparent
+  );
+  content: "";
+  pointer-events: none;
+  z-index: 0;
+}
+
+.qf-rs-ranking {
+  position: absolute;
+  top: 1rem;
+  left: 1rem;
+  z-index: 1;
+  display: grid;
+  width: min(22rem, calc(100% - 3rem));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.3rem 1rem;
+}
+
+.qf-rs-ranking__item {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  border-radius: 0.4rem;
+  padding: 0.2rem 0.3rem;
+  text-align: left;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.qf-rs-ranking__item:hover {
+  background: color-mix(in oklab, var(--muted) 52%, transparent);
+}
+
+.qf-rs-ranking__item.is-focused {
+  background: color-mix(in oklab, var(--primary) 12%, transparent);
+}
+
+.qf-rs-panel__chart {
+  position: relative;
+  z-index: 0;
+}
+
+.qf-mobile-brand {
+  display: none;
+}
+
+.qf-mobile-close,
+.qf-mobile-menu {
+  display: none;
+}
+
+.qf-overlay {
+  display: none;
+}
+
+@media (min-width: 1025px) {
+  .qf-app.is-sidebar-collapsed .qf-sidebar {
+    width: var(--qf-sidebar-collapsed-width);
+  }
+
+  .qf-app.is-sidebar-collapsed .qf-sidebar__header--expanded {
+    display: none;
+  }
+
+  .qf-app.is-sidebar-collapsed .qf-sidebar__header--collapsed {
+    display: flex;
+    padding: 0.85rem 0 0.6rem;
+  }
+
+  .qf-app.is-sidebar-collapsed .qf-sidebar__divider {
+    margin-inline: 0.7rem;
+    margin-bottom: 0.65rem;
+  }
+
+  .qf-app.is-sidebar-collapsed .qf-sidebar__sections {
+    gap: 0.8rem;
+    padding-inline: 0.45rem;
+  }
+
+  .qf-app.is-sidebar-collapsed .qf-sidebar__section {
+    align-items: center;
+    gap: 0.55rem;
+  }
+
+  .qf-app.is-sidebar-collapsed .qf-sidebar__section-title,
+  .qf-app.is-sidebar-collapsed .qf-sidebar__section-divider,
+  .qf-app.is-sidebar-collapsed .qf-nav-copy {
+    display: none;
+  }
+
+  .qf-app.is-sidebar-collapsed .qf-sidebar__items {
+    gap: 0.7rem;
+  }
+
+  .qf-app.is-sidebar-collapsed .qf-nav-link {
+    justify-content: center;
+    padding: 0;
+    border-color: transparent;
+    background: transparent;
+  }
+
+  .qf-app.is-sidebar-collapsed .qf-nav-link:hover {
+    border-color: transparent;
+    background: transparent;
+  }
+
+  .qf-app.is-sidebar-collapsed .qf-nav-icon-wrap {
+    height: 3rem;
+    width: 3rem;
+    border: 1px solid transparent;
+    border-radius: 0.85rem;
+    background: transparent;
+  }
+
+  .qf-app.is-sidebar-collapsed .qf-nav-link:hover .qf-nav-icon-wrap {
+    border-color: color-mix(in oklab, var(--border) 92%, transparent);
+    background: #202024;
+  }
+
+  .qf-app.is-sidebar-collapsed .qf-nav-link.is-active .qf-nav-icon-wrap {
+    border-color: color-mix(in oklab, var(--border) 92%, transparent);
+    background: #242428;
+  }
+
+  .qf-app.is-sidebar-collapsed .qf-sidebar-toggle--rail {
+    height: 2.85rem;
+    width: 2.85rem;
+    border-radius: 0.8rem;
+  }
+}
+
+@media (max-width: 1024px) {
+  .qf-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: var(--z-modal);
+    height: 100vh;
+    width: var(--qf-sidebar-width);
+    max-width: min(var(--qf-sidebar-width), calc(100vw - 2rem));
+    transform: translateX(-100%);
+    transition: transform 0.2s ease;
+  }
+
+  .qf-sidebar.is-open {
+    transform: translateX(0);
+  }
+
+  .qf-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: var(--z-modal-backdrop);
+    display: block;
+    border: 0;
+    background: rgba(0, 0, 0, 0.55);
+  }
+
+  .qf-topbar {
+    min-height: 61px;
+    padding: 0 1rem;
+  }
+
+  .qf-topbar__title,
+  .qf-sidebar__header--collapsed,
+  .qf-sidebar-toggle--desktop {
+    display: none;
+  }
+
+  .qf-mobile-brand {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .qf-mobile-close,
+  .qf-mobile-menu {
+    display: inline-flex;
+    height: 2.25rem;
+    width: 2.25rem;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--border);
+    border-radius: 0.25rem;
+    color: var(--muted-foreground);
+    transition:
+      background-color 0.15s ease,
+      color 0.15s ease,
+      border-color 0.15s ease;
+  }
+
+  .qf-mobile-close:hover,
+  .qf-mobile-menu:hover {
+    border-color: var(--ring);
+    background: color-mix(in oklab, var(--muted) 60%, transparent);
+    color: var(--foreground);
+  }
+
+  .qf-page {
+    padding: 1rem;
+  }
+
+  .qf-rs-ranking {
+    position: static;
+    width: 100%;
+    padding: 1rem 1rem 0;
+  }
+
+  .qf-rs-panel__surface::before {
+    display: none;
+  }
+}

@@ -161,38 +161,40 @@ export default function AppShell() {
     <div className={cx("qf-app", sidebarCollapsed && "is-sidebar-collapsed")}>
       <aside className={cx("qf-sidebar", sidebarOpen && "is-open", sidebarCollapsed && "is-collapsed")}>
         <div className="qf-sidebar__inner">
-          <div className="qf-sidebar__header qf-sidebar__header--expanded">
-            <Brand onNavigate={() => setSidebarOpen(false)} />
-            <div className="qf-sidebar__header-actions">
+          <div className="qf-sidebar__masthead">
+            <div className="qf-sidebar__header qf-sidebar__header--expanded">
+              <Brand onNavigate={() => setSidebarOpen(false)} />
+              <div className="qf-sidebar__header-actions">
+                <button
+                  type="button"
+                  className="qf-sidebar-toggle qf-sidebar-toggle--desktop"
+                  onClick={() => setSidebarCollapsed((value) => !value)}
+                  aria-label={sidebarToggleLabel}
+                  aria-pressed={sidebarCollapsed}
+                >
+                  {sidebarCollapsed ? <PanelLeftOpen className="size-5" /> : <PanelLeftClose className="size-5" />}
+                </button>
+                <button
+                  type="button"
+                  className="qf-mobile-close"
+                  onClick={() => setSidebarOpen(false)}
+                  aria-label="Close navigation"
+                >
+                  <X className="size-4" />
+                </button>
+              </div>
+            </div>
+
+            <div className="qf-sidebar__header qf-sidebar__header--collapsed">
               <button
                 type="button"
-                className="qf-sidebar-toggle qf-sidebar-toggle--desktop"
-                onClick={() => setSidebarCollapsed((value) => !value)}
-                aria-label={sidebarToggleLabel}
-                aria-pressed={sidebarCollapsed}
+                className="qf-sidebar-toggle qf-sidebar-toggle--rail"
+                onClick={() => setSidebarCollapsed(false)}
+                aria-label="Expand sidebar"
               >
-                {sidebarCollapsed ? <PanelLeftOpen className="size-5" /> : <PanelLeftClose className="size-5" />}
-              </button>
-              <button
-                type="button"
-                className="qf-mobile-close"
-                onClick={() => setSidebarOpen(false)}
-                aria-label="Close navigation"
-              >
-                <X className="size-4" />
+                <PanelLeftOpen className="size-5" />
               </button>
             </div>
-          </div>
-
-          <div className="qf-sidebar__header qf-sidebar__header--collapsed">
-            <button
-              type="button"
-              className="qf-sidebar-toggle qf-sidebar-toggle--rail"
-              onClick={() => setSidebarCollapsed(false)}
-              aria-label="Expand sidebar"
-            >
-              <PanelLeftOpen className="size-5" />
-            </button>
           </div>
 
           <div className="qf-sidebar__divider" />

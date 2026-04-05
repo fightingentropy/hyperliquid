@@ -13,6 +13,8 @@ body {
 :root {
   --qf-sidebar-width: 18.75rem;
   --qf-sidebar-collapsed-width: 4.2rem;
+  --qf-sidebar-masthead-height: 5rem;
+  --qf-sidebar-transition: 0.26s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .qf-app {
@@ -27,12 +29,14 @@ body {
   width: var(--qf-sidebar-width);
   flex-shrink: 0;
   overflow: hidden;
+  contain: layout paint;
   border-right: 1px solid color-mix(in oklab, var(--border) 92%, transparent);
   background:
     linear-gradient(180deg, color-mix(in oklab, var(--sidebar) 100%, #000 0%) 0%, var(--sidebar) 100%);
   transition:
-    width 0.22s cubic-bezier(0.22, 1, 0.36, 1),
+    width var(--qf-sidebar-transition),
     border-color 0.15s ease;
+  will-change: width;
 }
 
 .qf-sidebar__inner {
@@ -43,18 +47,41 @@ body {
   flex-direction: column;
 }
 
+.qf-sidebar__masthead {
+  position: relative;
+  min-height: var(--qf-sidebar-masthead-height);
+}
+
 .qf-sidebar__header {
+  position: absolute;
+  inset: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
   padding: 1rem 1rem 0.9rem;
+  transition:
+    opacity 0.16s ease,
+    transform var(--qf-sidebar-transition),
+    visibility 0s linear;
+}
+
+.qf-sidebar__header--expanded {
+  opacity: 1;
+  transform: translateX(0) scale(1);
+  visibility: visible;
+  pointer-events: auto;
+  transition-delay: 0.08s, 0.08s, 0s;
 }
 
 .qf-sidebar__header--collapsed {
-  display: none;
   justify-content: center;
-  padding-inline: 0;
+  padding: 0.85rem 0 0.6rem;
+  opacity: 0;
+  transform: translateX(-0.35rem) scale(0.98);
+  visibility: hidden;
+  pointer-events: none;
+  transition-delay: 0s, 0s, 0.16s;
 }
 
 .qf-sidebar__header-actions {
@@ -67,6 +94,9 @@ body {
   height: 1px;
   margin: 0 0.9rem 0.9rem;
   background: color-mix(in oklab, var(--border) 92%, transparent);
+  transition:
+    margin var(--qf-sidebar-transition),
+    opacity 0.16s ease;
 }
 
 .qf-brand {
@@ -114,33 +144,54 @@ body {
   flex-direction: column;
   gap: 1.25rem;
   padding: 0 0.9rem 1rem;
+  transition:
+    gap var(--qf-sidebar-transition),
+    padding var(--qf-sidebar-transition);
 }
 
 .qf-sidebar__section {
   display: flex;
   flex-direction: column;
   gap: 0.55rem;
+  transition: gap var(--qf-sidebar-transition);
 }
 
 .qf-sidebar__section-title {
+  overflow: hidden;
   padding: 0 0.8rem 0.25rem;
+  max-height: 1.75rem;
   font-size: 11px;
   font-weight: 500;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--muted-foreground);
+  opacity: 1;
+  transform: translateX(0);
+  transition:
+    max-height var(--qf-sidebar-transition),
+    opacity 0.14s ease,
+    transform 0.18s ease,
+    padding var(--qf-sidebar-transition);
 }
 
 .qf-sidebar__items {
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
+  transition: gap var(--qf-sidebar-transition);
 }
 
 .qf-sidebar__section-divider {
   height: 1px;
   margin-top: 0.8rem;
   background: color-mix(in oklab, var(--border) 92%, transparent);
+  opacity: 1;
+  transform: scaleX(1);
+  transform-origin: center;
+  transition:
+    margin var(--qf-sidebar-transition),
+    opacity 0.14s ease,
+    transform 0.18s ease;
 }
 
 .qf-nav-link {
@@ -152,6 +203,8 @@ body {
   padding: 0.78rem 0.9rem;
   color: var(--foreground);
   transition:
+    gap var(--qf-sidebar-transition),
+    padding var(--qf-sidebar-transition),
     border-color 0.15s ease,
     background-color 0.15s ease,
     color 0.15s ease;
@@ -184,6 +237,14 @@ body {
   flex: 1;
   flex-direction: column;
   gap: 0.2rem;
+  overflow: hidden;
+  max-width: 13rem;
+  opacity: 1;
+  transform: translateX(0);
+  transition:
+    max-width var(--qf-sidebar-transition),
+    opacity 0.14s ease,
+    transform 0.18s ease;
 }
 
 .qf-nav-icon.is-active {
@@ -371,12 +432,19 @@ body {
   }
 
   .qf-app.is-sidebar-collapsed .qf-sidebar__header--expanded {
-    display: none;
+    opacity: 0;
+    transform: translateX(0.5rem) scale(0.98);
+    visibility: hidden;
+    pointer-events: none;
+    transition-delay: 0s, 0s, 0.16s;
   }
 
   .qf-app.is-sidebar-collapsed .qf-sidebar__header--collapsed {
-    display: flex;
-    padding: 0.85rem 0 0.6rem;
+    opacity: 1;
+    transform: translateX(0) scale(1);
+    visibility: visible;
+    pointer-events: auto;
+    transition-delay: 0.08s, 0.08s, 0s;
   }
 
   .qf-app.is-sidebar-collapsed .qf-sidebar__divider {
@@ -394,10 +462,18 @@ body {
     gap: 0.55rem;
   }
 
-  .qf-app.is-sidebar-collapsed .qf-sidebar__section-title,
-  .qf-app.is-sidebar-collapsed .qf-sidebar__section-divider,
-  .qf-app.is-sidebar-collapsed .qf-nav-copy {
-    display: none;
+  .qf-app.is-sidebar-collapsed .qf-sidebar__section-title {
+    max-height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    opacity: 0;
+    transform: translateX(-0.5rem);
+  }
+
+  .qf-app.is-sidebar-collapsed .qf-sidebar__section-divider {
+    margin-top: 0;
+    opacity: 0;
+    transform: scaleX(0.5);
   }
 
   .qf-app.is-sidebar-collapsed .qf-sidebar__items {
@@ -407,6 +483,7 @@ body {
   .qf-app.is-sidebar-collapsed .qf-nav-link {
     justify-content: center;
     padding: 0;
+    gap: 0;
     border-color: transparent;
     background: transparent;
   }
@@ -432,6 +509,13 @@ body {
   .qf-app.is-sidebar-collapsed .qf-nav-link.is-active .qf-nav-icon-wrap {
     border-color: color-mix(in oklab, var(--border) 92%, transparent);
     background: #242428;
+  }
+
+  .qf-app.is-sidebar-collapsed .qf-nav-copy {
+    max-width: 0;
+    opacity: 0;
+    transform: translateX(-0.5rem);
+    pointer-events: none;
   }
 
   .qf-app.is-sidebar-collapsed .qf-sidebar-toggle--rail {
@@ -476,6 +560,19 @@ body {
   .qf-sidebar__header--collapsed,
   .qf-sidebar-toggle--desktop {
     display: none;
+  }
+
+  .qf-sidebar__masthead {
+    min-height: auto;
+  }
+
+  .qf-sidebar__header {
+    position: static;
+    transform: none;
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transition: none;
   }
 
   .qf-mobile-brand {

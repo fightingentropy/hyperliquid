@@ -82,7 +82,6 @@ export default function WalletPage() {
   const [performanceScope, setPerformanceScope] = useState("perp");
   const [performanceRange, setPerformanceRange] = useState("all");
   const [positionsView, setPositionsView] = useState("table");
-  const [deltaView, setDeltaView] = useState("table");
   const [walletInput, setWalletInput] = useState(walletAddress);
 
   const validAddress = isValidEvmAddress(walletAddress);
@@ -517,8 +516,6 @@ export default function WalletPage() {
       {walletId ? (
         <WalletNotionalDeltasPanel
           payload={notionalDeltasResource.data}
-          viewMode={deltaView}
-          onViewModeChange={setDeltaView}
           loading={notionalDeltasResource.isLoading}
           error={
             notionalDeltasResource.error

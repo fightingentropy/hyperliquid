@@ -1,0 +1,23 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "Vite Dev Server",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "port": 4173
+    },
+    {
+      "name": "Vite Preview",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "preview"],
+      "port": 4174
+    },
+    {
+      "name": "Cloudflare Pages Dev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "pages:dev"],
+      "port": 8788
+    }
+  ]
+}

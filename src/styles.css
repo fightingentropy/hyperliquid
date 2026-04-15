@@ -30,9 +30,8 @@ body {
   flex-shrink: 0;
   overflow: hidden;
   contain: layout paint;
-  border-right: 1px solid color-mix(in oklab, var(--border) 92%, transparent);
-  background:
-    linear-gradient(180deg, color-mix(in oklab, var(--sidebar) 100%, #000 0%) 0%, var(--sidebar) 100%);
+  border-right: 1px solid color-mix(in oklab, var(--sidebar-border) 92%, transparent);
+  background: var(--sidebar);
   transition:
     width var(--qf-sidebar-transition),
     border-color 0.15s ease;
@@ -93,7 +92,7 @@ body {
 .qf-sidebar__divider {
   height: 1px;
   margin: 0 0.9rem 0.9rem;
-  background: color-mix(in oklab, var(--border) 92%, transparent);
+  background: color-mix(in oklab, var(--sidebar-border) 92%, transparent);
   transition:
     margin var(--qf-sidebar-transition),
     opacity 0.16s ease;
@@ -120,8 +119,8 @@ body {
   justify-content: center;
   overflow: hidden;
   border-radius: 0.95rem;
-  background: color-mix(in oklab, var(--card) 80%, transparent);
-  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--border) 92%, transparent);
+  background: color-mix(in oklab, var(--sidebar-accent) 80%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--sidebar-border) 92%, transparent);
 }
 
 .qf-brand__wordmark {
@@ -184,7 +183,7 @@ body {
 .qf-sidebar__section-divider {
   height: 1px;
   margin-top: 0.8rem;
-  background: color-mix(in oklab, var(--border) 92%, transparent);
+  background: color-mix(in oklab, var(--sidebar-border) 92%, transparent);
   opacity: 1;
   transform: scaleX(1);
   transform-origin: center;
@@ -257,17 +256,17 @@ body {
 }
 
 .qf-nav-link:hover {
-  border-color: color-mix(in oklab, var(--border) 92%, transparent);
-  background: color-mix(in oklab, var(--muted) 72%, transparent);
+  border-color: color-mix(in oklab, var(--sidebar-border) 92%, transparent);
+  background: color-mix(in oklab, var(--sidebar-accent) 72%, transparent);
 }
 
 .qf-nav-link.is-active {
-  border-color: color-mix(in oklab, var(--border) 94%, transparent);
-  background: #202024;
+  border-color: color-mix(in oklab, var(--sidebar-border) 94%, transparent);
+  background: var(--sidebar-accent);
 }
 
 .qf-nav-link.is-active .qf-nav-icon-wrap {
-  background: #242428;
+  background: color-mix(in oklab, var(--sidebar-accent) 100%, var(--sidebar) 0%);
 }
 
 .qf-main {
@@ -541,13 +540,13 @@ body {
   }
 
   .qf-app.is-sidebar-collapsed .qf-sidebar__section-divider {
-    margin-top: 0;
-    opacity: 0;
-    transform: scaleX(0.5);
+    margin-top: 0.4rem;
+    opacity: 1;
+    transform: scaleX(1);
   }
 
   .qf-app.is-sidebar-collapsed .qf-sidebar__items {
-    gap: 0.7rem;
+    gap: 0.35rem;
   }
 
   .qf-app.is-sidebar-collapsed .qf-nav-link {
@@ -564,21 +563,23 @@ body {
   }
 
   .qf-app.is-sidebar-collapsed .qf-nav-icon-wrap {
-    height: 3rem;
-    width: 3rem;
-    border: 1px solid transparent;
-    border-radius: 0.85rem;
+    height: 2.5rem;
+    width: 2.5rem;
+    border: none;
+    border-radius: 0;
     background: transparent;
   }
 
   .qf-app.is-sidebar-collapsed .qf-nav-link:hover .qf-nav-icon-wrap {
-    border-color: color-mix(in oklab, var(--border) 92%, transparent);
-    background: #202024;
+    background: transparent;
+  }
+
+  .qf-app.is-sidebar-collapsed .qf-nav-link:hover .qf-nav-icon {
+    color: var(--sidebar-foreground);
   }
 
   .qf-app.is-sidebar-collapsed .qf-nav-link.is-active .qf-nav-icon-wrap {
-    border-color: color-mix(in oklab, var(--border) 92%, transparent);
-    background: #242428;
+    background: transparent;
   }
 
   .qf-app.is-sidebar-collapsed .qf-nav-copy {

@@ -3,7 +3,6 @@ import { Link } from "react-router-dom";
 import ButtonGroup from "./ButtonGroup";
 import { cx } from "../lib/cx";
 import {
-  DELTA_VIEW_OPTIONS,
   POSITION_VIEW_OPTIONS,
   buildNotionalDeltaRows,
   formatDateDay,
@@ -14,6 +13,7 @@ import {
   formatCount,
   formatCompactCurrency,
   formatCompactSignedCurrency,
+  formatCompactSignedCurrency2,
   formatCurrency,
   formatPercent,
   formatPrice,
@@ -921,7 +921,7 @@ export function WalletTransactionsPanel({ rows, error, loading, currentWalletAdd
   );
 }
 
-export function WalletNotionalDeltasPanel({ payload, viewMode, onViewModeChange, error, loading }) {
+export function WalletNotionalDeltasPanel({ payload, error, loading }) {
   if (error) {
     return <ErrorState message={error} />;
   }
@@ -938,76 +938,36 @@ export function WalletNotionalDeltasPanel({ payload, viewMode, onViewModeChange,
 
   return (
     <div className="rounded-sm border border-border bg-card">
-      <div className="flex flex-col gap-3 border-b border-border px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <p className="text-sm font-medium text-foreground">Net Notional Delta</p>
-          <p className="text-xs text-muted-foreground">Recent Qwantify notional changes for tracked markets.</p>
-        </div>
-        <div className="sm:hidden">
-          <ButtonGroup
-            kind="segmented"
-            size="sm"
-            value={viewMode}
-            onChange={onViewModeChange}
-            options={DELTA_VIEW_OPTIONS}
-          />
-        </div>
+      <div className="px-4 py-3">
+        <p className="text-sm font-medium text-foreground">Net Notional Delta</p>
       </div>
 
-      {viewMode === "table" ? (
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[760px] text-sm">
-            <thead className="text-left text-xs uppercase tracking-wide text-muted-foreground">
-              <tr className="border-b border-border">
-                <th className="px-4 py-3">Symbol</th>
-                <th className="px-4 py-3 text-right">1h</th>
-                <th className="px-4 py-3 text-right">4h</th>
-                <th className="px-4 py-3 text-right">12h</th>
-                <th className="px-4 py-3 text-right">1d</th>
-                <th className="px-4 py-3 text-right">7d</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => (
-                <tr key={row.symbol} className="border-b border-border/60 text-foreground last:border-b-0">
-                  <td className="px-4 py-3 font-mono">{row.symbol}</td>
-                  {["1h", "4h", "12h", "1d", "7d"].map((window) => (
-                    <td key={window} className={cx("px-4 py-3 text-right font-mono", toneClass(row.deltas[window]))}>
-                      {formatSignedCurrency(row.deltas[window], 2)}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 gap-3 px-4 py-4 md:grid-cols-2 xl:grid-cols-3">
-          {rows.map((row) => (
-            <div key={row.symbol} className="rounded-sm border border-border bg-card px-3 py-3">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <div className="font-mono text-sm text-foreground">{row.symbol}</div>
-                  <div className={cx("mt-2 text-xl font-light", toneClass(row.deltas["7d"]))}>
-                    {formatSignedCurrency(row.deltas["7d"], 2)}
-                  </div>
-                </div>
-                <ChevronRight className="size-4 text-muted-foreground" />
-              </div>
-              <div className="mt-4 grid grid-cols-5 gap-2 text-[11px]">
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[760px] text-sm">
+          <thead className="text-left text-[11px] uppercase tracking-wide text-muted-foreground">
+            <tr className="border-t border-border">
+              <th className="px-4 py-2.5 font-medium">Symbol</th>
+              <th className="px-4 py-2.5 text-right font-medium">&Delta;1H</th>
+              <th className="px-4 py-2.5 text-right font-medium">&Delta;4H</th>
+              <th className="px-4 py-2.5 text-right font-medium">&Delta;12H</th>
+              <th className="px-4 py-2.5 text-right font-medium">&Delta;1D</th>
+              <th className="px-4 py-2.5 text-right font-medium">&Delta;7D</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.symbol} className="border-t border-border/60 text-foreground">
+                <td className="px-4 py-2.5">{row.symbol}</td>
                 {["1h", "4h", "12h", "1d", "7d"].map((window) => (
-                  <div key={window} className="space-y-1">
-                    <div className="uppercase tracking-wide text-muted-foreground">{window}</div>
-                    <div className={cx("font-mono", toneClass(row.deltas[window]))}>
-                      {formatSignedCurrency(row.deltas[window], 0)}
-                    </div>
-                  </div>
+                  <td key={window} className={cx("px-4 py-2.5 text-right tabular-nums", toneClass(row.deltas[window]))}>
+                    {formatCompactSignedCurrency2(row.deltas[window])}
+                  </td>
                 ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

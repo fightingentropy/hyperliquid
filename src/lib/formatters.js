@@ -7,6 +7,12 @@ const compactCurrency = new Intl.NumberFormat("en-US", {
   maximumFractionDigits: 1,
 });
 
+const compactCurrency2 = new Intl.NumberFormat("en-US", {
+  notation: "compact",
+  maximumFractionDigits: 2,
+  minimumFractionDigits: 2,
+});
+
 export function pad2(value) {
   return `${value}`.padStart(2, "0");
 }
@@ -58,6 +64,19 @@ export function formatCompactSignedCurrency(value) {
 
   const sign = value > 0 ? "+" : "-";
   return `${sign}${formatCompactCurrency(Math.abs(value))}`;
+}
+
+export function formatCompactSignedCurrency2(value) {
+  if (!Number.isFinite(value)) {
+    return "—";
+  }
+
+  if (value === 0) {
+    return "$0";
+  }
+
+  const sign = value > 0 ? "+" : "-";
+  return `${sign}$${compactCurrency2.format(Math.abs(value))}`;
 }
 
 export function formatAxisCurrency(value) {

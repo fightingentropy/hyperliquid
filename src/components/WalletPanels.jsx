@@ -91,6 +91,7 @@ function StatCard({ label, value, tone = "neutral", footer }) {
 }
 
 export function WalletOverviewGrid({ metrics, slices }) {
+  const sliceMap = Object.fromEntries(slices.map((s) => [s.key, s]));
   const realized24h = `${formatSignedCurrency(metrics.realizedDelta24hUsd, 2)} (${formatPercent(metrics.realizedDelta24hPct ?? 0, 1)})`;
   const realized7d = `${formatSignedCurrency(metrics.realizedDelta7dUsd, 2)} (${formatPercent(metrics.realizedDelta7dPct ?? 0, 1)})`;
 
@@ -103,15 +104,15 @@ export function WalletOverviewGrid({ metrics, slices }) {
           <div className="space-y-2">
             <div className="h-2 w-full overflow-hidden rounded-full border border-border bg-muted">
               <div className="flex h-full w-full">
-                <div className="h-full bg-emerald-500" style={{ width: `${slices[0]?.percent ?? 0}%` }} />
-                <div className="h-full bg-orange-500" style={{ width: `${slices[2]?.percent ?? 0}%` }} />
-                <div className="h-full bg-violet-500" style={{ width: `${slices[1]?.percent ?? 0}%` }} />
+                <div className="h-full bg-emerald-500" style={{ width: `${sliceMap.spot?.percent ?? 0}%` }} />
+                <div className="h-full bg-orange-500" style={{ width: `${sliceMap.perps?.percent ?? 0}%` }} />
+                <div className="h-full bg-violet-500" style={{ width: `${sliceMap.staked?.percent ?? 0}%` }} />
               </div>
             </div>
             <div className="flex flex-wrap gap-2">
-              <span>Spot {slices[0]?.percent.toFixed(0)}%</span>
-              <span>Perps {slices[2]?.percent.toFixed(0)}%</span>
-              <span>Staked {slices[1]?.percent.toFixed(0)}%</span>
+              <span>Spot {sliceMap.spot?.percent.toFixed(0)}%</span>
+              <span>Perps {sliceMap.perps?.percent.toFixed(0)}%</span>
+              <span>Staked {sliceMap.staked?.percent.toFixed(0)}%</span>
             </div>
           </div>
         }

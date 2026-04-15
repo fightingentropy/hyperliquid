@@ -8,7 +8,9 @@ const CHART_CACHE_TTL_MS = 60_000;
 const STATIC_CACHE_TTL_MS = 300_000;
 
 let perpMetaAndAssetCtxsPromise = null;
+let perpMetaAndAssetCtxsTimestamp = 0;
 let spotMetaAndAssetCtxsPromise = null;
+let spotMetaAndAssetCtxsTimestamp = 0;
 
 async function requestHyperliquidInfo(payload, options = {}) {
   return requestJson(
@@ -54,7 +56,12 @@ export async function fetchHourlyCandles({ coin, chartWindow }) {
 }
 
 export async function fetchPerpMetaAndAssetCtxs() {
+  if (perpMetaAndAssetCtxsPromise && Date.now() - perpMetaAndAssetCtxsTimestamp > STATIC_CACHE_TTL_MS) {
+    perpMetaAndAssetCtxsPromise = null;
+  }
+
   if (!perpMetaAndAssetCtxsPromise) {
+    perpMetaAndAssetCtxsTimestamp = Date.now();
     perpMetaAndAssetCtxsPromise = requestHyperliquidInfo({
       type: "metaAndAssetCtxs",
     }, { cacheTtlMs: STATIC_CACHE_TTL_MS }).catch((error) => {
@@ -231,7 +238,12 @@ export async function fetchSpotClearinghouseState({ user }) {
 }
 
 export async function fetchSpotMetaAndAssetCtxs() {
+  if (spotMetaAndAssetCtxsPromise && Date.now() - spotMetaAndAssetCtxsTimestamp > STATIC_CACHE_TTL_MS) {
+    spotMetaAndAssetCtxsPromise = null;
+  }
+
   if (!spotMetaAndAssetCtxsPromise) {
+    spotMetaAndAssetCtxsTimestamp = Date.now();
     spotMetaAndAssetCtxsPromise = requestHyperliquidInfo({
       type: "spotMetaAndAssetCtxs",
     }, { cacheTtlMs: STATIC_CACHE_TTL_MS }).catch((error) => {

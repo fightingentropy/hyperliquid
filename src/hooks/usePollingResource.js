@@ -44,6 +44,7 @@ export function usePollingResource(request, dependencies, options = {}) {
   const initialDataRef = useRef(initialData);
   requestRef.current = request;
   initialDataRef.current = initialData;
+  const dependencyKey = JSON.stringify(dependencies);
 
   const buildInitialState = () => {
     const cachedData = readCachedResource(cacheKey, staleTimeMs);
@@ -69,7 +70,13 @@ export function usePollingResource(request, dependencies, options = {}) {
       return;
     }
 
-    setState(buildInitialState());
+    const cachedData = readCachedResource(cacheKey, staleTimeMs);
+    setState({
+      data: cachedData !== undefined ? cachedData : initialDataRef.current,
+      error: null,
+      isLoading: cachedData === undefined,
+      isRefreshing: false,
+    });
   }, [enabled, cacheKey, staleTimeMs]);
 
   useEffect(() => {
@@ -162,7 +169,7 @@ export function usePollingResource(request, dependencies, options = {}) {
         document.removeEventListener("visibilitychange", handleVisibilityChange);
       }
     };
-  }, [enabled, intervalMs, pauseInBackground, cacheKey, staleTimeMs, ...dependencies]);
+  }, [enabled, intervalMs, pauseInBackground, cacheKey, staleTimeMs, dependencyKey]);
 
   return state;
 }

@@ -790,7 +790,3 @@ export function formatTime(timestamp) {
     minute: "2-digit",
   });
 }
-
-export function pad2(value) {
-  return `${value}`.padStart(2, "0");
-}

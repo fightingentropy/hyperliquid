@@ -15,7 +15,11 @@ export const WALLET_TABS = [
 export const PINNED_WALLETS = [
   {
     address: "0x8def9f50456c6c4e37fa5d3d57f108ed23992dae",
-    label: "0x8def...92dae",
+    label: "Loracle",
+  },
+  {
+    address: "0xaf0FDd39e5D92499B0eD9F68693DA99C0ec1e92e",
+    label: "Purple surfer",
   },
 ];
 

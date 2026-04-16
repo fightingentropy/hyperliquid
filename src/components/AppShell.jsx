@@ -1,17 +1,38 @@
 import { Suspense, useEffect, useMemo, useState } from "react";
 import {
   Activity,
+  ArrowUpRight,
+  Bell,
+  BookOpen,
+  Bot,
   Check,
+  ChevronDown,
+  ChevronRight,
+  Compass,
   Copy,
   ExternalLink,
+  Flame,
+  Gift,
+  Heart,
+  LogIn,
   Menu,
+  Moon,
   PanelLeftClose,
   PanelLeftOpen,
+  PieChart,
+  Plus,
+  Settings,
+  Sun,
+  UserPlus,
+  Users,
+  Users2,
   Wallet,
+  Wrench,
   X,
 } from "lucide-react";
 import { Link, NavLink, Outlet, matchPath, useLocation } from "react-router-dom";
 import { cx } from "../lib/cx";
+import { PINNED_WALLETS } from "../lib/wallet";
 
 const SIDEBAR_COLLAPSE_STORAGE_KEY = "qf-sidebar-collapsed";
 const HYPURRSCAN_URL = "https://hypurrscan.io/address";
@@ -49,14 +70,43 @@ const NAV_SECTIONS = [
   {
     title: "Hyperliquid",
     items: [
-      { label: "Market Flow", path: "/app/market-flow", icon: MarketFlowIcon, subtitle: "Buy/sell pressure tracking" },
+      {
+        label: "Wallets",
+        path: "/app/wallets",
+        icon: Wallet,
+        subtitle: "Holdings and flows",
+      },
+      {
+        label: "Market Flow",
+        path: "/app/market-flow",
+        icon: MarketFlowIcon,
+        subtitle: "Buy/sell pressure tracking",
+      },
       {
         label: "Relative Strength",
         path: "/app/relative-strength",
         icon: Activity,
         subtitle: "Cross-market momentum map",
       },
-      { label: "Wallets", path: "/app/wallets", icon: Wallet, subtitle: "Lookup and performance breakdowns" },
+      {
+        label: "Liquidations",
+        path: "/app/liquidations",
+        icon: Flame,
+        subtitle: "Real-time liquidation feed and analyt…",
+        placeholder: true,
+      },
+    ],
+  },
+  {
+    title: "Public",
+    items: [
+      {
+        label: "Research",
+        path: "/app/research",
+        icon: BookOpen,
+        subtitle: "Public research results",
+        placeholder: true,
+      },
     ],
   },
 ];
@@ -104,14 +154,14 @@ function Brand({ className, onNavigate }) {
       className={cx("qf-brand", className)}
       onClick={onNavigate}
     >
-      <div className="qf-brand__mark">
+      <div className="qf-brand__mark" aria-hidden="true">
         <img
           src="/assets/hyperliquid-symbol-light.png"
-          alt="Hyperliquid"
-          className="size-full object-contain"
+          alt=""
+          className="qf-brand__logo"
         />
       </div>
-      <span className="qf-brand__wordmark">Qwantify</span>
+      <span className="qf-brand__wordmark">Stats</span>
     </Link>
   );
 }
@@ -128,6 +178,7 @@ function NavItem({ collapsed, item, onNavigate }) {
       onClick={onNavigate}
       aria-label={collapsed ? item.label : undefined}
       title={collapsed ? item.label : undefined}
+      end={item.path === "/app/wallets"}
     >
       {({ isActive }) => (
         <>
@@ -140,11 +191,14 @@ function NavItem({ collapsed, item, onNavigate }) {
             />
           </span>
           <div className="qf-nav-copy">
-            <span className="truncate text-[15px] leading-[1.05] text-foreground">{item.label}</span>
-            <span className="truncate text-[11px] leading-[1.18] text-muted-foreground">
-              {item.subtitle}
-            </span>
+            <span className="qf-nav-label">{item.label}</span>
+            {item.subtitle ? (
+              <span className="qf-nav-subtitle">{item.subtitle}</span>
+            ) : null}
           </div>
+          {item.expandable ? (
+            <ChevronRight className="qf-nav-chevron" aria-hidden="true" />
+          ) : null}
         </>
       )}
     </NavLink>
@@ -156,6 +210,37 @@ function PageLoadingState() {
     <div className="rounded-sm border border-border bg-card p-6 text-sm text-muted-foreground">
       Loading view...
     </div>
+  );
+}
+
+function ThemeToggleButton() {
+  const [isLight, setIsLight] = useState(() => {
+    if (typeof document === "undefined") {
+      return false;
+    }
+    return document.documentElement.classList.contains("light");
+  });
+
+  const toggle = () => {
+    setIsLight((value) => {
+      const next = !value;
+      if (typeof document !== "undefined") {
+        document.documentElement.classList.toggle("light", next);
+      }
+      return next;
+    });
+  };
+
+  return (
+    <button
+      type="button"
+      className="qf-sidebar-toggle"
+      onClick={toggle}
+      aria-label="Toggle theme"
+      title="Toggle theme"
+    >
+      {isLight ? <Sun className="size-5" /> : <Moon className="size-5" />}
+    </button>
   );
 }
 
@@ -171,6 +256,14 @@ export default function AppShell() {
   });
   const [copiedWalletAddress, setCopiedWalletAddress] = useState("");
   const pageHeader = useMemo(() => resolvePageHeader(location.pathname), [location.pathname]);
+
+  const pinnedAddresses = useMemo(
+    () => new Set(PINNED_WALLETS.map((wallet) => wallet.address.toLowerCase())),
+    [],
+  );
+  const walletIsPinned = pageHeader.walletAddress
+    ? pinnedAddresses.has(pageHeader.walletAddress.toLowerCase())
+    : false;
 
   useEffect(() => {
     setSidebarOpen(false);
@@ -223,6 +316,7 @@ export default function AppShell() {
             <div className="qf-sidebar__header qf-sidebar__header--expanded">
               <Brand onNavigate={() => setSidebarOpen(false)} />
               <div className="qf-sidebar__header-actions">
+                <ThemeToggleButton />
                 <button
                   type="button"
                   className="qf-sidebar-toggle qf-sidebar-toggle--desktop"
@@ -268,7 +362,7 @@ export default function AppShell() {
                     {section.items.map((item) => (
                       <NavItem
                         collapsed={sidebarCollapsed}
-                        key={item.path}
+                        key={`${section.title}-${item.path}`}
                         item={item}
                         onNavigate={() => setSidebarOpen(false)}
                       />
@@ -338,12 +432,35 @@ export default function AppShell() {
                 href={`${HYPURRSCAN_URL}/${pageHeader.walletAddress}`}
                 target="_blank"
                 rel="noreferrer noopener"
-                className="qf-topbar__icon-button"
-                aria-label="Open wallet on HypurrScan"
-                title="Open wallet on HypurrScan"
+                className="qf-topbar__icon-split"
+                aria-label="Open wallet externally"
+                title="Open wallet externally"
               >
                 <ExternalLink className="size-4" />
+                <ChevronDown className="size-3 qf-topbar__icon-split-caret" />
               </a>
+
+              <button
+                type="button"
+                className={cx(
+                  "qf-topbar__cta",
+                  walletIsPinned && "is-pinned",
+                )}
+                disabled={walletIsPinned}
+                aria-label={walletIsPinned ? "Wallet already saved" : "Add to my wallets"}
+              >
+                {walletIsPinned ? (
+                  <>
+                    <Check className="size-4" aria-hidden="true" />
+                    <span>SAVED</span>
+                  </>
+                ) : (
+                  <>
+                    <Plus className="size-4" aria-hidden="true" />
+                    <span>ADD TO MY WALLETS</span>
+                  </>
+                )}
+              </button>
             </div>
           ) : null}
         </header>

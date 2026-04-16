@@ -337,13 +337,6 @@ export default function WalletPage() {
 
   return (
     <div className="space-y-6">
-      <WalletPickerPanel
-        value={walletInput}
-        onChange={setWalletInput}
-        onSubmit={handleWalletJump}
-        activeAddress={normalizedWalletAddress}
-      />
-
       {resolveResource.error ? (
         <div className="rounded-sm border border-border bg-card px-4 py-3 text-sm text-muted-foreground">
           {errorMessage(resolveResource.error, "Unable to resolve this wallet in Qwantify.")}

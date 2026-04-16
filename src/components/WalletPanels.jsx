@@ -65,24 +65,34 @@ function formatSignedPercent(value, maximumFractionDigits = 1) {
   }).format(value)}%`;
 }
 
-function StatCard({ label, value, tone = "neutral", footer }) {
+function StatCard({ label, value, valueSuffix, tone = "neutral", badge, footer }) {
   return (
     <div className="rounded-sm border border-border bg-card">
       <div className="space-y-2 p-4">
         <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground sm:text-xs">
           {label}
         </p>
-        <div
-          className={cx(
-            "text-xl font-light sm:text-2xl",
-            tone === "positive"
-              ? "text-profit"
-              : tone === "negative"
-                ? "text-loss"
-                : "text-foreground",
-          )}
-        >
-          {value}
+        <div className="flex items-baseline justify-between gap-3">
+          <div
+            className={cx(
+              "text-xl font-light sm:text-2xl",
+              tone === "positive"
+                ? "text-profit"
+                : tone === "negative"
+                  ? "text-loss"
+                  : "text-foreground",
+            )}
+          >
+            {value}
+          </div>
+          {valueSuffix ? (
+            <div className="text-xs text-muted-foreground">{valueSuffix}</div>
+          ) : null}
+          {badge ? (
+            <span className="rounded-full border border-border px-2 py-0.5 text-[11px] text-muted-foreground">
+              {badge}
+            </span>
+          ) : null}
         </div>
         {footer ? <div className="text-[11px] text-muted-foreground">{footer}</div> : null}
       </div>
@@ -183,12 +193,9 @@ export function WalletOverviewGrid({ metrics, slices }) {
       <StatCard
         label="Risk Profile"
         value={metrics.effectiveLeverage === null ? "—" : `${metrics.effectiveLeverage.toFixed(2)}x`}
+        badge={metrics.biasLabel}
         footer={
           <div className="space-y-2">
-            <div className="flex items-center justify-between gap-3">
-              <span>{metrics.biasLabel}</span>
-              <span className="rounded-full border border-border px-2 py-1">{metrics.biasLabel}</span>
-            </div>
             <div className="flex h-2 overflow-hidden rounded-full bg-muted">
               <div className="h-full bg-profit" style={{ width: `${metrics.longPct}%` }} />
               <div className="h-full bg-loss" style={{ width: `${metrics.shortPct}%` }} />

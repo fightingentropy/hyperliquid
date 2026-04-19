@@ -21,6 +21,10 @@ export const PINNED_WALLETS = [
     address: "0xaf0FDd39e5D92499B0eD9F68693DA99C0ec1e92e",
     label: "Purple surfer",
   },
+  {
+    address: "0x939f95036d2e7b6d7419ec072bf9d967352204d2",
+    label: "50m$ whale",
+  },
 ];
 
 export const PERFORMANCE_METRIC_OPTIONS = [

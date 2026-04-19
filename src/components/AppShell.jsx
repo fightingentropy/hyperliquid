@@ -32,7 +32,8 @@ import {
 } from "lucide-react";
 import { Link, NavLink, Outlet, matchPath, useLocation } from "react-router-dom";
 import { cx } from "../lib/cx";
-import { PINNED_WALLETS } from "../lib/wallet";
+import { useWallets } from "../hooks/useWallets";
+import WalletFormModal from "./WalletFormModal";
 
 const SIDEBAR_COLLAPSE_STORAGE_KEY = "qf-sidebar-collapsed";
 const HYPURRSCAN_URL = "https://hypurrscan.io/address";
@@ -255,15 +256,11 @@ export default function AppShell() {
     return window.localStorage.getItem(SIDEBAR_COLLAPSE_STORAGE_KEY) === "1";
   });
   const [copiedWalletAddress, setCopiedWalletAddress] = useState("");
+  const [saveModalOpen, setSaveModalOpen] = useState(false);
   const pageHeader = useMemo(() => resolvePageHeader(location.pathname), [location.pathname]);
 
-  const pinnedAddresses = useMemo(
-    () => new Set(PINNED_WALLETS.map((wallet) => wallet.address.toLowerCase())),
-    [],
-  );
-  const walletIsPinned = pageHeader.walletAddress
-    ? pinnedAddresses.has(pageHeader.walletAddress.toLowerCase())
-    : false;
+  const { addWallet, isSaved } = useWallets();
+  const walletIsPinned = pageHeader.walletAddress ? isSaved(pageHeader.walletAddress) : false;
 
   useEffect(() => {
     setSidebarOpen(false);
@@ -448,6 +445,11 @@ export default function AppShell() {
                 )}
                 disabled={walletIsPinned}
                 aria-label={walletIsPinned ? "Wallet already saved" : "Add to my wallets"}
+                onClick={() => {
+                  if (!walletIsPinned) {
+                    setSaveModalOpen(true);
+                  }
+                }}
               >
                 {walletIsPinned ? (
                   <>
@@ -471,6 +473,16 @@ export default function AppShell() {
           </Suspense>
         </main>
       </div>
+
+      <WalletFormModal
+        open={saveModalOpen}
+        onClose={() => setSaveModalOpen(false)}
+        onSubmit={({ address, label }) => addWallet(address, label)}
+        initialAddress={pageHeader.walletAddress ?? ""}
+        lockAddress
+        title="Save wallet"
+        submitLabel="Save wallet"
+      />
     </div>
   );
 }

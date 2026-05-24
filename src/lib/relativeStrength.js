@@ -13,6 +13,12 @@ export const RELATIVE_STRENGTH_UNIVERSE_OPTIONS = [
   { value: 32, label: "32 assets" },
 ];
 
+export const RELATIVE_STRENGTH_MARKET_OPTIONS = [
+  { value: "crypto", label: "Crypto" },
+  { value: "combined", label: "Crypto + TradFi" },
+  { value: "tradfi", label: "TradFi" },
+];
+
 const SERIES_PALETTE = [
   "#4ade80",
   "#2dd4bf",

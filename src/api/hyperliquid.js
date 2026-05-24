@@ -3,14 +3,35 @@ import { requestJson } from "./request";
 
 const HYPERLIQUID_INFO_URL = "https://api.hyperliquid.xyz/info";
 const PERP_DEXES = ["", "xyz", "flx", "vntl", "hyna", "km"];
+const XYZ_DEX = "xyz";
 const LIVE_CACHE_TTL_MS = 15_000;
 const CHART_CACHE_TTL_MS = 60_000;
 const STATIC_CACHE_TTL_MS = 300_000;
 
-let perpMetaAndAssetCtxsPromise = null;
-let perpMetaAndAssetCtxsTimestamp = 0;
+const perpMetaAndAssetCtxsCache = new Map();
 let spotMetaAndAssetCtxsPromise = null;
 let spotMetaAndAssetCtxsTimestamp = 0;
+
+const RELATIVE_STRENGTH_CRYPTO_PINS = ["HYPE"];
+const RELATIVE_STRENGTH_TRADFI_PINS = [
+  "SPX",
+  "NDX",
+  "NVDA",
+  "GOOGL",
+  "AMZN",
+  "TSLA",
+  "HOOD",
+  "SNDK",
+  "MU",
+  "HIMS",
+  "LLY",
+  "LITE",
+];
+
+const XYZ_DISPLAY_ALIASES = {
+  "XYZ:SP500": "SPX",
+  "XYZ:XYZ100": "NDX",
+};
 
 async function requestHyperliquidInfo(payload, options = {}) {
   return requestJson(
@@ -55,35 +76,68 @@ export async function fetchHourlyCandles({ coin, chartWindow }) {
   return payload.map(parseCandle).filter(Boolean);
 }
 
-export async function fetchPerpMetaAndAssetCtxs() {
-  if (perpMetaAndAssetCtxsPromise && Date.now() - perpMetaAndAssetCtxsTimestamp > STATIC_CACHE_TTL_MS) {
-    perpMetaAndAssetCtxsPromise = null;
+export async function fetchPerpMetaAndAssetCtxs({ dex = "" } = {}) {
+  const cacheKey = dex || "primary";
+  const cached = perpMetaAndAssetCtxsCache.get(cacheKey);
+
+  if (cached?.promise && Date.now() - cached.timestamp <= STATIC_CACHE_TTL_MS) {
+    return cached.promise;
   }
 
-  if (!perpMetaAndAssetCtxsPromise) {
-    perpMetaAndAssetCtxsTimestamp = Date.now();
-    perpMetaAndAssetCtxsPromise = requestHyperliquidInfo({
-      type: "metaAndAssetCtxs",
-    }, { cacheTtlMs: STATIC_CACHE_TTL_MS }).catch((error) => {
-      perpMetaAndAssetCtxsPromise = null;
+  const requestPayload = dex
+    ? {
+        type: "metaAndAssetCtxs",
+        dex,
+      }
+    : {
+        type: "metaAndAssetCtxs",
+      };
+
+  const promise = requestHyperliquidInfo(requestPayload, { cacheTtlMs: STATIC_CACHE_TTL_MS }).catch(
+    (error) => {
+      if (perpMetaAndAssetCtxsCache.get(cacheKey)?.promise === promise) {
+        perpMetaAndAssetCtxsCache.delete(cacheKey);
+      }
+
       throw error;
-    });
-  }
+    },
+  );
 
-  return perpMetaAndAssetCtxsPromise;
+  perpMetaAndAssetCtxsCache.set(cacheKey, {
+    promise,
+    timestamp: Date.now(),
+  });
+
+  return promise;
 }
 
 function getRelativeStrengthLookbackHours(chartWindow) {
   return chartWindow === "7d" ? 24 * 7 : 24;
 }
 
-function parsePerpMarkets(universe, assetCtxs) {
+function getXyzDisplaySymbol(symbol) {
+  const normalized = String(symbol ?? "").trim();
+
+  if (!normalized) {
+    return "";
+  }
+
+  return (
+    XYZ_DISPLAY_ALIASES[normalized.toUpperCase()] ??
+    normalized.replace(/^xyz:/i, "").toUpperCase()
+  );
+}
+
+function parsePerpMarkets(universe, assetCtxs, { dex = "", marketType = "crypto" } = {}) {
   return universe
     .map((asset, index) => {
       const ctx = assetCtxs[index] ?? {};
+      const coin = asset.name;
 
       return {
-        symbol: asset.name,
+        symbol: dex === XYZ_DEX ? getXyzDisplaySymbol(coin) : coin,
+        coin,
+        marketType,
         dayNotionalVolume: Number(ctx.dayNtlVlm ?? 0),
         openInterest: Number(ctx.openInterest ?? 0),
         midPrice: Number(ctx.midPx ?? ctx.markPx ?? 0),
@@ -93,10 +147,37 @@ function parsePerpMarkets(universe, assetCtxs) {
     .filter(
       (asset) =>
         asset.symbol &&
+        asset.coin &&
         !asset.isDelisted &&
         Number.isFinite(asset.dayNotionalVolume) &&
         asset.dayNotionalVolume > 0,
     );
+}
+
+function buildMarketLookup(markets) {
+  const lookup = new Map();
+
+  markets.forEach((market) => {
+    [market.symbol, market.coin].forEach((key) => {
+      if (key) {
+        lookup.set(String(key).toUpperCase(), market);
+      }
+    });
+  });
+
+  return lookup;
+}
+
+function getRelativeStrengthPinnedCoins(marketScope) {
+  if (marketScope === "tradfi") {
+    return RELATIVE_STRENGTH_TRADFI_PINS;
+  }
+
+  if (marketScope === "combined") {
+    return [...RELATIVE_STRENGTH_CRYPTO_PINS, ...RELATIVE_STRENGTH_TRADFI_PINS];
+  }
+
+  return RELATIVE_STRENGTH_CRYPTO_PINS;
 }
 
 async function fetchAssetCandles({ coin, startTime }) {
@@ -119,32 +200,53 @@ async function fetchAssetCandles({ coin, startTime }) {
 export async function fetchRelativeStrengthUniverse({
   chartWindow = "24h",
   limit = 24,
-  pinnedCoins = ["HYPE"],
+  marketScope = "crypto",
+  pinnedCoins,
 } = {}) {
-  const [meta, assetCtxs] = await fetchPerpMetaAndAssetCtxs();
-  const allMarkets = parsePerpMarkets(meta?.universe ?? [], assetCtxs ?? []);
+  const includeCrypto = marketScope !== "tradfi";
+  const includeTradFi = marketScope !== "crypto";
+  const marketGroups = await Promise.all([
+    includeCrypto ? fetchPerpMetaAndAssetCtxs() : Promise.resolve(null),
+    includeTradFi ? fetchPerpMetaAndAssetCtxs({ dex: XYZ_DEX }) : Promise.resolve(null),
+  ]);
+  const [cryptoPayload, tradFiPayload] = marketGroups;
+  const allMarkets = [
+    ...(cryptoPayload
+      ? parsePerpMarkets(cryptoPayload[0]?.universe ?? [], cryptoPayload[1] ?? [], {
+          marketType: "crypto",
+        })
+      : []),
+    ...(tradFiPayload
+      ? parsePerpMarkets(tradFiPayload[0]?.universe ?? [], tradFiPayload[1] ?? [], {
+          dex: XYZ_DEX,
+          marketType: "tradfi",
+        })
+      : []),
+  ];
   const rankedMarkets = [...allMarkets].sort(
     (left, right) => right.dayNotionalVolume - left.dayNotionalVolume,
   );
+  const marketLookup = buildMarketLookup(rankedMarkets);
   const selectedMarkets = [];
   const seen = new Set();
+  const pinnedMarkets = pinnedCoins ?? getRelativeStrengthPinnedCoins(marketScope);
 
   const appendMarket = (symbol) => {
-    if (!symbol || seen.has(symbol)) {
+    if (!symbol) {
       return;
     }
 
-    const market = rankedMarkets.find((item) => item.symbol === symbol);
+    const market = marketLookup.get(String(symbol).toUpperCase());
 
-    if (!market) {
+    if (!market || seen.has(market.symbol)) {
       return;
     }
 
-    seen.add(symbol);
+    seen.add(market.symbol);
     selectedMarkets.push(market);
   };
 
-  pinnedCoins.forEach(appendMarket);
+  pinnedMarkets.forEach(appendMarket);
   rankedMarkets.forEach((market) => {
     if (selectedMarkets.length < limit) {
       appendMarket(market.symbol);
@@ -158,7 +260,7 @@ export async function fetchRelativeStrengthUniverse({
     selectedMarkets.map(async (market) => ({
       ...market,
       points: await fetchAssetCandles({
-        coin: market.symbol,
+        coin: market.coin,
         startTime,
       }),
     })),

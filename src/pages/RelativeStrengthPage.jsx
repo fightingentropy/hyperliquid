@@ -7,6 +7,7 @@ import { usePollingResource } from "../hooks/usePollingResource";
 import { formatPercent, formatSignedPercent } from "../lib/formatters";
 import {
   DEFAULT_RELATIVE_STRENGTH_FOCUS,
+  RELATIVE_STRENGTH_MARKET_OPTIONS,
   RELATIVE_STRENGTH_UNIVERSE_OPTIONS,
   RELATIVE_STRENGTH_WINDOW_OPTIONS,
   buildRelativeStrengthModel,
@@ -60,6 +61,7 @@ function ChartLoadingState({ height = 640 }) {
 
 export default function RelativeStrengthPage() {
   const [chartWindow, setChartWindow] = useState("24h");
+  const [marketScope, setMarketScope] = useState("crypto");
   const [universeSize, setUniverseSize] = useState(24);
   const [focusSymbol, setFocusSymbol] = useState(DEFAULT_RELATIVE_STRENGTH_FOCUS);
 
@@ -68,11 +70,12 @@ export default function RelativeStrengthPage() {
       fetchRelativeStrengthUniverse({
         chartWindow,
         limit: universeSize,
+        marketScope,
       }),
-    [chartWindow, universeSize],
+    [chartWindow, marketScope, universeSize],
     {
       intervalMs: 300_000,
-      cacheKey: `relative-strength:${chartWindow}:${universeSize}`,
+      cacheKey: `relative-strength:${chartWindow}:${marketScope}:${universeSize}`,
       staleTimeMs: 60_000,
     },
   );
@@ -101,13 +104,20 @@ export default function RelativeStrengthPage() {
         <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div className="max-w-3xl">
             <p className="text-sm text-muted-foreground">
-              Relative performance for the most active Hyperliquid perp markets. Every line is
-              rebased to 0% at the start of the selected window so leadership, breadth, and
-              laggards stand out immediately.
+              Relative performance for the most active Hyperliquid perp markets and XYZ Markets
+              HIP-3 TradFi perps. Every line is rebased to 0% at the start of the selected window
+              so leadership, breadth, and laggards stand out immediately.
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
+            <ButtonGroup
+              kind="segmented"
+              options={RELATIVE_STRENGTH_MARKET_OPTIONS}
+              value={marketScope}
+              onChange={setMarketScope}
+              size="sm"
+            />
             <ButtonGroup
               kind="segmented"
               options={RELATIVE_STRENGTH_WINDOW_OPTIONS}

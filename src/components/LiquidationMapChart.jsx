@@ -13,7 +13,7 @@ import {
 
 const LONG_COLOR = "#ff4055";
 const SHORT_COLOR = "#2bb8a8";
-const LIQUIDATION_BAR_SIZE = 6;
+const LIQUIDATION_BAR_SIZE = 10;
 
 function formatCompactNumber(value) {
   if (!Number.isFinite(value)) {

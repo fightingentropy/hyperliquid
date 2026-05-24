@@ -55,7 +55,7 @@ function LiquidationMetric({ label, value, tone }) {
 }
 
 export default function LiquidationMapPage() {
-  const [symbol, setSymbol] = useState("BTC");
+  const [symbol, setSymbol] = useState("HYPE");
   const [refreshNonce, setRefreshNonce] = useState(0);
 
   const { data, error, isLoading, isRefreshing } = usePollingResource(

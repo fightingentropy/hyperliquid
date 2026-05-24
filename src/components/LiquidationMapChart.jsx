@@ -13,6 +13,7 @@ import {
 
 const LONG_COLOR = "#ff4055";
 const SHORT_COLOR = "#2bb8a8";
+const LIQUIDATION_BAR_SIZE = 6;
 
 function formatCompactNumber(value) {
   if (!Number.isFinite(value)) {
@@ -328,7 +329,7 @@ export default function LiquidationMapChart({ model, currentPrice, symbol, heigh
             dataKey="shortBar"
             name="Short"
             fill={SHORT_COLOR}
-            barSize={3}
+            barSize={LIQUIDATION_BAR_SIZE}
             isAnimationActive={false}
           />
           <Bar
@@ -336,7 +337,7 @@ export default function LiquidationMapChart({ model, currentPrice, symbol, heigh
             dataKey="longBar"
             name="Long"
             fill={LONG_COLOR}
-            barSize={3}
+            barSize={LIQUIDATION_BAR_SIZE}
             isAnimationActive={false}
           />
         </ComposedChart>

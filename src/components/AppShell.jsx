@@ -93,8 +93,7 @@ const NAV_SECTIONS = [
         label: "Liquidations",
         path: "/app/liquidations",
         icon: Flame,
-        subtitle: "Real-time liquidation feed and analyt…",
-        placeholder: true,
+        subtitle: "CoinGlass liquidation map",
       },
     ],
   },
@@ -127,6 +126,7 @@ function resolvePageHeader(pathname) {
 
   const routeTitles = [
     { pattern: "/app/market-flow", title: "Market Flow" },
+    { pattern: "/app/liquidations", title: "Liquidations" },
     { pattern: "/app/relative-strength", title: "Relative Strength" },
     { pattern: "/app/wallets", title: "Wallets" },
   ];

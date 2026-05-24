@@ -13,7 +13,9 @@
   },
   "type": "module",
   "dependencies": {
+    "crypto-js": "^4.2.0",
     "lucide-react": "^0.577.0",
+    "pako": "^2.1.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "react-router-dom": "^7.13.1",

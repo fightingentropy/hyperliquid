@@ -721,47 +721,88 @@ body {
   z-index: 0;
 }
 
-.qf-embed-page {
-  display: flex;
-  min-height: calc(100vh - 7.75rem);
+.qf-liquidation-page {
   min-width: 0;
-  flex-direction: column;
-  gap: 1rem;
 }
 
-.qf-embed-page__header {
+.qf-liquidation-panel {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  background: var(--card);
+}
+
+.qf-liquidation-toolbar {
   display: flex;
   min-width: 0;
   align-items: flex-start;
   justify-content: space-between;
   gap: 1rem;
+  padding: 1.25rem 1.35rem 0.9rem;
 }
 
-.qf-embed-page__copy {
-  max-width: 46rem;
+.qf-liquidation-title {
+  min-width: 0;
 }
 
-.qf-embed-page__actions {
+.qf-liquidation-title h2 {
+  margin: 0;
+  font-size: 1.45rem;
+  font-weight: 650;
+  letter-spacing: 0;
+  color: var(--foreground);
+}
+
+.qf-liquidation-title p {
+  margin: 0.35rem 0 0;
+  color: var(--muted-foreground);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+}
+
+.qf-liquidation-actions {
   display: flex;
   flex-shrink: 0;
-  flex-wrap: wrap;
+  align-items: center;
   justify-content: flex-end;
   gap: 0.55rem;
 }
 
-.qf-embed-page__button {
+.qf-liquidation-select {
   display: inline-flex;
-  height: 2.35rem;
+  height: 2.45rem;
   align-items: center;
-  justify-content: center;
-  gap: 0.45rem;
+  gap: 0.55rem;
   border: 1px solid color-mix(in oklab, var(--border) 92%, transparent);
   border-radius: 0.45rem;
-  background: color-mix(in oklab, var(--card) 14%, transparent);
-  padding: 0 0.8rem;
+  background: color-mix(in oklab, var(--background) 45%, transparent);
+  padding: 0 0.75rem;
   color: var(--muted-foreground);
-  font-size: 13px;
-  font-weight: 500;
+  font-size: 0.78rem;
+}
+
+.qf-liquidation-select select {
+  min-width: 5.6rem;
+  border: 0;
+  background: transparent;
+  color: var(--foreground);
+  font: inherit;
+  font-size: 0.95rem;
+  outline: none;
+}
+
+.qf-liquidation-icon-button,
+.qf-liquidation-icon-button:visited {
+  display: inline-flex;
+  height: 2.45rem;
+  width: 2.45rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid color-mix(in oklab, var(--border) 92%, transparent);
+  border-radius: 0.45rem;
+  background: color-mix(in oklab, var(--background) 45%, transparent);
+  color: var(--muted-foreground);
   text-decoration: none;
   transition:
     border-color 0.15s ease,
@@ -770,56 +811,156 @@ body {
     transform 0.15s ease;
 }
 
-.qf-embed-page__button:visited {
-  color: var(--muted-foreground);
-}
-
-.qf-embed-page__button:hover {
+.qf-liquidation-icon-button:hover:not(:disabled) {
   border-color: color-mix(in oklab, var(--ring) 34%, var(--border));
   background: color-mix(in oklab, var(--muted) 72%, transparent);
   color: var(--foreground);
 }
 
-.qf-embed-page__button:focus-visible {
+.qf-liquidation-icon-button:focus-visible {
   outline: none;
   box-shadow: 0 0 0 1px color-mix(in oklab, var(--ring) 72%, transparent);
 }
 
-.qf-embed-page__button:active {
+.qf-liquidation-icon-button:active:not(:disabled) {
   transform: translateY(1px);
 }
 
-.qf-embed-page__button--primary {
-  border-color: transparent;
-  background: var(--primary);
-  color: var(--primary-foreground);
+.qf-liquidation-icon-button:disabled {
+  cursor: default;
+  opacity: 0.62;
 }
 
-.qf-embed-page__button--primary:visited {
-  color: var(--primary-foreground);
+.qf-liquidation-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0;
+  border-top: 1px solid color-mix(in oklab, var(--border) 76%, transparent);
+  border-bottom: 1px solid color-mix(in oklab, var(--border) 76%, transparent);
 }
 
-.qf-embed-page__button--primary:hover {
-  border-color: transparent;
-  background: color-mix(in oklab, var(--primary) 92%, #fff);
-  color: var(--primary-foreground);
+.qf-liquidation-metric {
+  min-width: 0;
+  padding: 0.8rem 1.15rem;
+  border-right: 1px solid color-mix(in oklab, var(--border) 76%, transparent);
 }
 
-.qf-embed-frame {
-  flex: 1;
-  min-height: 42rem;
+.qf-liquidation-metric:last-child {
+  border-right: 0;
+}
+
+.qf-liquidation-metric__label {
+  display: block;
+  color: var(--muted-foreground);
+  font-size: 0.72rem;
+  line-height: 1.2;
+}
+
+.qf-liquidation-metric__value {
+  display: block;
+  margin-top: 0.25rem;
   overflow: hidden;
-  border: 1px solid var(--border);
-  border-radius: 0.5rem;
-  background: var(--card);
+  color: var(--foreground);
+  font-family: var(--font-mono);
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.qf-embed-frame__iframe {
-  height: 100%;
-  min-height: inherit;
-  width: 100%;
-  border: 0;
+.qf-liquidation-metric__value.is-long {
+  color: #ff4055;
+}
+
+.qf-liquidation-metric__value.is-short {
+  color: #2bb8a8;
+}
+
+.qf-liquidation-chart-wrap {
+  position: relative;
+  min-height: 35rem;
+  padding: 0.65rem 0.8rem 0.8rem;
+}
+
+.qf-liquidation-chart {
+  min-width: 0;
+}
+
+.qf-liquidation-empty {
+  display: flex;
+  min-height: 34rem;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted-foreground);
+  font-size: 0.9rem;
+}
+
+.qf-liquidation-loading {
+  position: absolute;
+  top: 0.9rem;
+  right: 1rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  border: 1px solid color-mix(in oklab, var(--border) 86%, transparent);
+  border-radius: 0.45rem;
+  background: color-mix(in oklab, var(--card) 90%, transparent);
+  padding: 0.42rem 0.65rem;
+  color: var(--muted-foreground);
+  font-size: 0.78rem;
+  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.18);
+}
+
+.qf-liquidation-error {
+  margin: 0 1rem 1rem;
+  border: 1px solid color-mix(in oklab, var(--loss) 48%, transparent);
+  border-radius: 0.45rem;
+  background: color-mix(in oklab, var(--loss) 11%, transparent);
+  padding: 0.75rem 0.85rem;
+  color: var(--foreground);
+  font-size: 0.85rem;
+}
+
+.qf-liquidation-tooltip {
+  min-width: 13rem;
+  border: 1px solid var(--border);
+  border-radius: 0.45rem;
   background: var(--card);
+  padding: 0.75rem;
+  color: var(--foreground);
+  font-size: 0.78rem;
+  box-shadow: 0 16px 32px rgba(0, 0, 0, 0.28);
+}
+
+.qf-liquidation-tooltip__title {
+  margin-bottom: 0.5rem;
+  font-family: var(--font-mono);
+  font-weight: 700;
+}
+
+.qf-liquidation-tooltip__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  color: var(--muted-foreground);
+  line-height: 1.7;
+}
+
+.qf-liquidation-tooltip__row strong {
+  color: var(--foreground);
+  font-family: var(--font-mono);
+}
+
+.qf-spin {
+  animation: qf-spin 0.85s linear infinite;
+}
+
+@keyframes qf-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .qf-mobile-brand {
@@ -1038,29 +1179,6 @@ body {
     padding: 1rem;
   }
 
-  .qf-embed-page {
-    min-height: calc(100vh - 5.8rem);
-  }
-
-  .qf-embed-page__header {
-    flex-direction: column;
-  }
-
-  .qf-embed-page__actions {
-    width: 100%;
-    justify-content: stretch;
-  }
-
-  .qf-embed-page__button {
-    flex: 1;
-    min-width: min(10rem, 100%);
-  }
-
-  .qf-embed-frame {
-    min-height: 38rem;
-    border-radius: 0.35rem;
-  }
-
   .qf-rs-ranking {
     position: static;
     width: 100%;
@@ -1069,5 +1187,46 @@ body {
 
   .qf-rs-panel__surface::before {
     display: none;
+  }
+
+  .qf-liquidation-toolbar {
+    flex-direction: column;
+    padding: 1rem;
+  }
+
+  .qf-liquidation-actions {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .qf-liquidation-select {
+    flex: 1;
+    justify-content: space-between;
+    min-width: 0;
+  }
+
+  .qf-liquidation-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .qf-liquidation-metric:nth-child(2n) {
+    border-right: 0;
+  }
+
+  .qf-liquidation-metric:nth-child(n + 3) {
+    border-top: 1px solid color-mix(in oklab, var(--border) 76%, transparent);
+  }
+
+  .qf-liquidation-chart-wrap {
+    min-height: 28rem;
+    padding: 0.5rem 0.25rem 0.7rem;
+  }
+
+  .qf-liquidation-chart {
+    height: 28rem !important;
+  }
+
+  .qf-liquidation-empty {
+    min-height: 27rem;
   }
 }

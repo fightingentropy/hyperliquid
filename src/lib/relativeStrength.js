@@ -1,6 +1,9 @@
 import { formatTooltipTimestamp, pad2 } from "./formatters";
 
 export const DEFAULT_RELATIVE_STRENGTH_FOCUS = "HYPE";
+export const DEFAULT_RELATIVE_STRENGTH_WINDOW = "7d";
+export const DEFAULT_RELATIVE_STRENGTH_SCOPE = "combined";
+export const DEFAULT_RELATIVE_STRENGTH_UNIVERSE_SIZE = 24;
 
 export const RELATIVE_STRENGTH_WINDOW_OPTIONS = [
   { value: "24h", label: "24H" },

@@ -1,12 +1,17 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
-import { fetchRelativeStrengthUniverse } from "../api/hyperliquid";
+import { SlidersHorizontal } from "lucide-react";
+import { fetchRelativeStrengthMarkets, fetchRelativeStrengthUniverse } from "../api/hyperliquid";
 import ButtonGroup from "../components/ButtonGroup";
 import DeferredMount from "../components/DeferredMount";
 import MetricCard from "../components/MetricCard";
+import RelativeStrengthConfigModal from "../components/RelativeStrengthConfigModal";
 import { usePollingResource } from "../hooks/usePollingResource";
 import { formatPercent, formatSignedPercent } from "../lib/formatters";
 import {
   DEFAULT_RELATIVE_STRENGTH_FOCUS,
+  DEFAULT_RELATIVE_STRENGTH_SCOPE,
+  DEFAULT_RELATIVE_STRENGTH_UNIVERSE_SIZE,
+  DEFAULT_RELATIVE_STRENGTH_WINDOW,
   RELATIVE_STRENGTH_MARKET_OPTIONS,
   RELATIVE_STRENGTH_UNIVERSE_OPTIONS,
   RELATIVE_STRENGTH_WINDOW_OPTIONS,
@@ -16,6 +21,69 @@ import {
 } from "../lib/relativeStrength";
 
 const RelativeStrengthChart = lazy(() => import("../components/RelativeStrengthChart"));
+const RELATIVE_STRENGTH_MODEL_STORAGE_KEY = "hl-stats.relativeStrengthModel.v1";
+
+function uniqueSymbols(symbols) {
+  return Array.from(
+    new Set(
+      symbols
+        .map((symbol) => String(symbol ?? "").trim().toUpperCase())
+        .filter(Boolean),
+    ),
+  );
+}
+
+function optionValueExists(options, value) {
+  return options.some((option) => option.value === value);
+}
+
+function readStoredRelativeStrengthModel() {
+  const fallback = {
+    chartWindow: DEFAULT_RELATIVE_STRENGTH_WINDOW,
+    marketScope: DEFAULT_RELATIVE_STRENGTH_SCOPE,
+    universeSize: DEFAULT_RELATIVE_STRENGTH_UNIVERSE_SIZE,
+    benchmarkSymbol: DEFAULT_RELATIVE_STRENGTH_FOCUS,
+    selectedSymbols: null,
+  };
+
+  if (typeof window === "undefined") {
+    return fallback;
+  }
+
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(RELATIVE_STRENGTH_MODEL_STORAGE_KEY));
+
+    if (!parsed || typeof parsed !== "object") {
+      return fallback;
+    }
+
+    return {
+      chartWindow: optionValueExists(RELATIVE_STRENGTH_WINDOW_OPTIONS, parsed.chartWindow)
+        ? parsed.chartWindow
+        : fallback.chartWindow,
+      marketScope: optionValueExists(RELATIVE_STRENGTH_MARKET_OPTIONS, parsed.marketScope)
+        ? parsed.marketScope
+        : fallback.marketScope,
+      universeSize: optionValueExists(RELATIVE_STRENGTH_UNIVERSE_OPTIONS, parsed.universeSize)
+        ? parsed.universeSize
+        : fallback.universeSize,
+      benchmarkSymbol: String(parsed.benchmarkSymbol ?? fallback.benchmarkSymbol).toUpperCase(),
+      selectedSymbols: Array.isArray(parsed.selectedSymbols)
+        ? uniqueSymbols(parsed.selectedSymbols)
+        : fallback.selectedSymbols,
+    };
+  } catch {
+    return fallback;
+  }
+}
+
+function writeStoredRelativeStrengthModel(model) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.localStorage.setItem(RELATIVE_STRENGTH_MODEL_STORAGE_KEY, JSON.stringify(model));
+}
 
 function metricTone(value) {
   if (!Number.isFinite(value) || value === 0) {
@@ -60,10 +128,14 @@ function ChartLoadingState({ height = 640 }) {
 }
 
 export default function RelativeStrengthPage() {
-  const [chartWindow, setChartWindow] = useState("24h");
-  const [marketScope, setMarketScope] = useState("crypto");
-  const [universeSize, setUniverseSize] = useState(24);
-  const [focusSymbol, setFocusSymbol] = useState(DEFAULT_RELATIVE_STRENGTH_FOCUS);
+  const [initialModel] = useState(readStoredRelativeStrengthModel);
+  const [chartWindow, setChartWindow] = useState(initialModel.chartWindow);
+  const [marketScope, setMarketScope] = useState(initialModel.marketScope);
+  const [universeSize, setUniverseSize] = useState(initialModel.universeSize);
+  const [benchmarkSymbol, setBenchmarkSymbol] = useState(initialModel.benchmarkSymbol);
+  const [selectedSymbols, setSelectedSymbols] = useState(initialModel.selectedSymbols);
+  const [modelOpen, setModelOpen] = useState(false);
+  const selectedSymbolsKey = selectedSymbols?.length ? selectedSymbols.join(",") : "auto";
 
   const resource = usePollingResource(
     () =>
@@ -71,12 +143,23 @@ export default function RelativeStrengthPage() {
         chartWindow,
         limit: universeSize,
         marketScope,
+        benchmarkSymbol,
+        includedSymbols: selectedSymbols,
       }),
-    [chartWindow, marketScope, universeSize],
+    [chartWindow, marketScope, universeSize, benchmarkSymbol, selectedSymbolsKey],
     {
       intervalMs: 300_000,
-      cacheKey: `relative-strength:${chartWindow}:${marketScope}:${universeSize}`,
+      cacheKey: `relative-strength:${chartWindow}:${marketScope}:${universeSize}:${benchmarkSymbol}:${selectedSymbolsKey}`,
       staleTimeMs: 60_000,
+    },
+  );
+  const marketsResource = usePollingResource(
+    () => fetchRelativeStrengthMarkets({ marketScope: "combined" }),
+    [],
+    {
+      intervalMs: 300_000,
+      cacheKey: "relative-strength:markets:combined",
+      staleTimeMs: 300_000,
     },
   );
 
@@ -86,17 +169,44 @@ export default function RelativeStrengthPage() {
   );
 
   useEffect(() => {
-    const nextFocus = resolveRelativeStrengthFocus(model.assets, focusSymbol);
+    const nextFocus = resolveRelativeStrengthFocus(model.assets, benchmarkSymbol);
 
-    if (nextFocus && nextFocus !== focusSymbol) {
-      setFocusSymbol(nextFocus);
+    if (nextFocus && nextFocus !== benchmarkSymbol) {
+      setBenchmarkSymbol(nextFocus);
     }
-  }, [focusSymbol, model.assets]);
+  }, [benchmarkSymbol, model.assets]);
+
+  useEffect(() => {
+    writeStoredRelativeStrengthModel({
+      chartWindow,
+      marketScope,
+      universeSize,
+      benchmarkSymbol,
+      selectedSymbols,
+    });
+  }, [benchmarkSymbol, chartWindow, marketScope, selectedSymbols, universeSize]);
 
   const snapshot = useMemo(
-    () => buildRelativeStrengthSnapshot(model.assets, focusSymbol),
-    [focusSymbol, model.assets],
+    () => buildRelativeStrengthSnapshot(model.assets, benchmarkSymbol),
+    [benchmarkSymbol, model.assets],
   );
+  const activeSymbols = useMemo(
+    () => uniqueSymbols(model.assets.map((asset) => asset.symbol)),
+    [model.assets],
+  );
+  const availableMarkets = marketsResource.data?.markets ?? resource.data?.markets ?? [];
+  const customModelActive = Boolean(selectedSymbols?.length);
+
+  const handleMarketScopeChange = (nextScope) => {
+    setMarketScope(nextScope);
+    setSelectedSymbols(null);
+  };
+
+  const handleApplyModel = (nextModel) => {
+    setMarketScope(nextModel.marketScope);
+    setBenchmarkSymbol(nextModel.benchmarkSymbol);
+    setSelectedSymbols(nextModel.selectedSymbols?.length ? nextModel.selectedSymbols : null);
+  };
 
   return (
     <div className="space-y-6">
@@ -115,7 +225,7 @@ export default function RelativeStrengthPage() {
               kind="segmented"
               options={RELATIVE_STRENGTH_MARKET_OPTIONS}
               value={marketScope}
-              onChange={setMarketScope}
+              onChange={handleMarketScopeChange}
               size="sm"
             />
             <ButtonGroup
@@ -125,12 +235,35 @@ export default function RelativeStrengthPage() {
               onChange={setChartWindow}
               uppercase
             />
-            <ButtonGroup
-              kind="pills"
-              options={RELATIVE_STRENGTH_UNIVERSE_OPTIONS}
-              value={universeSize}
-              onChange={setUniverseSize}
-            />
+            {customModelActive ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="rounded-sm bg-muted px-3 py-1.5 text-xs font-medium text-foreground">
+                  Custom {selectedSymbols.length} assets
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setSelectedSymbols(null)}
+                  className="rounded-sm px-3 py-1.5 text-xs font-medium text-muted-foreground transition hover:bg-muted/50 hover:text-foreground"
+                >
+                  Auto
+                </button>
+              </div>
+            ) : (
+              <ButtonGroup
+                kind="pills"
+                options={RELATIVE_STRENGTH_UNIVERSE_OPTIONS}
+                value={universeSize}
+                onChange={setUniverseSize}
+              />
+            )}
+            <button
+              type="button"
+              onClick={() => setModelOpen(true)}
+              className="inline-flex h-10 items-center gap-2 rounded-sm border border-border px-3 text-sm font-medium text-muted-foreground transition hover:bg-muted/50 hover:text-foreground"
+            >
+              <SlidersHorizontal className="size-4" />
+              Model
+            </button>
           </div>
         </div>
 
@@ -142,7 +275,7 @@ export default function RelativeStrengthPage() {
             loading={resource.isLoading && !resource.data}
           />
           <MetricCard
-            label="Focus"
+            label="Benchmark"
             value={formatAssetMove(snapshot.focus)}
             tone={metricTone(snapshot.focus?.latestChange)}
             loading={resource.isLoading && !resource.data}
@@ -173,7 +306,7 @@ export default function RelativeStrengthPage() {
           <div>
             <h2 className="text-lg font-light text-foreground">Cross-market strength map</h2>
             <p className="text-sm text-muted-foreground">
-              Click a symbol on the left to highlight it. The active line gets a live tag on the
+              Click a symbol on the left to set the benchmark. The active line gets a live tag on the
               right edge.
             </p>
           </div>
@@ -200,14 +333,26 @@ export default function RelativeStrengthPage() {
               <RelativeStrengthChart
                 data={model.chartData}
                 assets={model.assets}
-                focusSymbol={focusSymbol}
-                onFocusChange={setFocusSymbol}
+                focusSymbol={benchmarkSymbol}
+                onFocusChange={setBenchmarkSymbol}
                 domain={model.domain}
               />
             </Suspense>
           </DeferredMount>
         ) : null}
       </section>
+
+      <RelativeStrengthConfigModal
+        open={modelOpen}
+        markets={availableMarkets}
+        marketScope={marketScope}
+        benchmarkSymbol={benchmarkSymbol}
+        selectedSymbols={selectedSymbols}
+        activeSymbols={activeSymbols}
+        onApply={handleApplyModel}
+        onClose={() => setModelOpen(false)}
+        isLoading={marketsResource.isLoading && !marketsResource.data}
+      />
     </div>
   );
 }

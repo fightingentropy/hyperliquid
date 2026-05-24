@@ -180,6 +180,48 @@ function getRelativeStrengthPinnedCoins(marketScope) {
   return RELATIVE_STRENGTH_CRYPTO_PINS;
 }
 
+async function loadRelativeStrengthMarkets(marketScope) {
+  const includeCrypto = marketScope !== "tradfi";
+  const includeTradFi = marketScope !== "crypto";
+  const marketGroups = await Promise.all([
+    includeCrypto ? fetchPerpMetaAndAssetCtxs() : Promise.resolve(null),
+    includeTradFi ? fetchPerpMetaAndAssetCtxs({ dex: XYZ_DEX }) : Promise.resolve(null),
+  ]);
+  const [cryptoPayload, tradFiPayload] = marketGroups;
+  const markets = [
+    ...(cryptoPayload
+      ? parsePerpMarkets(cryptoPayload[0]?.universe ?? [], cryptoPayload[1] ?? [], {
+          marketType: "crypto",
+        })
+      : []),
+    ...(tradFiPayload
+      ? parsePerpMarkets(tradFiPayload[0]?.universe ?? [], tradFiPayload[1] ?? [], {
+          dex: XYZ_DEX,
+          marketType: "tradfi",
+        })
+      : []),
+  ];
+  const seen = new Set();
+
+  return markets
+    .sort((left, right) => right.dayNotionalVolume - left.dayNotionalVolume)
+    .filter((market) => {
+      if (seen.has(market.symbol)) {
+        return false;
+      }
+
+      seen.add(market.symbol);
+      return true;
+    });
+}
+
+export async function fetchRelativeStrengthMarkets({ marketScope = "combined" } = {}) {
+  return {
+    asOf: Date.now(),
+    markets: await loadRelativeStrengthMarkets(marketScope),
+  };
+}
+
 async function fetchAssetCandles({ coin, startTime }) {
   const payload = await requestHyperliquidInfo({
     type: "candleSnapshot",
@@ -201,35 +243,21 @@ export async function fetchRelativeStrengthUniverse({
   chartWindow = "24h",
   limit = 24,
   marketScope = "crypto",
+  benchmarkSymbol = "HYPE",
+  includedSymbols,
   pinnedCoins,
 } = {}) {
-  const includeCrypto = marketScope !== "tradfi";
-  const includeTradFi = marketScope !== "crypto";
-  const marketGroups = await Promise.all([
-    includeCrypto ? fetchPerpMetaAndAssetCtxs() : Promise.resolve(null),
-    includeTradFi ? fetchPerpMetaAndAssetCtxs({ dex: XYZ_DEX }) : Promise.resolve(null),
-  ]);
-  const [cryptoPayload, tradFiPayload] = marketGroups;
-  const allMarkets = [
-    ...(cryptoPayload
-      ? parsePerpMarkets(cryptoPayload[0]?.universe ?? [], cryptoPayload[1] ?? [], {
-          marketType: "crypto",
-        })
-      : []),
-    ...(tradFiPayload
-      ? parsePerpMarkets(tradFiPayload[0]?.universe ?? [], tradFiPayload[1] ?? [], {
-          dex: XYZ_DEX,
-          marketType: "tradfi",
-        })
-      : []),
-  ];
-  const rankedMarkets = [...allMarkets].sort(
-    (left, right) => right.dayNotionalVolume - left.dayNotionalVolume,
-  );
+  const rankedMarkets = await loadRelativeStrengthMarkets(marketScope);
   const marketLookup = buildMarketLookup(rankedMarkets);
   const selectedMarkets = [];
   const seen = new Set();
-  const pinnedMarkets = pinnedCoins ?? getRelativeStrengthPinnedCoins(marketScope);
+  const explicitSymbols = Array.isArray(includedSymbols)
+    ? includedSymbols.filter(Boolean)
+    : null;
+  const benchmarkPins = benchmarkSymbol ? [benchmarkSymbol] : [];
+  const pinnedMarkets = explicitSymbols?.length
+    ? [...benchmarkPins, ...explicitSymbols]
+    : [...benchmarkPins, ...(pinnedCoins ?? getRelativeStrengthPinnedCoins(marketScope))];
 
   const appendMarket = (symbol) => {
     if (!symbol) {
@@ -247,11 +275,14 @@ export async function fetchRelativeStrengthUniverse({
   };
 
   pinnedMarkets.forEach(appendMarket);
-  rankedMarkets.forEach((market) => {
-    if (selectedMarkets.length < limit) {
-      appendMarket(market.symbol);
-    }
-  });
+
+  if (!explicitSymbols?.length) {
+    rankedMarkets.forEach((market) => {
+      if (selectedMarkets.length < limit) {
+        appendMarket(market.symbol);
+      }
+    });
+  }
 
   const startTime =
     Date.now() - (getRelativeStrengthLookbackHours(chartWindow) + 1) * 60 * 60 * 1000;
@@ -268,6 +299,7 @@ export async function fetchRelativeStrengthUniverse({
 
   return {
     asOf: Date.now(),
+    markets: rankedMarkets,
     assets: results
       .filter((result) => result.status === "fulfilled")
       .map((result) => result.value)

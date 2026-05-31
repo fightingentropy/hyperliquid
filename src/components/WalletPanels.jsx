@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { ExternalLink, Share2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import ButtonGroup from "./ButtonGroup";
@@ -79,6 +80,28 @@ function formatCompactSignedCurrencyLower(value, maximumFractionDigits = 2) {
   }
 
   return `${value > 0 ? "+" : "-"}${formatCompactCurrencyLower(value, maximumFractionDigits)}`;
+}
+
+function formatPositionPrice(value) {
+  if (!Number.isFinite(value)) {
+    return "—";
+  }
+
+  return `$${new Intl.NumberFormat("en-US", {
+    maximumFractionDigits: 4,
+  }).format(value)}`;
+}
+
+function formatPositionFunding(value) {
+  if (!Number.isFinite(value)) {
+    return "—";
+  }
+
+  if (Math.abs(value) >= 1_000) {
+    return formatCompactSignedCurrencyLower(value, 2);
+  }
+
+  return formatSignedCurrency(value, 4);
 }
 
 function formatNetCurrency(value, maximumFractionDigits = 2) {
@@ -284,13 +307,23 @@ function ErrorState({ message }) {
 }
 
 function PositionTokenMark({ coin }) {
+  const [imageFailed, setImageFailed] = useState(false);
   const normalizedCoin = String(coin ?? "").replace(/^xyz:/i, "").trim();
   const label = normalizedCoin.slice(0, normalizedCoin.length <= 3 ? 2 : 1).toUpperCase();
+  const rawCoin = String(coin ?? "").trim();
+  const iconName = rawCoin.replace(/^xyz:/i, "xyz__").replace(/[/:]/g, "__");
+  const iconSrc = iconName ? `/hyperliquid/coins/${iconName}.svg` : "";
 
-  if (normalizedCoin.toUpperCase() === "HYPE") {
+  if (iconSrc && !imageFailed) {
     return (
       <span className="qf-position-token qf-position-token--image">
-        <img src="/assets/hyperliquid-symbol-light.png" alt="" aria-hidden="true" />
+        <img
+          src={iconSrc}
+          alt=""
+          aria-hidden="true"
+          loading="lazy"
+          onError={() => setImageFailed(true)}
+        />
       </span>
     );
   }
@@ -308,10 +341,6 @@ function PositionTokenMark({ coin }) {
       {label || "?"}
     </span>
   );
-}
-
-function buildPositionMarketUrl(coin) {
-  return `https://app.hyperliquid.xyz/trade/${encodeURIComponent(String(coin ?? "").trim())}`;
 }
 
 export function WalletPositionsPanel({ tabs, snapshot, viewMode, onViewModeChange, error, loading }) {
@@ -336,7 +365,7 @@ export function WalletPositionsPanel({ tabs, snapshot, viewMode, onViewModeChang
 
       <div className="qf-positions-summary">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
+          <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
             <span className="font-mono">
               Long: <span className="text-profit">{formatCompactCurrencyLower(snapshot.longExposureUsd)}</span>
             </span>
@@ -346,7 +375,7 @@ export function WalletPositionsPanel({ tabs, snapshot, viewMode, onViewModeChang
           </div>
 
           <div className="flex items-center justify-between gap-3 sm:justify-end">
-            <span className="font-mono text-sm text-muted-foreground">
+            <span className="font-mono text-xs text-muted-foreground">
               Total PnL:{" "}
               <span className={toneClass(snapshot.totalUnrealizedPnlUsd)}>
                 {formatCompactSignedCurrencyLower(snapshot.totalUnrealizedPnlUsd)}
@@ -366,16 +395,16 @@ export function WalletPositionsPanel({ tabs, snapshot, viewMode, onViewModeChang
         </div>
       </div>
 
-      <div className="qf-positions-totals hidden flex-wrap items-center gap-5 text-sm text-muted-foreground sm:flex">
-        <span className="font-mono">
-          Value: <span className="text-foreground">{formatCurrency(snapshot.accountValueUsd, 0)}</span>
+      <div className="qf-positions-totals hidden flex-wrap items-center gap-4 text-sm text-muted-foreground sm:flex">
+        <span>
+          Value: <span className="font-mono text-foreground">{formatCurrency(snapshot.accountValueUsd, 2)}</span>
         </span>
-        <span className="font-mono">
-          Notional: <span className="text-foreground">{formatCurrency(snapshot.totalNotionalUsd, 2)}</span>
+        <span>
+          Notional: <span className="font-mono text-foreground">{formatCurrency(snapshot.totalNotionalUsd, 2)}</span>
         </span>
-        <span className="font-mono">
+        <span>
           Net Notional:{" "}
-          <span className="text-foreground">{formatNetCurrency(snapshot.netExposureUsd, 2)}</span>
+          <span className="font-mono text-foreground">{formatNetCurrency(snapshot.netExposureUsd, 2)}</span>
         </span>
       </div>
 
@@ -486,19 +515,19 @@ export function WalletPositionsPanel({ tabs, snapshot, viewMode, onViewModeChang
         </div>
       ) : (
         <div className="overflow-x-auto">
-          <table className="qf-positions-table w-full min-w-[1120px]">
+          <table className="qf-positions-table w-full min-w-[1216px]">
             <thead>
               <tr>
-                <th>Symbol</th>
-                <th className="text-right">Size</th>
-                <th className="text-right">Entry Price</th>
-                <th className="text-right">Mark Price</th>
-                <th className="text-right">Position Value</th>
-                <th className="text-right">Unrealized PnL</th>
-                <th className="text-right">ROE</th>
-                <th className="text-right">Funding</th>
-                <th className="text-right">Liq. Price</th>
-                <th className="w-12" aria-label="Actions" />
+                <th className="qf-positions-col-symbol">Symbol</th>
+                <th className="qf-positions-col-size text-right">Size</th>
+                <th className="qf-positions-col-price text-right">Entry Price</th>
+                <th className="qf-positions-col-price text-right">Mark Price</th>
+                <th className="qf-positions-col-value text-right">Position Value</th>
+                <th className="qf-positions-col-value text-right">Unrealized PnL</th>
+                <th className="qf-positions-col-roe text-right">ROE</th>
+                <th className="qf-positions-col-funding text-right">Funding</th>
+                <th className="qf-positions-col-liq text-right">Liq. Price</th>
+                <th className="qf-positions-col-action text-right" aria-label="Actions" />
               </tr>
             </thead>
             <tbody>
@@ -524,8 +553,8 @@ export function WalletPositionsPanel({ tabs, snapshot, viewMode, onViewModeChang
                   >
                     {formatPositionQuantity(position.size)}
                   </td>
-                  <td className="text-right font-mono">{formatPrice(position.entryPrice)}</td>
-                  <td className="text-right font-mono">{formatPrice(position.markPrice)}</td>
+                  <td className="text-right font-mono tabular-nums">{formatPositionPrice(position.entryPrice)}</td>
+                  <td className="text-right font-mono tabular-nums">{formatPositionPrice(position.markPrice)}</td>
                   <td className="text-right font-mono tabular-nums">
                     {formatCompactCurrencyLower(position.positionValueUsd)}
                   </td>
@@ -536,22 +565,20 @@ export function WalletPositionsPanel({ tabs, snapshot, viewMode, onViewModeChang
                     {formatSignedPercent(position.roePct, 4)}
                   </td>
                   <td className={cx("text-right font-mono", toneClass(position.fundingUsd))}>
-                    {formatCompactSignedCurrencyLower(position.fundingUsd, 2)}
+                    {formatPositionFunding(position.fundingUsd)}
                   </td>
                   <td className="text-right font-mono text-muted-foreground">
-                    {position.liquidationPrice === null ? "-" : formatPrice(position.liquidationPrice)}
+                    {position.liquidationPrice === null ? "-" : formatPositionPrice(position.liquidationPrice)}
                   </td>
                   <td className="text-right">
-                    <a
-                      href={buildPositionMarketUrl(position.coin)}
-                      target="_blank"
-                      rel="noreferrer noopener"
+                    <button
+                      type="button"
                       className="qf-position-action"
-                      aria-label={`Open ${position.coin} market`}
-                      title={`Open ${position.coin} market`}
+                      aria-label={`Share poster for ${position.coin} ${position.side.toLowerCase()}`}
+                      title="Share poster"
                     >
-                      <Share2 className="size-4" aria-hidden="true" />
-                    </a>
+                      <Share2 className="size-3.5" aria-hidden="true" />
+                    </button>
                   </td>
                 </tr>
               ))}

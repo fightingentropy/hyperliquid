@@ -72,8 +72,8 @@ export default function WalletPerformanceChart({ data, metric, loading, height =
     );
   }
 
-  const stroke = metric === "pnl" ? "var(--primary)" : "var(--foreground)";
-  const fill = metric === "pnl" ? "rgba(249, 115, 22, 0.16)" : "rgba(255, 255, 255, 0.08)";
+  const stroke = metric === "pnl" ? "var(--profit)" : "var(--foreground)";
+  const fill = metric === "pnl" ? "rgba(52, 211, 153, 0.16)" : "rgba(255, 255, 255, 0.08)";
   const initialDimension = { width: -1, height };
 
   return (

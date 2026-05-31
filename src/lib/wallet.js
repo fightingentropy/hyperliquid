@@ -252,24 +252,6 @@ export function buildPositionSnapshot(entries) {
     }
   }
 
-  positions.sort((left, right) => {
-    const leftDexIndex = PERP_DEX_ORDER.indexOf(left.dex);
-    const rightDexIndex = PERP_DEX_ORDER.indexOf(right.dex);
-
-    if (leftDexIndex !== rightDexIndex) {
-      return leftDexIndex - rightDexIndex;
-    }
-
-    const leftSideRank = left.side === "LONG" ? 0 : left.side === "SHORT" ? 1 : 2;
-    const rightSideRank = right.side === "LONG" ? 0 : right.side === "SHORT" ? 1 : 2;
-
-    if (leftSideRank !== rightSideRank) {
-      return leftSideRank - rightSideRank;
-    }
-
-    return right.positionValueUsd - left.positionValueUsd;
-  });
-
   return {
     positions,
     accountValueUsd,

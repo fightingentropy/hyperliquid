@@ -30,7 +30,6 @@ function WalletCompositionTooltip({ active, payload }) {
 }
 
 export default function WalletCompositionCard({ slices }) {
-  const total = slices.reduce((sum, slice) => sum + slice.valueUsd, 0);
   const colors = {
     spot: "#22c55e",
     staked: "#a78bfa",
@@ -49,44 +48,9 @@ export default function WalletCompositionCard({ slices }) {
           Spot vs staked HYPE vs perps (perp equity).
         </p>
 
-        <div className="space-y-3 pt-1 lg:hidden">
-          <div className="h-3 w-full overflow-hidden rounded-sm border border-border bg-muted">
-            <div className="flex h-full w-full">
-              {chartSlices.map((slice) => (
-                <div
-                  key={slice.key}
-                  className="h-full"
-                  style={{
-                    width: `${total > 0 ? (slice.valueUsd / total) * 100 : 0}%`,
-                    backgroundColor: slice.color,
-                  }}
-                />
-              ))}
-            </div>
-          </div>
-
-          <div className="space-y-2 text-xs">
-            {chartSlices.map((slice) => (
-              <div key={slice.key} className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  <span
-                    className="h-2.5 w-2.5 rounded-sm"
-                    style={{ backgroundColor: slice.color }}
-                  />
-                  <span className="text-muted-foreground">{slice.label}</span>
-                </div>
-                <div className="flex items-baseline gap-2">
-                  <span className="font-mono text-foreground">{formatCurrency(slice.valueUsd, 2)}</span>
-                  <span className="font-mono text-muted-foreground">{slice.percent.toFixed(1)}%</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="hidden items-center gap-4 pt-1 lg:flex">
-          <div className="flex h-44 w-44 shrink-0 items-center justify-center">
-            <RechartsPieChart width={176} height={176}>
+        <div className="space-y-4 pt-4">
+          <div className="flex justify-center">
+            <RechartsPieChart width={224} height={224}>
               <Tooltip content={<WalletCompositionTooltip />} />
               <Pie
                 data={chartSlices}
@@ -94,8 +58,8 @@ export default function WalletCompositionCard({ slices }) {
                 nameKey="label"
                 cx="50%"
                 cy="50%"
-                innerRadius={54}
-                outerRadius={74}
+                innerRadius={0}
+                outerRadius={84}
                 stroke="var(--border)"
                 strokeWidth={1}
                 isAnimationActive={false}
@@ -107,19 +71,22 @@ export default function WalletCompositionCard({ slices }) {
             </RechartsPieChart>
           </div>
 
-          <div className="min-w-0 flex-1 space-y-2 text-xs">
+          <div className="grid grid-cols-1 gap-2 text-[10px] sm:grid-cols-3">
             {chartSlices.map((slice) => (
-              <div key={slice.key} className="flex items-center justify-between gap-3">
-                <div className="flex min-w-0 items-center gap-2">
+              <div
+                key={slice.key}
+                className="min-w-0 rounded-sm border border-border px-1.5 py-2"
+              >
+                <div className="mb-1 flex min-w-0 items-center gap-1">
                   <span
-                    className="h-2.5 w-2.5 rounded-sm"
+                    className="h-2.5 w-2.5 shrink-0 rounded-sm"
                     style={{ backgroundColor: slice.color }}
                   />
                   <span className="text-muted-foreground">{slice.label}</span>
                 </div>
-                <div className="flex items-baseline gap-2">
-                  <span className="font-mono text-foreground">{formatCurrency(slice.valueUsd, 2)}</span>
-                  <span className="font-mono text-muted-foreground">{slice.percent.toFixed(1)}%</span>
+                <div className="flex min-w-0 items-baseline gap-2">
+                  <span className="truncate font-mono text-foreground">{formatCurrency(slice.valueUsd, 2)}</span>
+                  <span className="shrink-0 font-mono text-muted-foreground">{slice.percent.toFixed(1)}%</span>
                 </div>
               </div>
             ))}

@@ -79,7 +79,7 @@ export default function WalletPage() {
 
   const [selectedTab, setSelectedTab] = useState("positions");
   const [performanceMetric, setPerformanceMetric] = useState("pnl");
-  const [performanceScope, setPerformanceScope] = useState("perp");
+  const [performanceScope, setPerformanceScope] = useState("total");
   const [performanceRange, setPerformanceRange] = useState("all");
   const [positionsView, setPositionsView] = useState("table");
   const [walletInput, setWalletInput] = useState(walletAddress);
@@ -90,7 +90,7 @@ export default function WalletPage() {
 
   useEffect(() => {
     const previousTitle = document.title;
-    document.title = "Hyperliquid";
+    document.title = "Qwantify";
 
     return () => {
       document.title = previousTitle;

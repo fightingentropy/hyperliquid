@@ -33,6 +33,24 @@ const XYZ_DISPLAY_ALIASES = {
   "XYZ:XYZ100": "NDX",
 };
 
+function dexLabel(dex) {
+  return dex || "main";
+}
+
+function throwIfDexRequestsFailed(results, resourceName) {
+  const failedDexes = results
+    .map((result, index) => (result.status === "rejected" ? dexLabel(PERP_DEXES[index]) : null))
+    .filter(Boolean);
+
+  if (!failedDexes.length) {
+    return;
+  }
+
+  throw new Error(
+    `Failed to load ${resourceName} for ${failedDexes.length}/${PERP_DEXES.length} perp DEXes: ${failedDexes.join(", ")}.`,
+  );
+}
+
 async function requestHyperliquidInfo(payload, options = {}) {
   return requestJson(
     HYPERLIQUID_INFO_URL,
@@ -330,6 +348,8 @@ export async function fetchAllClearinghouseStates({ user }) {
     }),
   );
 
+  throwIfDexRequestsFailed(results, "clearinghouse state");
+
   return results
     .filter((result) => result.status === "fulfilled")
     .map((result) => result.value);
@@ -353,6 +373,8 @@ export async function fetchAllOpenOrders({ user }) {
       };
     }),
   );
+
+  throwIfDexRequestsFailed(results, "open orders");
 
   return results
     .filter((result) => result.status === "fulfilled")

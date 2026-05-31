@@ -37,6 +37,12 @@ function routeErrorMessage(error, fallback) {
   return error instanceof Error ? error.message : fallback;
 }
 
+function formatDeltaValue(deltas, windowValue) {
+  const value = deltas?.[windowValue]?.netUsd;
+
+  return Number.isFinite(value) ? formatSignedCurrency(Math.round(value)) : "—";
+}
+
 function ChartLoadingState({ height = 360 }) {
   return (
     <div
@@ -250,31 +256,31 @@ export default function MarketFlowPage() {
       <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
         <MetricCard
           label="Net delta 1h"
-          value={deltas ? formatSignedCurrency(Math.round(deltas["1h"].netUsd)) : "—"}
+          value={formatDeltaValue(deltas, "1h")}
           tone={metricTone(deltas?.["1h"]?.netUsd)}
           loading={batchResource.isLoading && !summary}
         />
         <MetricCard
           label="Net delta 4h"
-          value={deltas ? formatSignedCurrency(Math.round(deltas["4h"].netUsd)) : "—"}
+          value={formatDeltaValue(deltas, "4h")}
           tone={metricTone(deltas?.["4h"]?.netUsd)}
           loading={batchResource.isLoading && !summary}
         />
         <MetricCard
           label="Net delta 1D"
-          value={deltas ? formatSignedCurrency(Math.round(deltas["24h"].netUsd)) : "—"}
+          value={formatDeltaValue(deltas, "24h")}
           tone={metricTone(deltas?.["24h"]?.netUsd)}
           loading={batchResource.isLoading && !summary}
         />
         <MetricCard
           label="Net delta 7d"
-          value={deltas ? formatSignedCurrency(Math.round(deltas["7d"].netUsd)) : "—"}
+          value={formatDeltaValue(deltas, "7d")}
           tone={metricTone(deltas?.["7d"]?.netUsd)}
           loading={batchResource.isLoading && !summary}
         />
         <MetricCard
           label="Net delta 30d"
-          value={deltas ? formatSignedCurrency(Math.round(deltas["30d"].netUsd)) : "—"}
+          value={formatDeltaValue(deltas, "30d")}
           tone={metricTone(deltas?.["30d"]?.netUsd)}
           loading={batchResource.isLoading && !summary}
         />

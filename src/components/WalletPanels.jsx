@@ -65,6 +65,10 @@ function formatSignedPercent(value, maximumFractionDigits = 1) {
   }).format(value)}%`;
 }
 
+function formatMaybePercent(value, maximumFractionDigits = 1) {
+  return Number.isFinite(value) ? formatPercent(value, maximumFractionDigits) : "—";
+}
+
 function StatCard({ label, value, valueSuffix, tone = "neutral", badge, footer }) {
   return (
     <div className="rounded-sm border border-border bg-card">
@@ -102,8 +106,8 @@ function StatCard({ label, value, valueSuffix, tone = "neutral", badge, footer }
 
 export function WalletOverviewGrid({ metrics, slices }) {
   const sliceMap = Object.fromEntries(slices.map((s) => [s.key, s]));
-  const realized24h = `${formatSignedCurrency(metrics.realizedDelta24hUsd, 2)} (${formatPercent(metrics.realizedDelta24hPct ?? 0, 1)})`;
-  const realized7d = `${formatSignedCurrency(metrics.realizedDelta7dUsd, 2)} (${formatPercent(metrics.realizedDelta7dPct ?? 0, 1)})`;
+  const realized24h = `${formatSignedCurrency(metrics.realizedDelta24hUsd, 2)} (${formatMaybePercent(metrics.realizedDelta24hPct, 1)})`;
+  const realized7d = `${formatSignedCurrency(metrics.realizedDelta7dUsd, 2)} (${formatMaybePercent(metrics.realizedDelta7dPct, 1)})`;
 
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">

@@ -1,5 +1,6 @@
 const REQUEST_CACHE = new Map();
 const IN_FLIGHT_REQUESTS = new Map();
+const REQUEST_CACHE_MAX_ENTRIES = 200;
 
 function buildRequestCacheKey(url, init) {
   const method = String(init?.method ?? "GET").toUpperCase();
@@ -32,6 +33,31 @@ function writeCachedJson(cacheKey, data, cacheTtlMs) {
   REQUEST_CACHE.set(cacheKey, {
     data,
     expiresAt: Date.now() + cacheTtlMs,
+  });
+
+  pruneRequestCache();
+}
+
+function pruneRequestCache() {
+  const now = Date.now();
+
+  for (const [cacheKey, cachedEntry] of REQUEST_CACHE.entries()) {
+    if (cachedEntry.expiresAt <= now) {
+      REQUEST_CACHE.delete(cacheKey);
+    }
+  }
+
+  if (REQUEST_CACHE.size <= REQUEST_CACHE_MAX_ENTRIES) {
+    return;
+  }
+
+  const oldestEntries = [...REQUEST_CACHE.entries()].sort(
+    (left, right) => left[1].expiresAt - right[1].expiresAt,
+  );
+  const removeCount = REQUEST_CACHE.size - REQUEST_CACHE_MAX_ENTRIES;
+
+  oldestEntries.slice(0, removeCount).forEach(([cacheKey]) => {
+    REQUEST_CACHE.delete(cacheKey);
   });
 }
 
@@ -69,11 +95,12 @@ export async function requestJson(url, init, options = {}) {
 
   if (cacheKey && dedupe) {
     IN_FLIGHT_REQUESTS.set(cacheKey, requestPromise);
-    requestPromise.finally(() => {
+    const cleanup = () => {
       if (IN_FLIGHT_REQUESTS.get(cacheKey) === requestPromise) {
         IN_FLIGHT_REQUESTS.delete(cacheKey);
       }
-    });
+    };
+    requestPromise.then(cleanup, cleanup);
   }
 
   return requestPromise;

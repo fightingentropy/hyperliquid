@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
 const RESOURCE_CACHE = new Map();
+const RESOURCE_CACHE_MAX_ENTRIES = 150;
 
 function readCachedResource(cacheKey, staleTimeMs) {
   if (!cacheKey || staleTimeMs <= 0) {
@@ -29,6 +30,23 @@ function writeCachedResource(cacheKey, data) {
     data,
     timestamp: Date.now(),
   });
+
+  pruneResourceCache();
+}
+
+function pruneResourceCache() {
+  if (RESOURCE_CACHE.size <= RESOURCE_CACHE_MAX_ENTRIES) {
+    return;
+  }
+
+  const oldestEntries = [...RESOURCE_CACHE.entries()].sort(
+    (left, right) => left[1].timestamp - right[1].timestamp,
+  );
+  const removeCount = RESOURCE_CACHE.size - RESOURCE_CACHE_MAX_ENTRIES;
+
+  oldestEntries.slice(0, removeCount).forEach(([cacheKey]) => {
+    RESOURCE_CACHE.delete(cacheKey);
+  });
 }
 
 export function usePollingResource(request, dependencies, options = {}) {
@@ -48,12 +66,14 @@ export function usePollingResource(request, dependencies, options = {}) {
 
   const buildInitialState = () => {
     const cachedData = readCachedResource(cacheKey, staleTimeMs);
+    const hasLoaded = cachedData !== undefined;
 
     return {
-      data: cachedData !== undefined ? cachedData : initialDataRef.current,
+      data: hasLoaded ? cachedData : initialDataRef.current,
       error: null,
-      isLoading: enabled && cachedData === undefined,
+      isLoading: enabled && !hasLoaded,
       isRefreshing: false,
+      hasLoaded,
     };
   };
 
@@ -61,21 +81,25 @@ export function usePollingResource(request, dependencies, options = {}) {
 
   useEffect(() => {
     if (!enabled) {
+      const cachedData = readCachedResource(cacheKey, staleTimeMs);
       setState({
-        data: readCachedResource(cacheKey, staleTimeMs) ?? initialDataRef.current,
+        data: cachedData ?? initialDataRef.current,
         error: null,
         isLoading: false,
         isRefreshing: false,
+        hasLoaded: cachedData !== undefined,
       });
       return;
     }
 
     const cachedData = readCachedResource(cacheKey, staleTimeMs);
+    const hasLoaded = cachedData !== undefined;
     setState({
-      data: cachedData !== undefined ? cachedData : initialDataRef.current,
+      data: hasLoaded ? cachedData : initialDataRef.current,
       error: null,
-      isLoading: cachedData === undefined,
+      isLoading: !hasLoaded,
       isRefreshing: false,
+      hasLoaded,
     });
   }, [enabled, cacheKey, staleTimeMs]);
 
@@ -96,6 +120,7 @@ export function usePollingResource(request, dependencies, options = {}) {
             error: null,
             isLoading: false,
             isRefreshing: false,
+            hasLoaded: true,
           });
           return;
         }
@@ -103,8 +128,8 @@ export function usePollingResource(request, dependencies, options = {}) {
 
       setState((previous) => ({
         ...previous,
-        isLoading: previous.data === null && !isRefresh,
-        isRefreshing: previous.data !== null || isRefresh,
+        isLoading: !previous.hasLoaded && !isRefresh,
+        isRefreshing: previous.hasLoaded || isRefresh,
         error: null,
       }));
 
@@ -121,6 +146,7 @@ export function usePollingResource(request, dependencies, options = {}) {
           error: null,
           isLoading: false,
           isRefreshing: false,
+          hasLoaded: true,
         });
       } catch (error) {
         if (!isActive) {

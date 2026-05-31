@@ -1,7 +1,7 @@
 {
   "name": "hl-stats",
   "version": "0.1.0",
-  "description": "Readable React rebuild of the Qwantify Hyperliquid analytics workspace.",
+  "description": "Readable React rebuild of the Hyperliquid analytics workspace.",
   "private": true,
   "scripts": {
     "dev": "vite",

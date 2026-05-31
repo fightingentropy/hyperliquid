@@ -32,7 +32,9 @@ function formatPriceTick(value) {
     return "$0";
   }
 
-  return `$${Intl.NumberFormat(undefined, { maximumFractionDigits: 4 }).format(value)}`;
+  const maximumFractionDigits = Math.abs(value) >= 1 ? 2 : 4;
+
+  return `$${Intl.NumberFormat(undefined, { maximumFractionDigits }).format(value)}`;
 }
 
 function TooltipBody({ active, payload, mode, assetLabel }) {

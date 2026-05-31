@@ -1,8 +1,5 @@
 import { Suspense, useEffect, useMemo, useState } from "react";
 import {
-  Activity,
-  ArrowUpRight,
-  Bell,
   BookOpen,
   Bot,
   Check,
@@ -12,18 +9,13 @@ import {
   Copy,
   ExternalLink,
   Flame,
-  Gift,
-  Heart,
-  LogIn,
   Menu,
   Moon,
   PanelLeftClose,
   PanelLeftOpen,
   PieChart,
   Plus,
-  Settings,
   Sun,
-  UserPlus,
   Users,
   Users2,
   Wallet,
@@ -72,10 +64,16 @@ const NAV_SECTIONS = [
     title: "Hyperliquid",
     items: [
       {
-        label: "Wallets",
-        path: "/app/wallets",
-        icon: Wallet,
-        subtitle: "Holdings and flows",
+        label: "Explorer",
+        path: "/app",
+        icon: Compass,
+        subtitle: "Search addresses and transactions",
+      },
+      {
+        label: "Verify Position",
+        path: "/app/positions/verify",
+        icon: Check,
+        subtitle: "Check a position proof",
       },
       {
         label: "Market Flow",
@@ -84,16 +82,46 @@ const NAV_SECTIONS = [
         subtitle: "Buy/sell pressure tracking",
       },
       {
-        label: "Relative Strength",
-        path: "/app/relative-strength",
-        icon: Activity,
-        subtitle: "Cross-market momentum map",
+        label: "Execution Bot",
+        path: "/app/execution-bots",
+        icon: Bot,
+        subtitle: "Plan setup and analytics",
       },
       {
         label: "Liquidations",
         path: "/app/liquidations",
         icon: Flame,
-        subtitle: "CoinGlass liquidation map",
+        subtitle: "Real-time liquidation feed",
+      },
+      {
+        label: "Team Wallets",
+        path: "/app/team-wallets",
+        icon: Users2,
+        subtitle: "Monthly team distributions",
+      },
+      {
+        label: "Entities",
+        path: "/app/entities",
+        icon: Users,
+        subtitle: "Profiles and relationships",
+      },
+      {
+        label: "Wallets",
+        path: "/app/wallets",
+        icon: Wallet,
+        subtitle: "Holdings and flows",
+      },
+      {
+        label: "Token Analytics",
+        path: "/app/token-analytics",
+        icon: PieChart,
+        subtitle: "Distribution insights",
+      },
+      {
+        label: "Toolbox",
+        path: "/app/toolbox",
+        icon: Wrench,
+        subtitle: "Strategy simulators",
       },
     ],
   },
@@ -142,7 +170,7 @@ function resolvePageHeader(pathname) {
   }
 
   return {
-    title: "Qwantify",
+    title: "Hyperliquid",
     meta: null,
     walletAddress: null,
   };
@@ -162,7 +190,7 @@ function Brand({ className, onNavigate }) {
           className="qf-brand__logo"
         />
       </div>
-      <span className="qf-brand__wordmark">Stats</span>
+      <span className="qf-brand__wordmark">Hyperliquid</span>
     </Link>
   );
 }
@@ -179,7 +207,7 @@ function NavItem({ collapsed, item, onNavigate }) {
       onClick={onNavigate}
       aria-label={collapsed ? item.label : undefined}
       title={collapsed ? item.label : undefined}
-      end={item.path === "/app/wallets"}
+      end={item.path === "/app" || item.path === "/app/wallets"}
     >
       {({ isActive }) => (
         <>

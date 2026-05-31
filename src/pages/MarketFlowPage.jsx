@@ -21,7 +21,6 @@ import {
   getSelectedMarket,
   parseMarketFlowState,
 } from "../lib/marketFlow";
-import { formatSignedCurrency } from "../lib/formatters";
 
 const MarketFlowChart = lazy(() => import("../components/MarketFlowChart"));
 
@@ -37,10 +36,23 @@ function routeErrorMessage(error, fallback) {
   return error instanceof Error ? error.message : fallback;
 }
 
+function formatMarketFlowSignedCurrency(value) {
+  if (!Number.isFinite(value)) {
+    return "—";
+  }
+
+  const sign = value > 0 ? "+" : value < 0 ? "-" : "";
+  const formattedValue = new Intl.NumberFormat("en-US", {
+    maximumFractionDigits: 0,
+  }).format(Math.abs(value));
+
+  return `$${sign}${formattedValue}`;
+}
+
 function formatDeltaValue(deltas, windowValue) {
   const value = deltas?.[windowValue]?.netUsd;
 
-  return Number.isFinite(value) ? formatSignedCurrency(Math.round(value)) : "—";
+  return Number.isFinite(value) ? formatMarketFlowSignedCurrency(Math.round(value)) : "—";
 }
 
 function ChartLoadingState({ height = 360 }) {
@@ -222,7 +234,6 @@ export default function MarketFlowPage() {
               chartMode: "interval",
             })
           }
-          uppercase
         />
 
         {state.asset === "HYPE" ? (
@@ -259,30 +270,35 @@ export default function MarketFlowPage() {
           value={formatDeltaValue(deltas, "1h")}
           tone={metricTone(deltas?.["1h"]?.netUsd)}
           loading={batchResource.isLoading && !summary}
+          surface="market-flow"
         />
         <MetricCard
           label="Net delta 4h"
           value={formatDeltaValue(deltas, "4h")}
           tone={metricTone(deltas?.["4h"]?.netUsd)}
           loading={batchResource.isLoading && !summary}
+          surface="market-flow"
         />
         <MetricCard
           label="Net delta 1D"
           value={formatDeltaValue(deltas, "24h")}
           tone={metricTone(deltas?.["24h"]?.netUsd)}
           loading={batchResource.isLoading && !summary}
+          surface="market-flow"
         />
         <MetricCard
           label="Net delta 7d"
           value={formatDeltaValue(deltas, "7d")}
           tone={metricTone(deltas?.["7d"]?.netUsd)}
           loading={batchResource.isLoading && !summary}
+          surface="market-flow"
         />
         <MetricCard
           label="Net delta 30d"
           value={formatDeltaValue(deltas, "30d")}
           tone={metricTone(deltas?.["30d"]?.netUsd)}
           loading={batchResource.isLoading && !summary}
+          surface="market-flow"
         />
       </section>
 

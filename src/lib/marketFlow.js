@@ -2,10 +2,8 @@ import { formatBucketLabel, formatTooltipTimestamp, pad2 } from "./formatters";
 
 export const ASSET_OPTIONS = [
   { value: "HYPE", label: "HYPE" },
-  { value: "LIT", label: "LIT" },
   { value: "XYZ100", label: "XYZ100" },
-  { value: "US500", label: "US500" },
-  { value: "USTECH", label: "USTECH" },
+  { value: "XYZ:SP500", label: "S&P500" },
 ];
 
 export const HYPE_MARKET_OPTIONS = [
@@ -123,14 +121,10 @@ export function buildMarketFlowSearchParams(state) {
 
 export function getSelectedMarket(state) {
   switch (state.asset) {
-    case "LIT":
-      return { marketId: "LIT-PERP", candleCoin: "LIT", assetLabel: "LIT" };
     case "XYZ100":
       return { marketId: "XYZ100-PERP", candleCoin: "xyz:XYZ100", assetLabel: "XYZ100" };
-    case "US500":
-      return { marketId: "US500-PERP", candleCoin: "km:US500", assetLabel: "US500" };
-    case "USTECH":
-      return { marketId: "USTECH-PERP", candleCoin: "km:USTECH", assetLabel: "USTECH" };
+    case "XYZ:SP500":
+      return { marketId: "US500-PERP", candleCoin: "xyz:SP500", assetLabel: "S&P500" };
     default:
       return {
         marketId: state.hypeMarketId,

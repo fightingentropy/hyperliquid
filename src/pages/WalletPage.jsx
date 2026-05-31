@@ -90,7 +90,7 @@ export default function WalletPage() {
 
   useEffect(() => {
     const previousTitle = document.title;
-    document.title = "Qwantify";
+    document.title = "Hyperliquid";
 
     return () => {
       document.title = previousTitle;
@@ -293,8 +293,8 @@ export default function WalletPage() {
     [transactionsResource.data, walletAddress],
   );
 
-  const tabStrip = (
-    <div className="rounded-sm border border-border bg-card">
+  const renderWalletTabs = (embedded = false) => (
+    <div className={cx("qf-wallet-tabs", embedded ? "qf-wallet-tabs--embedded" : "qf-wallet-tabs--standalone")}>
       <div className="relative">
         <div className="flex overflow-x-auto pb-px scrollbar-hide">
           {WALLET_TABS.map((tab) => (
@@ -303,10 +303,8 @@ export default function WalletPage() {
               type="button"
               onClick={() => setSelectedTab(tab.value)}
               className={cx(
-                "px-4 py-3 text-sm font-medium whitespace-nowrap transition-colors",
-                selectedTab === tab.value
-                  ? "border-b-2 border-primary text-foreground"
-                  : "text-muted-foreground hover:text-foreground",
+                "qf-wallet-tab whitespace-nowrap transition-colors",
+                selectedTab === tab.value && "is-active",
               )}
             >
               {tab.label}
@@ -339,7 +337,7 @@ export default function WalletPage() {
     <div className="space-y-6">
       {resolveResource.error ? (
         <div className="rounded-sm border border-border bg-card px-4 py-3 text-sm text-muted-foreground">
-          {errorMessage(resolveResource.error, "Unable to resolve this wallet in Qwantify.")}
+          {errorMessage(resolveResource.error, "Unable to resolve this wallet in Hyperliquid.")}
         </div>
       ) : null}
 
@@ -421,10 +419,11 @@ export default function WalletPage() {
         </div>
       </div>
 
-      {tabStrip}
+      {selectedTab === "positions" ? null : renderWalletTabs()}
 
       {selectedTab === "positions" ? (
         <WalletPositionsPanel
+          tabs={renderWalletTabs(true)}
           snapshot={positionSnapshot}
           viewMode={positionsView}
           onViewModeChange={setPositionsView}

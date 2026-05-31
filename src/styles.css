@@ -11,9 +11,9 @@ body {
 }
 
 :root {
-  --qf-sidebar-width: 18.75rem;
+  --qf-sidebar-width: 18rem;
   --qf-sidebar-collapsed-width: 3.25rem;
-  --qf-sidebar-masthead-height: 5rem;
+  --qf-sidebar-masthead-height: 4rem;
   --qf-sidebar-transition: 0.26s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
@@ -58,7 +58,7 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
-  padding: 1rem 1rem 0.9rem;
+  padding: 0.75rem 0.9rem;
   transition:
     opacity 0.16s ease,
     transform var(--qf-sidebar-transition),
@@ -91,7 +91,7 @@ body {
 
 .qf-sidebar__divider {
   height: 1px;
-  margin: 0 0.9rem 0.9rem;
+  margin: 0 0.9rem 0.75rem;
   background: color-mix(in oklab, var(--sidebar-border) 92%, transparent);
   transition:
     margin var(--qf-sidebar-transition),
@@ -113,8 +113,8 @@ body {
 
 .qf-brand__mark {
   display: flex;
-  height: 2.25rem;
-  width: 2.25rem;
+  height: 2rem;
+  width: 2rem;
   align-items: center;
   justify-content: center;
   overflow: hidden;
@@ -130,7 +130,7 @@ body {
   white-space: nowrap;
   font-size: 1.25rem;
   font-weight: 500;
-  letter-spacing: -0.02em;
+  letter-spacing: 0;
   color: var(--foreground);
 }
 
@@ -144,7 +144,7 @@ body {
 .qf-sidebar__sections {
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
+  gap: 0.85rem;
   padding: 0 0.9rem 1rem;
   transition:
     gap var(--qf-sidebar-transition),
@@ -303,145 +303,6 @@ body {
   background: transparent;
 }
 
-.qf-sidebar__footer {
-  display: flex;
-  flex-direction: column;
-  gap: 0.6rem;
-  padding: 0.4rem 0.9rem 1rem;
-  border-top: 1px solid color-mix(in oklab, var(--sidebar-border) 92%, transparent);
-  margin-top: 0.5rem;
-}
-
-.qf-referral {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  border: 1px solid color-mix(in oklab, var(--primary) 40%, transparent);
-  border-radius: 0.45rem;
-  padding: 0.45rem 0.7rem;
-  background: color-mix(in oklab, var(--primary) 8%, transparent);
-  color: var(--primary);
-  text-decoration: none;
-  transition:
-    background-color 0.15s ease,
-    border-color 0.15s ease;
-}
-
-.qf-referral:hover {
-  background: color-mix(in oklab, var(--primary) 14%, transparent);
-  border-color: color-mix(in oklab, var(--primary) 60%, transparent);
-}
-
-.qf-referral__mark {
-  display: inline-flex;
-  height: 1.35rem;
-  width: 1.35rem;
-  flex-shrink: 0;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-}
-
-.qf-referral__label {
-  flex: 1;
-  font-size: 13px;
-  font-weight: 500;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.qf-referral__arrow {
-  width: 0.9rem;
-  height: 0.9rem;
-  flex-shrink: 0;
-  color: var(--primary);
-}
-
-.qf-sidebar__meta {
-  display: flex;
-  align-items: center;
-  gap: 0.45rem;
-  padding: 0 0.3rem;
-  font-size: 13px;
-}
-
-.qf-sidebar__meta-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  color: var(--muted-foreground);
-  text-decoration: none;
-  transition: color 0.15s ease;
-}
-
-.qf-sidebar__meta-link:hover {
-  color: var(--foreground);
-}
-
-.qf-sidebar__meta-link--accent {
-  color: var(--primary);
-}
-
-.qf-sidebar__meta-link--accent:hover {
-  color: var(--primary);
-  opacity: 0.85;
-}
-
-.qf-sidebar__meta-dot {
-  color: var(--muted-foreground);
-}
-
-.qf-sidebar__auth {
-  display: flex;
-  flex-direction: column;
-  gap: 0.45rem;
-}
-
-.qf-sidebar__btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.55rem;
-  height: 2.4rem;
-  border-radius: 0.45rem;
-  padding: 0 0.9rem;
-  font-size: 13px;
-  font-weight: 500;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  transition:
-    background-color 0.15s ease,
-    border-color 0.15s ease,
-    color 0.15s ease,
-    transform 0.15s ease;
-}
-
-.qf-sidebar__btn:active {
-  transform: translateY(1px);
-}
-
-.qf-sidebar__btn--outline {
-  border: 1px solid color-mix(in oklab, var(--sidebar-border) 90%, transparent);
-  background: transparent;
-  color: var(--foreground);
-}
-
-.qf-sidebar__btn--outline:hover {
-  border-color: color-mix(in oklab, var(--foreground) 35%, transparent);
-  background: color-mix(in oklab, var(--muted) 40%, transparent);
-}
-
-.qf-sidebar__btn--primary {
-  border: 1px solid transparent;
-  background: var(--primary);
-  color: var(--primary-foreground);
-}
-
-.qf-sidebar__btn--primary:hover {
-  background: color-mix(in oklab, var(--primary) 92%, #fff);
-}
-
 .qf-main {
   display: flex;
   min-width: 0;
@@ -454,13 +315,13 @@ body {
   top: 0;
   z-index: var(--z-sticky);
   display: flex;
-  min-height: 5.25rem;
+  min-height: 4rem;
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
   border-bottom: 1px solid var(--border);
   background: rgba(18, 18, 21, 0.95);
-  padding: 0 1.35rem;
+  padding: 0 1.5rem;
   backdrop-filter: blur(16px);
 }
 
@@ -481,9 +342,9 @@ body {
 
 .qf-topbar__title {
   min-width: 0;
-  font-size: 2rem;
+  font-size: 1.5rem;
   font-weight: 300;
-  letter-spacing: -0.045em;
+  letter-spacing: 0;
   color: var(--foreground);
 }
 
@@ -616,6 +477,170 @@ body {
   color: var(--foreground);
 }
 
+.qf-wallet-tabs {
+  background: var(--card);
+}
+
+.qf-wallet-tabs--standalone {
+  border: 1px solid var(--border);
+  border-radius: 0.25rem;
+}
+
+.qf-wallet-tabs--embedded {
+  border-bottom: 1px solid var(--border);
+}
+
+.qf-wallet-tab {
+  position: relative;
+  padding: 1rem 1.5rem;
+  border: 0;
+  color: var(--muted-foreground);
+  font-size: 0.95rem;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+.qf-wallet-tab::after {
+  position: absolute;
+  right: 1.5rem;
+  bottom: -1px;
+  left: 1.5rem;
+  height: 2px;
+  background: transparent;
+  content: "";
+}
+
+.qf-wallet-tab:hover,
+.qf-wallet-tab.is-active {
+  color: var(--foreground);
+}
+
+.qf-wallet-tab.is-active::after {
+  background: var(--primary);
+}
+
+.qf-positions-card {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 0.25rem;
+  background: color-mix(in oklab, var(--card) 94%, #101014);
+}
+
+.qf-positions-summary,
+.qf-positions-totals {
+  border-bottom: 1px solid var(--border);
+  padding: 1rem 1.5rem;
+}
+
+.qf-positions-table {
+  border-collapse: collapse;
+  font-size: 0.95rem;
+}
+
+.qf-positions-table th {
+  padding: 1rem 1.5rem;
+  color: var(--muted-foreground);
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-align: left;
+  text-transform: uppercase;
+}
+
+.qf-positions-table th.text-right {
+  text-align: right;
+}
+
+.qf-positions-table td {
+  padding: 0.95rem 1.5rem;
+  border-top: 1px solid var(--border);
+  color: var(--foreground);
+  vertical-align: middle;
+}
+
+.qf-positions-row {
+  transition: background-color 0.15s ease;
+}
+
+.qf-positions-row:hover {
+  background: color-mix(in oklab, var(--muted) 30%, transparent);
+}
+
+.qf-position-symbol {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.55rem;
+  font-family: var(--font-mono);
+}
+
+.qf-position-side-dot {
+  width: 0.42rem;
+  height: 0.42rem;
+  flex: 0 0 auto;
+  border-radius: 999px;
+}
+
+.qf-position-side-dot.is-long {
+  background: var(--profit);
+}
+
+.qf-position-side-dot.is-short {
+  background: var(--loss);
+}
+
+.qf-position-token {
+  display: inline-flex;
+  width: 1.35rem;
+  height: 1.35rem;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 999px;
+  background:
+    radial-gradient(circle at 35% 30%, hsl(var(--token-hue, 170deg) 85% 86%), transparent 42%),
+    hsl(var(--token-hue, 170deg) 72% 42%);
+  color: #07110f;
+  font-family: var(--font-sans);
+  font-size: 0.62rem;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0;
+}
+
+.qf-position-token--image {
+  background: #0f1716;
+}
+
+.qf-position-token img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.qf-position-action {
+  display: inline-flex;
+  width: 2rem;
+  height: 2rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: 0.25rem;
+  color: var(--muted-foreground);
+  transition:
+    border-color 0.15s ease,
+    background-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.qf-position-action:hover {
+  border-color: color-mix(in oklab, var(--primary) 42%, var(--border));
+  background: color-mix(in oklab, var(--primary) 10%, var(--card));
+  color: var(--foreground);
+}
+
 .qf-sidebar-toggle {
   display: inline-flex;
   height: 3rem;
@@ -655,7 +680,7 @@ body {
 .qf-page {
   flex: 1;
   min-width: 0;
-  padding: 1.25rem;
+  padding: 1.5rem;
 }
 
 .qf-rs-panel {

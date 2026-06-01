@@ -90,7 +90,7 @@ export default function WalletPage() {
 
   useEffect(() => {
     const previousTitle = document.title;
-    document.title = "Qwantify";
+    document.title = "Hyperliquid";
 
     return () => {
       document.title = previousTitle;

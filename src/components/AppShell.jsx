@@ -1,5 +1,6 @@
 import { Suspense, useEffect, useMemo, useState } from "react";
 import {
+  Activity,
   BookOpen,
   Bot,
   Check,
@@ -9,16 +10,12 @@ import {
   Copy,
   ExternalLink,
   Flame,
-  Gift,
-  Heart,
-  LogIn,
   Menu,
   Moon,
   PanelLeftClose,
   PanelLeftOpen,
   PieChart,
   Sun,
-  UserPlus,
   Users,
   Users2,
   Wallet,
@@ -76,13 +73,19 @@ const NAV_SECTIONS = [
         label: "Verify Position",
         path: "/app/positions/verify",
         icon: Check,
-        subtitle: "Check a Qwantify position proof",
+        subtitle: "Check a Hyperliquid position proof",
       },
       {
         label: "Market Flow",
         path: "/app/market-flow",
         icon: MarketFlowIcon,
         subtitle: "Buy/sell pressure tracking",
+      },
+      {
+        label: "Relative Strength",
+        path: "/app/relative-strength",
+        icon: Activity,
+        subtitle: "Compare market momentum",
       },
       {
         label: "Execution Bot",
@@ -126,23 +129,6 @@ const NAV_SECTIONS = [
         icon: Wrench,
         subtitle: "Strategy simulators and analyses",
         expandable: true,
-      },
-    ],
-  },
-  {
-    title: "Lighter",
-    items: [
-      {
-        label: "Explorer",
-        path: "/app/lighter",
-        icon: PanelLeftOpen,
-        subtitle: "Search addresses and transactions",
-      },
-      {
-        label: "Airdrop",
-        path: "/app/lighter/airdrop",
-        icon: Gift,
-        subtitle: "LIT airdrop analytics",
       },
     ],
   },
@@ -206,99 +192,13 @@ function Brand({ className, onNavigate }) {
     >
       <div className="qf-brand__mark" aria-hidden="true">
         <img
-          src="/logo.png"
+          src="/assets/hyperliquid-symbol-light.png"
           alt=""
           className="qf-brand__logo"
         />
       </div>
-      <span className="qf-brand__wordmark">Qwantify</span>
+      <span className="qf-brand__wordmark">Hyperliquid</span>
     </Link>
-  );
-}
-
-function SidebarFooter({ collapsed }) {
-  return (
-    <div className="qf-sidebar__footer">
-      <a
-        className="qf-sidebar__referral"
-        href="https://app.hyperliquid.xyz/join/QWANTIFY"
-        target="_blank"
-        rel="noreferrer noopener"
-      >
-        <img src="/assets/hyperliquid-symbol-light.png" alt="" aria-hidden="true" />
-        <span className="qf-sidebar__footer-copy">Use our Hyperliquid referral</span>
-        <ExternalLink className="size-3.5 qf-sidebar__footer-copy" aria-hidden="true" />
-      </a>
-
-      <div className="qf-sidebar__legal qf-sidebar__footer-copy">
-        <a href="/support">Support</a>
-        <span>.</span>
-        <a href="/privacy-policy">Privacy</a>
-      </div>
-
-      <div className="qf-sidebar__auth">
-        <a className="qf-sidebar__auth-link" href="/login" aria-label="Sign in">
-          <LogIn className="size-4" aria-hidden="true" />
-          <span className="qf-sidebar__footer-copy">SIGN IN</span>
-        </a>
-        <a className="qf-sidebar__auth-link qf-sidebar__auth-link--primary" href="/signup" aria-label="Sign up">
-          <UserPlus className="size-4" aria-hidden="true" />
-          <span className="qf-sidebar__footer-copy">SIGN UP</span>
-        </a>
-      </div>
-
-      {collapsed ? <span className="sr-only">Sidebar footer</span> : null}
-    </div>
-  );
-}
-
-function SupportWidget() {
-  const [open, setOpen] = useState(true);
-
-  if (!open) {
-    return null;
-  }
-
-  return (
-    <div className="qf-support-widget" role="complementary" aria-label="Support Qwantify">
-      <div className="qf-support-widget__header">
-        <div className="qf-support-widget__title">
-          <span className="qf-support-widget__icon" aria-hidden="true">
-            <Heart className="size-4" />
-          </span>
-          <span>Support Qwantify</span>
-        </div>
-        <button
-          type="button"
-          className="qf-support-widget__close"
-          onClick={() => setOpen(false)}
-          aria-label="Close support card"
-        >
-          <X className="size-4" aria-hidden="true" />
-        </button>
-      </div>
-
-      <div className="qf-support-widget__row">
-        <span>Trade on Hyperliquid</span>
-        <a
-          href="https://app.hyperliquid.xyz/join/QWANTIFY"
-          target="_blank"
-          rel="noreferrer noopener"
-        >
-          Referral Code <ExternalLink className="size-3" aria-hidden="true" />
-        </a>
-      </div>
-
-      <div className="qf-support-widget__donate">
-        <div>
-          <p>Or donate directly via crypto.</p>
-          <p>We accept HYPE, BTC, ETH, SOL, stables, and more on any EVM chain, Solana, or Bitcoin.</p>
-        </div>
-        <a href="/support" className="qf-support-widget__button">
-          Donate
-        </a>
-      </div>
-    </div>
   );
 }
 
@@ -511,8 +411,6 @@ export default function AppShell() {
               ))}
             </div>
           </nav>
-
-          <SidebarFooter collapsed={sidebarCollapsed} />
         </div>
       </aside>
 
@@ -621,8 +519,6 @@ export default function AppShell() {
         title="Save wallet"
         submitLabel="Save wallet"
       />
-
-      <SupportWidget />
     </div>
   );
 }

@@ -542,6 +542,7 @@ body {
 
 .qf-positions-table {
   border-collapse: collapse;
+  color: var(--foreground);
   font-size: 0.875rem;
 }
 
@@ -570,7 +571,6 @@ body {
 
 .qf-positions-table td {
   padding: 0.5rem 1rem;
-  color: var(--foreground);
   vertical-align: middle;
   white-space: nowrap;
 }

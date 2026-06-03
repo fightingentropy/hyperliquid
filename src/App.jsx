@@ -15,7 +15,7 @@ export default function App() {
         <Route path="/" element={<Navigate to="/app/market-flow" replace />} />
 
         <Route path="/app" element={<AppShell />}>
-          <Route index element={<Navigate to="/app/market-flow" replace />} />
+          <Route index element={<WalletLookupPage />} />
           <Route path="market-flow" element={<MarketFlowPage />} />
           <Route path="liquidations" element={<LiquidationMapPage />} />
           <Route path="relative-strength" element={<RelativeStrengthPage />} />

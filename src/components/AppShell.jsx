@@ -160,6 +160,7 @@ function resolvePageHeader(pathname) {
   }
 
   const routeTitles = [
+    { pattern: "/app", title: "Explorer" },
     { pattern: "/app/market-flow", title: "Market Flow" },
     { pattern: "/app/liquidations", title: "Liquidations" },
     { pattern: "/app/relative-strength", title: "Relative Strength" },

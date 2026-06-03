@@ -620,9 +620,9 @@ body {
   overflow: hidden;
   border-radius: 999px;
   background:
-    radial-gradient(circle at 35% 30%, hsl(var(--token-hue, 170deg) 85% 86%), transparent 42%),
-    hsl(var(--token-hue, 170deg) 72% 42%);
-  color: #07110f;
+    radial-gradient(circle at 35% 30%, var(--token-highlight, hsl(var(--token-hue, 170deg) 85% 86%)), transparent 42%),
+    var(--token-bg, hsl(var(--token-hue, 170deg) 72% 42%));
+  color: var(--token-fg, #07110f);
   font-family: var(--font-sans);
   font-size: 0.62rem;
   font-weight: 600;

@@ -306,15 +306,59 @@ function ErrorState({ message }) {
   );
 }
 
+const LOCAL_POSITION_TOKEN_ICONS = new Set([
+  "ASTER",
+  "HYPE",
+  "TON",
+  "ZEC",
+  "xyz__TSLA",
+  "xyz__XYZ100",
+]);
+
+const POSITION_TOKEN_FALLBACKS = {
+  NEAR: {
+    "--token-bg": "#be35cf",
+    "--token-highlight": "#f08aff",
+    "--token-fg": "#05020a",
+  },
+  WLD: {
+    "--token-bg": "#335fe2",
+    "--token-highlight": "#83a5ff",
+    "--token-fg": "#050713",
+  },
+  XMR: {
+    "--token-bg": "#3e36d3",
+    "--token-highlight": "#8d6cff",
+    "--token-fg": "#050513",
+  },
+};
+
+function getPositionTokenFallbackStyle(normalizedCoin) {
+  const preset = POSITION_TOKEN_FALLBACKS[normalizedCoin.toUpperCase()];
+  if (preset) {
+    return preset;
+  }
+
+  return {
+    "--token-hue": `${Math.abs(
+      normalizedCoin.split("").reduce((sum, character) => sum + character.charCodeAt(0), 0),
+    ) % 360}deg`,
+  };
+}
+
 function PositionTokenMark({ coin }) {
   const [imageFailed, setImageFailed] = useState(false);
-  const normalizedCoin = String(coin ?? "").replace(/^xyz:/i, "").trim();
+  const normalizedCoin = String(coin ?? "").replace(/^xyz:/i, "").trim().toUpperCase();
   const label = normalizedCoin.slice(0, normalizedCoin.length <= 3 ? 2 : 1).toUpperCase();
   const rawCoin = String(coin ?? "").trim();
-  const iconName = rawCoin.replace(/^xyz:/i, "xyz__").replace(/[/:]/g, "__");
+  const rawIconName = rawCoin.replace(/^xyz:/i, "xyz__").replace(/[/:]/g, "__");
+  const iconName = rawIconName.startsWith("xyz__")
+    ? `xyz__${rawIconName.slice("xyz__".length).toUpperCase()}`
+    : rawIconName.toUpperCase();
   const iconSrc = iconName ? `/hyperliquid/coins/${iconName}.svg` : "";
+  const hasLocalIcon = LOCAL_POSITION_TOKEN_ICONS.has(iconName);
 
-  if (iconSrc && !imageFailed) {
+  if (hasLocalIcon && iconSrc && !imageFailed) {
     return (
       <span className="qf-position-token qf-position-token--image">
         <img
@@ -331,11 +375,7 @@ function PositionTokenMark({ coin }) {
   return (
     <span
       className="qf-position-token"
-      style={{
-        "--token-hue": `${Math.abs(
-          normalizedCoin.split("").reduce((sum, character) => sum + character.charCodeAt(0), 0),
-        ) % 360}deg`,
-      }}
+      style={getPositionTokenFallbackStyle(normalizedCoin)}
       aria-hidden="true"
     >
       {label || "?"}

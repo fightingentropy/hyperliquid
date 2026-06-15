@@ -5,6 +5,7 @@ import { fetchMarketFlowBatch, fetchMarketFlowSummaries } from "../api/marketFlo
 import ButtonGroup from "../components/ButtonGroup";
 import DeferredMount from "../components/DeferredMount";
 import MetricCard from "../components/MetricCard";
+import NetworkPulse from "../components/NetworkPulse";
 import ParticipantListCard from "../components/ParticipantListCard";
 import { usePollingResource } from "../hooks/usePollingResource";
 import {
@@ -217,6 +218,8 @@ export default function MarketFlowPage() {
 
   return (
     <div className="space-y-6">
+      <NetworkPulse />
+
       <div>
         <p className="text-sm text-muted-foreground">
           Participant market flow from Hyperliquid trade data: buy vs sell pressure across HYPE

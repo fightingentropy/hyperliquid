@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
-  buildActiveHypeTwaps,
+  activeTwapsFromState,
   computeFeeStats,
+  createTwapTrackerState,
   projectTwapPressure,
+  reconcileHypeTwaps,
   selectHypeSpotPriceByAssetId,
   summarizeTwapPressure,
 } from "./hypurrscan";
@@ -94,25 +96,84 @@ describe("selectHypeSpotPriceByAssetId", () => {
   });
 });
 
-describe("buildActiveHypeTwaps", () => {
+describe("reconcileHypeTwaps", () => {
   const now = 1_000_000_000_000;
   const priceByAssetId = { 10107: 68 };
+  const entry = (over) => ({
+    hash: over.hash,
+    time: over.time,
+    ended: over.ended,
+    action: { twap: { a: over.a ?? 10107, b: over.b ?? true, s: over.s ?? "100", m: over.m ?? 60 } },
+  });
 
   it("keeps running HYPE orders and drops finished or untracked markets", () => {
     const twaps = [
-      // Active HYPE buy: started 10m ago, 60m order -> ends 50m from now.
-      { time: now - 10 * 60 * 1000, action: { twap: { a: 10107, b: true, s: "100", m: 60 } } },
-      // Finished HYPE order: started 120m ago, 60m order.
-      { time: now - 120 * 60 * 1000, action: { twap: { a: 10107, b: false, s: "100", m: 60 } } },
-      // Untracked market (no price entry).
-      { time: now, action: { twap: { a: 10999, b: true, s: "100", m: 60 } } },
+      entry({ hash: "a", time: now - 10 * 60 * 1000 }), // active, ends 50m out
+      entry({ hash: "b", time: now - 120 * 60 * 1000 }), // already finished
+      entry({ hash: "c", time: now, a: 10999 }), // untracked market
     ];
 
-    const active = buildActiveHypeTwaps({ twaps, priceByAssetId, now });
+    const state = reconcileHypeTwaps({ ...createTwapTrackerState(), twaps, priceByAssetId, now });
+    const active = activeTwapsFromState(state);
 
     expect(active).toHaveLength(1);
-    expect(active[0]).toMatchObject({ isBuy: true, value: 6800 });
+    expect(active[0]).toMatchObject({ hash: "a", isBuy: true, value: 6800 });
     expect(active[0].end).toBe(now + 50 * 60 * 1000);
+  });
+
+  it("removes a cancelled order once it is flagged ended", () => {
+    let state = reconcileHypeTwaps({
+      ...createTwapTrackerState(),
+      twaps: [entry({ hash: "a", time: now - 5 * 60 * 1000 })],
+      priceByAssetId,
+      now,
+    });
+    expect(activeTwapsFromState(state)).toHaveLength(1);
+
+    // Next poll reports the same order as cancelled.
+    state = reconcileHypeTwaps({
+      ...state,
+      twaps: [entry({ hash: "a", time: now - 5 * 60 * 1000, ended: true })],
+      priceByAssetId,
+      now,
+    });
+    expect(activeTwapsFromState(state)).toHaveLength(0);
+    expect(state.endedHashes.has("a")).toBe(true);
+  });
+
+  it("retains an order that scrolls out of the feed window until it expires", () => {
+    let state = reconcileHypeTwaps({
+      ...createTwapTrackerState(),
+      twaps: [entry({ hash: "a", time: now - 10 * 60 * 1000, m: 60 })],
+      priceByAssetId,
+      now,
+    });
+
+    // Order no longer present in the feed, but not ended and not expired.
+    state = reconcileHypeTwaps({ ...state, twaps: [], priceByAssetId, now: now + 60_000 });
+    expect(activeTwapsFromState(state)).toHaveLength(1);
+
+    // Now past its natural end -> pruned.
+    state = reconcileHypeTwaps({ ...state, twaps: [], priceByAssetId, now: now + 51 * 60 * 1000 });
+    expect(activeTwapsFromState(state)).toHaveLength(0);
+  });
+
+  it("freezes notional at first sighting even if the price moves", () => {
+    let state = reconcileHypeTwaps({
+      ...createTwapTrackerState(),
+      twaps: [entry({ hash: "a", time: now, s: "100", m: 60 })],
+      priceByAssetId: { 10107: 68 },
+      now,
+    });
+
+    state = reconcileHypeTwaps({
+      ...state,
+      twaps: [entry({ hash: "a", time: now, s: "100", m: 60 })],
+      priceByAssetId: { 10107: 99 }, // price moved; value must not change
+      now,
+    });
+
+    expect(activeTwapsFromState(state)[0].value).toBe(6800);
   });
 });
 

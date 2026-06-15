@@ -1,4 +1,5 @@
-import { fetchHypeTwapPressure, fetchNetworkFeeStats } from "../api/hypurrscan";
+import { fetchNetworkFeeStats } from "../api/hypurrscan";
+import { useHypeTwapPressure } from "../hooks/useHypeTwapPressure";
 import { usePollingResource } from "../hooks/usePollingResource";
 import NetworkFeesCard from "./NetworkFeesCard";
 import TwapPressureCard from "./TwapPressureCard";
@@ -13,12 +14,7 @@ export default function NetworkPulse() {
     staleTimeMs: 120_000,
   });
 
-  const twapResource = usePollingResource(fetchHypeTwapPressure, [], {
-    intervalMs: 60_000,
-    initialData: null,
-    cacheKey: "hypurrscan:twap-pressure",
-    staleTimeMs: 30_000,
-  });
+  const twap = useHypeTwapPressure();
 
   return (
     <section className="grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -28,9 +24,9 @@ export default function NetworkPulse() {
         error={feesResource.error}
       />
       <TwapPressureCard
-        activeTwaps={twapResource.data?.activeTwaps}
-        loading={twapResource.isLoading}
-        error={twapResource.error}
+        activeTwaps={twap.activeTwaps}
+        loading={twap.isLoading}
+        error={twap.error}
       />
     </section>
   );

@@ -100,46 +100,80 @@ export function selectHypeSpotPriceByAssetId(spotMetaAndAssetCtxs) {
   return priceByAssetId;
 }
 
-// Reduce the raw TWAP feed to the still-running HYPE spot orders, carrying only
-// what the pressure projection needs. Notional value = size * current mid price.
-export function buildActiveHypeTwaps({ twaps, priceByAssetId, now }) {
-  if (!Array.isArray(twaps)) {
-    return [];
-  }
+export function createTwapTrackerState() {
+  return { activeByHash: new Map(), endedHashes: new Set() };
+}
 
-  const active = [];
+// Merge a fresh `twap/*` snapshot into the running active-set state, mirroring
+// hypurrscan's stateful poller: add newly-seen HYPE spot orders, honor the
+// `ended` flag (cancelled orders), retain orders that scroll out of the feed's
+// rolling window, and prune ended or naturally-expired orders. The notional
+// value is frozen at first sighting (as hypurrscan does), so a later price tick
+// doesn't retroactively change an order already counted.
+export function reconcileHypeTwaps({ activeByHash, endedHashes, twaps, priceByAssetId, now }) {
+  const nextActive = new Map(activeByHash ?? []);
+  const nextEnded = new Set(endedHashes ?? []);
+  const entries = Array.isArray(twaps) ? twaps : [];
 
-  twaps.forEach((entry) => {
+  for (const entry of entries) {
     const twap = entry?.action?.twap;
-    if (!twap) {
-      return;
+    const hash = entry?.hash;
+    if (!twap || !hash) {
+      continue;
+    }
+
+    // A cancelled order is reported with ended === true; drop it for good.
+    if (entry.ended === true) {
+      nextEnded.add(hash);
+      nextActive.delete(hash);
+      continue;
+    }
+
+    // Already counted (kept frozen) or already known-ended.
+    if (nextEnded.has(hash) || nextActive.has(hash)) {
+      continue;
     }
 
     const price = priceByAssetId?.[twap.a];
     if (!price) {
-      return; // Not a HYPE spot market we track.
+      continue; // Not a HYPE spot market we track (or price unavailable yet).
     }
 
     const start = new Date(entry.time).getTime();
     const durationMs = Number(twap.m) * 60 * 1000;
-    if (!Number.isFinite(start) || !Number.isFinite(durationMs) || durationMs <= 0) {
-      return;
-    }
-
-    const end = start + durationMs;
-    if (end <= now) {
-      return; // Already finished.
+    if (!Number.isFinite(start) || !(durationMs > 0)) {
+      continue;
     }
 
     const value = Number(twap.s) * price;
     if (!Number.isFinite(value) || value < 0) {
-      return;
+      continue;
     }
 
-    active.push({ start, end, durationMs, isBuy: Boolean(twap.b), value });
-  });
+    nextActive.set(hash, {
+      hash,
+      start,
+      end: start + durationMs,
+      durationMs,
+      isBuy: Boolean(twap.b),
+      value,
+    });
+  }
 
-  return active;
+  // Prune orders that have run past their natural end.
+  for (const [hash, record] of nextActive) {
+    if (record.end <= now) {
+      nextActive.delete(hash);
+      nextEnded.add(hash);
+    }
+  }
+
+  return { activeByHash: nextActive, endedHashes: nextEnded };
+}
+
+// The active orders as a plain array for the pressure projection.
+export function activeTwapsFromState(state) {
+  return state?.activeByHash ? [...state.activeByHash.values()] : [];
 }
 
 // Net signed notional (buys positive, sells negative) that the active TWAPs will

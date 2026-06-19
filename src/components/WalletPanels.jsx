@@ -1,14 +1,17 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ExternalLink, Share2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import ButtonGroup from "./ButtonGroup";
 import { cx } from "../lib/cx";
 import {
   POSITION_VIEW_OPTIONS,
+  TRADES_PAGE_SIZE,
   buildNotionalDeltaRows,
+  buildTradeTimeline,
   formatDateDay,
   formatDateTime,
   formatTime,
+  summarizeTradeData,
 } from "../lib/wallet";
 import {
   formatCount,
@@ -873,79 +876,235 @@ export function WalletHoldingsPanel({ snapshot, error, loading }) {
   );
 }
 
-export function WalletTradesPanel({ rows, error, loading }) {
+function TradeTypeBadge({ row }) {
+  if (row.type === "twap") {
+    return (
+      <span className="inline-flex rounded-sm bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-primary">
+        TWAP
+      </span>
+    );
+  }
+
+  return (
+    <span className="inline-flex rounded-sm bg-muted px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+      {row.count > 1 ? `Fill ×${row.count}` : "Fill"}
+    </span>
+  );
+}
+
+function AggregateFillsToggle({ checked, onChange }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      onClick={() => onChange(!checked)}
+      className="inline-flex items-center gap-2 text-xs text-muted-foreground transition-colors hover:text-foreground"
+    >
+      <span
+        className={cx(
+          "relative inline-flex h-4 w-7 shrink-0 items-center rounded-full transition-colors",
+          checked ? "bg-primary" : "bg-muted",
+        )}
+      >
+        <span
+          className={cx(
+            "inline-block size-3 rounded-full bg-background transition-transform",
+            checked ? "translate-x-3.5" : "translate-x-0.5",
+          )}
+        />
+      </span>
+      <span className="whitespace-nowrap">Aggregate fills</span>
+    </button>
+  );
+}
+
+export function WalletTradesPanel({ fills, twaps, error, loading }) {
+  const [aggregate, setAggregate] = useState(true);
+  const [coin, setCoin] = useState("all");
+  const [page, setPage] = useState(1);
+
+  const timeline = useMemo(
+    () => buildTradeTimeline(fills, twaps, { aggregate }),
+    [fills, twaps, aggregate],
+  );
+  const summary = useMemo(() => summarizeTradeData(fills, twaps), [fills, twaps]);
+
+  const coinOptions = useMemo(() => {
+    const coins = new Set(timeline.map((row) => row.coin).filter(Boolean));
+    return Array.from(coins).sort((left, right) => left.localeCompare(right));
+  }, [timeline]);
+
+  const filtered = useMemo(
+    () => (coin === "all" ? timeline : timeline.filter((row) => row.coin === coin)),
+    [timeline, coin],
+  );
+
+  // Reset to the first page whenever the result set changes underneath us.
+  useEffect(() => {
+    setPage(1);
+  }, [coin, aggregate]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / TRADES_PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const rangeStart = (safePage - 1) * TRADES_PAGE_SIZE;
+  const pageRows = filtered.slice(rangeStart, rangeStart + TRADES_PAGE_SIZE);
+  const showingFrom = filtered.length ? rangeStart + 1 : 0;
+  const showingTo = Math.min(rangeStart + TRADES_PAGE_SIZE, filtered.length);
+
   if (error) {
     return <ErrorState message={error} />;
   }
 
-  if (loading && !rows.length) {
+  if (loading && !timeline.length) {
     return <EmptyState message="Loading trades..." />;
   }
 
   return (
-    <PanelShell title="Recent trades" description={`Showing ${formatCount(rows.length)} aggregated fills.`}>
-      {!rows.length ? (
+    <div className="rounded-sm border border-border bg-card">
+      <div className="flex flex-col gap-3 border-b border-border px-4 py-3 lg:flex-row lg:items-start lg:justify-between">
+        <div className="space-y-1">
+          <p className="text-sm font-medium text-foreground">Recent trades</p>
+          <p className="text-xs text-muted-foreground">
+            Showing {TRADES_PAGE_SIZE} trades per page (fills + TWAPs). · Fetched{" "}
+            {formatCount(summary.fillCount)} fills · {formatCount(summary.twapCount)} TWAPs
+          </p>
+          {summary.startTime && summary.endTime ? (
+            <p className="text-xs text-muted-foreground">
+              {formatDateTime(summary.startTime)} – {formatDateTime(summary.endTime)}
+            </p>
+          ) : null}
+        </div>
+
+        <div className="flex shrink-0 items-center gap-3">
+          <select
+            value={coin}
+            onChange={(event) => setCoin(event.target.value)}
+            aria-label="Filter trades by coin"
+            className="h-8 rounded-sm border border-border bg-background px-2 text-xs text-foreground outline-none transition focus:border-ring"
+          >
+            <option value="all">All coins</option>
+            {coinOptions.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
+          <AggregateFillsToggle checked={aggregate} onChange={setAggregate} />
+        </div>
+      </div>
+
+      {!filtered.length ? (
         <EmptyState message="No trades available." />
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[980px] text-sm">
-            <thead className="text-left text-xs uppercase tracking-wide text-muted-foreground">
-              <tr className="border-b border-border">
-                <th className="px-4 py-3">Time</th>
-                <th className="px-4 py-3">Coin</th>
-                <th className="px-4 py-3">Dir</th>
-                <th className="px-4 py-3 text-right">Price</th>
-                <th className="px-4 py-3 text-right">Size</th>
-                <th className="px-4 py-3 text-right">Notional</th>
-                <th className="px-4 py-3 text-right">Fee</th>
-                <th className="px-4 py-3 text-right">PnL</th>
-                <th className="px-4 py-3 text-right">Tx</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => (
-                <tr key={`${row.hash}:${row.parsedTime}:${row.tid ?? "fill"}`} className="border-b border-border/60 text-foreground last:border-b-0">
-                  <td className="px-4 py-3 text-muted-foreground">{formatDateTime(row.parsedTime)}</td>
-                  <td className="px-4 py-3 font-mono">{row.coin}</td>
-                  <td className="px-4 py-3">
-                    <span
-                      className={cx(
-                        "inline-flex rounded-sm px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide",
-                        row.direction.includes("BUY") || row.direction.includes("LONG")
-                          ? "bg-profit/10 text-profit"
-                          : "bg-loss/10 text-loss",
-                      )}
-                    >
-                      {row.direction}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-right font-mono">{formatPrice(row.price)}</td>
-                  <td className="px-4 py-3 text-right font-mono">{formatQuantity(row.size)}</td>
-                  <td className="px-4 py-3 text-right font-mono">{formatCurrency(row.notionalUsd, 2)}</td>
-                  <td className="px-4 py-3 text-right font-mono text-muted-foreground">
-                    {formatCurrency(row.feeUsd, 2)}
-                  </td>
-                  <td className={cx("px-4 py-3 text-right font-mono", toneClass(row.closedPnlUsd))}>
-                    {formatSignedCurrency(row.closedPnlUsd, 2)}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <a
-                      href={`https://app.hyperliquid.xyz/explorer/tx/${row.hash}`}
-                      target="_blank"
-                      rel="noreferrer noopener"
-                      className="inline-flex items-center gap-1 font-mono text-xs text-muted-foreground transition hover:text-foreground"
-                    >
-                      {shortAddress(row.hash)}
-                      <ExternalLink className="size-3.5" />
-                    </a>
-                  </td>
+        <>
+          <p className="px-4 pt-3 text-xs text-muted-foreground">
+            Showing {formatCount(showingFrom)}-{formatCount(showingTo)} of {formatCount(filtered.length)} trades
+          </p>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[1040px] text-sm">
+              <thead className="text-left text-xs uppercase tracking-wide text-muted-foreground">
+                <tr className="border-b border-border">
+                  <th className="px-4 py-3">Time</th>
+                  <th className="px-4 py-3">Type</th>
+                  <th className="px-4 py-3">Coin</th>
+                  <th className="px-4 py-3">Dir</th>
+                  <th className="px-4 py-3 text-right">Price</th>
+                  <th className="px-4 py-3 text-right">Size</th>
+                  <th className="px-4 py-3 text-right">Notional</th>
+                  <th className="px-4 py-3 text-right">Fee</th>
+                  <th className="px-4 py-3 text-right">PnL / Status</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {pageRows.map((row) => (
+                  <tr key={row.id} className="border-b border-border/60 text-foreground last:border-b-0">
+                    <td className="px-4 py-3 text-muted-foreground">
+                      {row.startTime !== row.endTime ? (
+                        <div className="flex flex-col leading-tight">
+                          <span>{formatDateTime(row.startTime)}</span>
+                          <span>{formatDateTime(row.endTime)}</span>
+                        </div>
+                      ) : (
+                        formatDateTime(row.parsedTime)
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      <TradeTypeBadge row={row} />
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <PositionTokenMark coin={row.coin} />
+                        <span className="font-mono">{row.coin}</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span
+                        className={cx(
+                          "inline-flex rounded-sm px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide",
+                          row.direction.includes("BUY") || row.direction.includes("LONG")
+                            ? "bg-profit/10 text-profit"
+                            : "bg-loss/10 text-loss",
+                        )}
+                      >
+                        {row.direction}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-right font-mono">{formatPrice(row.price)}</td>
+                    <td className="px-4 py-3 text-right font-mono">
+                      {row.type === "twap" && Number.isFinite(row.totalSize)
+                        ? `${formatQuantity(row.size)}/${formatQuantity(row.totalSize)}`
+                        : formatQuantity(row.size)}
+                    </td>
+                    <td className="px-4 py-3 text-right font-mono">{formatCurrency(row.notionalUsd, 2)}</td>
+                    <td className="px-4 py-3 text-right font-mono text-muted-foreground">
+                      {row.type === "twap" ? "—" : formatCurrency(row.feeUsd, 2)}
+                    </td>
+                    <td className="px-4 py-3 text-right font-mono">
+                      {row.type === "twap" ? (
+                        <span className={row.status === "error" ? "text-loss" : "text-muted-foreground"}>
+                          {row.statusLabel}
+                        </span>
+                      ) : (
+                        <span className={toneClass(row.closedPnlUsd)}>
+                          {formatSignedCurrency(row.closedPnlUsd, 2)}
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {totalPages > 1 ? (
+            <div className="flex items-center justify-between gap-3 border-t border-border px-4 py-3 text-xs text-muted-foreground">
+              <span>
+                Page {formatCount(safePage)} of {formatCount(totalPages)}
+              </span>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setPage((current) => Math.max(1, current - 1))}
+                  disabled={safePage <= 1}
+                  className="rounded-sm border border-border px-3 py-1.5 font-medium text-foreground transition-colors hover:bg-muted/50 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Prev
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+                  disabled={safePage >= totalPages}
+                  className="rounded-sm border border-border px-3 py-1.5 font-medium text-foreground transition-colors hover:bg-muted/50 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          ) : null}
+        </>
       )}
-    </PanelShell>
+    </div>
   );
 }
 

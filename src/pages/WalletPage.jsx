@@ -7,8 +7,10 @@ import {
   fetchHourlyCandles,
   fetchPortfolio,
   fetchSpotClearinghouseState,
+  fetchAllUserFills,
   fetchSpotMetaAndAssetCtxs,
   fetchSubAccounts,
+  fetchTwapHistory,
   fetchUserFills,
   fetchUserNonFundingLedgerUpdates,
 } from "../api/hyperliquid";
@@ -186,10 +188,35 @@ export default function WalletPage() {
     () => fetchUserFills({ user: walletAddress, aggregateByTime: true }),
     [walletAddress],
     {
-      enabled: validAddress && ["trades", "performance", "statistics"].includes(selectedTab),
+      enabled: validAddress && ["performance", "statistics"].includes(selectedTab),
       initialData: [],
       cacheKey: `${walletCachePrefix}:fills`,
       staleTimeMs: 15_000,
+    },
+  );
+
+  // Trades tab pulls the wallet's full retained fill history (paginated), so the
+  // counts and aggregation match what the live API can serve. It's heavier than
+  // the recent-2000 `fillsResource`, so it polls less frequently.
+  const tradeFillsResource = usePollingResource(
+    () => fetchAllUserFills({ user: walletAddress }),
+    [walletAddress],
+    {
+      enabled: validAddress && selectedTab === "trades",
+      initialData: [],
+      cacheKey: `${walletCachePrefix}:all-fills`,
+      staleTimeMs: 60_000,
+    },
+  );
+
+  const twapHistoryResource = usePollingResource(
+    () => fetchTwapHistory({ user: walletAddress }),
+    [walletAddress],
+    {
+      enabled: validAddress && selectedTab === "trades",
+      initialData: [],
+      cacheKey: `${walletCachePrefix}:twap-history`,
+      staleTimeMs: 30_000,
     },
   );
 
@@ -279,7 +306,7 @@ export default function WalletPage() {
     [openOrdersResource.data],
   );
 
-  const tradeRows = useMemo(() => buildTradeRows(fillsResource.data), [fillsResource.data]);
+  const tradeRows = useMemo(() => buildTradeRows(tradeFillsResource.data), [tradeFillsResource.data]);
   const assetPerformanceRows = useMemo(
     () => buildAssetPerformanceRows(fillsResource.data),
     [fillsResource.data],
@@ -462,9 +489,14 @@ export default function WalletPage() {
 
       {selectedTab === "trades" ? (
         <WalletTradesPanel
-          rows={tradeRows}
-          loading={fillsResource.isLoading}
-          error={fillsResource.error ? errorMessage(fillsResource.error, "Failed to load trades.") : null}
+          fills={tradeRows}
+          twaps={twapHistoryResource.data}
+          loading={tradeFillsResource.isLoading || twapHistoryResource.isLoading}
+          error={
+            tradeFillsResource.error
+              ? errorMessage(tradeFillsResource.error, "Failed to load trades.")
+              : null
+          }
         />
       ) : null}
 

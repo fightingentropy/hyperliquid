@@ -679,6 +679,240 @@ export function buildTradeRows(fills) {
     .sort((left, right) => right.parsedTime - left.parsedTime);
 }
 
+export const TRADES_PAGE_SIZE = 50;
+
+function twapDirectionLabel(side) {
+  return String(side ?? "").trim().toUpperCase() === "B" ? "BUY" : "SELL";
+}
+
+function capitalizeWord(value) {
+  const text = String(value ?? "").trim();
+  return text ? text.charAt(0).toUpperCase() + text.slice(1) : "";
+}
+
+// Normalize Hyperliquid's `twapHistory` entries into trade-timeline rows. Each
+// TWAP order emits several lifecycle events sharing one `twapId` (activated →
+// finished/terminated/error), so we keep only the latest event per order — it
+// carries the final executed size/notional and terminal status. Each entry's
+// `state` exposes the original order size (`sz`) alongside the executed
+// size/notional, so we can show "executed / total" and the status.
+export function buildTwapRows(twapHistory) {
+  const latestById = new Map();
+  const standalone = [];
+
+  for (const entry of twapHistory ?? []) {
+    const id = entry?.twapId;
+    if (id == null) {
+      standalone.push(entry);
+      continue;
+    }
+    const existing = latestById.get(id);
+    if (!existing || Number(entry?.time ?? 0) >= Number(existing?.time ?? 0)) {
+      latestById.set(id, entry);
+    }
+  }
+
+  return [...latestById.values(), ...standalone]
+    .map((entry, index) => {
+      const state = entry?.state ?? {};
+      const executedSize = toNumber(state.executedSz);
+      const totalSize = toNumber(state.sz);
+      const executedNotional = toNumber(state.executedNtl);
+      // `state.timestamp` is in ms; the top-level `time` is in seconds.
+      const time = Number(state.timestamp ?? (entry?.time ? entry.time * 1000 : NaN));
+      const status = entry?.status?.status ?? "";
+      const twapId = entry?.twapId ?? null;
+
+      return {
+        type: "twap",
+        id: `twap:${twapId ?? `i${index}`}`,
+        twapId,
+        coin: state.coin ?? "—",
+        direction: twapDirectionLabel(state.side),
+        parsedTime: time,
+        startTime: time,
+        endTime: time,
+        price: executedSize > 0 ? executedNotional / executedSize : Number.NaN,
+        size: executedSize,
+        totalSize,
+        notionalUsd: executedNotional,
+        feeUsd: Number.NaN,
+        closedPnlUsd: Number.NaN,
+        status,
+        statusLabel: capitalizeWord(status) || "—",
+        reduceOnly: Boolean(state.reduceOnly),
+        count: 1,
+      };
+    })
+    .filter((row) => Number.isFinite(row.parsedTime));
+}
+
+// Collapse a list of fills (newest-first) into a single aggregated row using a
+// size-weighted average price and summed size/notional/fee/PnL.
+function collapseFillGroup(fills) {
+  const newest = fills[0];
+  let size = 0;
+  let notionalUsd = 0;
+  let feeUsd = 0;
+  let closedPnlUsd = 0;
+  let startTime = Number.POSITIVE_INFINITY;
+  let endTime = Number.NEGATIVE_INFINITY;
+
+  for (const fill of fills) {
+    size += fill.size;
+    notionalUsd += fill.notionalUsd;
+    feeUsd += fill.feeUsd;
+    closedPnlUsd += fill.closedPnlUsd;
+    startTime = Math.min(startTime, fill.parsedTime);
+    endTime = Math.max(endTime, fill.parsedTime);
+  }
+
+  return {
+    type: "fill",
+    id: `fill:${newest.tid ?? `${newest.hash}:${endTime}`}`,
+    count: fills.length,
+    coin: newest.coin,
+    direction: newest.direction,
+    parsedTime: endTime,
+    startTime,
+    endTime,
+    price: size !== 0 ? notionalUsd / size : toNumber(newest.price),
+    size,
+    notionalUsd,
+    feeUsd,
+    closedPnlUsd,
+    hash: newest.hash,
+    tid: newest.tid,
+  };
+}
+
+function toFillEntry(fill) {
+  return {
+    type: "fill",
+    id: `fill:${fill.tid ?? `${fill.hash}:${fill.parsedTime}`}`,
+    count: 1,
+    coin: fill.coin,
+    direction: fill.direction,
+    parsedTime: fill.parsedTime,
+    startTime: fill.parsedTime,
+    endTime: fill.parsedTime,
+    price: toNumber(fill.price),
+    size: fill.size,
+    notionalUsd: fill.notionalUsd,
+    feeUsd: fill.feeUsd,
+    closedPnlUsd: fill.closedPnlUsd,
+    hash: fill.hash,
+    tid: fill.tid,
+  };
+}
+
+// Group a newest-first fill list into consecutive runs sharing the same coin and
+// direction (e.g. an unbroken stretch of "HYPE / Close Short" fills).
+function aggregateFillRows(fillRows) {
+  const groups = [];
+  for (const fill of fillRows) {
+    const current = groups[groups.length - 1];
+    if (current && current[0].coin === fill.coin && current[0].direction === fill.direction) {
+      current.push(fill);
+    } else {
+      groups.push([fill]);
+    }
+  }
+  return groups.map(collapseFillGroup);
+}
+
+// A TWAP whose sub-fills exist but is missing from `twapHistory` (e.g. older than
+// the API retains) is reconstructed from its fills. We only know the executed
+// portion, so total size mirrors executed size and the status is unknown.
+function synthesizeTwapRow(twapId, fills) {
+  const collapsed = collapseFillGroup(fills);
+  return {
+    ...collapsed,
+    type: "twap",
+    id: `twap:${twapId}`,
+    twapId,
+    direction: twapDirectionLabel(fills[0]?.side),
+    totalSize: collapsed.size,
+    feeUsd: Number.NaN,
+    closedPnlUsd: Number.NaN,
+    status: "",
+    statusLabel: "—",
+  };
+}
+
+// Merge fills and TWAPs into one newest-first timeline. Fills tagged with a
+// `twapId` are folded into their TWAP row so the same execution isn't shown both
+// as a fill and inside a TWAP. When `aggregate` is false, every fill is its own
+// row; otherwise consecutive same coin+direction fills collapse into "Fill ×N".
+export function buildTradeTimeline(fillRows, twapHistory, { aggregate = true } = {}) {
+  const fills = fillRows ?? [];
+  const twapRows = buildTwapRows(twapHistory);
+  const coveredTwapIds = new Set(twapRows.map((row) => row.twapId).filter((id) => id != null));
+
+  const regularFills = [];
+  const orphanTwapFills = new Map();
+
+  for (const fill of fills) {
+    const twapId = fill?.twapId ?? null;
+    if (twapId == null) {
+      regularFills.push(fill);
+    } else if (!coveredTwapIds.has(twapId)) {
+      const bucket = orphanTwapFills.get(twapId) ?? [];
+      bucket.push(fill);
+      orphanTwapFills.set(twapId, bucket);
+    }
+  }
+
+  for (const [twapId, bucket] of orphanTwapFills) {
+    twapRows.push(synthesizeTwapRow(twapId, bucket));
+  }
+
+  const fillEntries = aggregate ? aggregateFillRows(regularFills) : regularFills.map(toFillEntry);
+
+  return [...fillEntries, ...twapRows].sort((left, right) => right.parsedTime - left.parsedTime);
+}
+
+// Header summary for the trades panel: raw fetched counts plus the overall time
+// span covered by the fetched fills and TWAPs.
+export function summarizeTradeData(fillRows, twapHistory) {
+  const fills = fillRows ?? [];
+  const twaps = twapHistory ?? [];
+  let startTime = Number.POSITIVE_INFINITY;
+  let endTime = Number.NEGATIVE_INFINITY;
+
+  for (const fill of fills) {
+    if (Number.isFinite(fill.parsedTime)) {
+      startTime = Math.min(startTime, fill.parsedTime);
+      endTime = Math.max(endTime, fill.parsedTime);
+    }
+  }
+
+  // twapHistory carries several lifecycle events per order, so count distinct
+  // orders (by twapId) rather than raw events.
+  const twapIds = new Set();
+  let untaggedTwaps = 0;
+  for (const entry of twaps) {
+    const id = entry?.twapId;
+    if (id == null) {
+      untaggedTwaps += 1;
+    } else {
+      twapIds.add(id);
+    }
+    const time = Number(entry?.state?.timestamp ?? (entry?.time ? entry.time * 1000 : Number.NaN));
+    if (Number.isFinite(time)) {
+      startTime = Math.min(startTime, time);
+      endTime = Math.max(endTime, time);
+    }
+  }
+
+  return {
+    fillCount: fills.length,
+    twapCount: twapIds.size + untaggedTwaps,
+    startTime: Number.isFinite(startTime) ? startTime : null,
+    endTime: Number.isFinite(endTime) ? endTime : null,
+  };
+}
+
 export function buildTransactionRows(entries, currentWalletAddress) {
   return [...(entries ?? [])]
     .map((entry) => {

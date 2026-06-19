@@ -433,6 +433,61 @@ export async function fetchUserFills({ user, aggregateByTime = true }) {
   }, { cacheTtlMs: LIVE_CACHE_TTL_MS });
 }
 
+export async function fetchUserFillsByTime({ user, startTime = 0, endTime, aggregateByTime = true }) {
+  return requestHyperliquidInfo({
+    type: "userFillsByTime",
+    user,
+    startTime,
+    endTime,
+    aggregateByTime,
+  }, { cacheTtlMs: LIVE_CACHE_TTL_MS });
+}
+
+const USER_FILLS_PAGE_SIZE = 2000;
+const USER_FILLS_MAX_PAGES = 10;
+
+// Hyperliquid serves at most ~2000 fills per `userFillsByTime` request
+// (oldest-first) and retains roughly the most recent 10k fills. Page forward by
+// time to assemble the full retained history client-side — the same approach
+// qwantify uses, which has no fills API of its own: both read this endpoint.
+export async function fetchAllUserFills({
+  user,
+  maxPages = USER_FILLS_MAX_PAGES,
+  fetchPage = fetchUserFillsByTime,
+}) {
+  const byKey = new Map();
+  let startTime = 0;
+
+  for (let page = 0; page < maxPages; page += 1) {
+    const batch = await fetchPage({ user, startTime });
+    if (!Array.isArray(batch) || batch.length === 0) {
+      break;
+    }
+
+    let maxTime = startTime;
+    let added = 0;
+    for (const fill of batch) {
+      const key = fill?.tid ?? `${fill?.hash}:${fill?.time}`;
+      if (!byKey.has(key)) {
+        byKey.set(key, fill);
+        added += 1;
+      }
+      const time = Number(fill?.time);
+      if (Number.isFinite(time) && time > maxTime) {
+        maxTime = time;
+      }
+    }
+
+    // Stop on the last (partial) page, or if the window can't advance.
+    if (batch.length < USER_FILLS_PAGE_SIZE || added === 0 || maxTime <= startTime) {
+      break;
+    }
+    startTime = maxTime + 1;
+  }
+
+  return Array.from(byKey.values());
+}
+
 export async function fetchTwapHistory({ user }) {
   return requestHyperliquidInfo({
     type: "twapHistory",

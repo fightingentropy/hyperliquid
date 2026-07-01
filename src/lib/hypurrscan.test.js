@@ -1,12 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
-  activeTwapsFromState,
+  buildActiveTwapRows,
+  buildTwapMarketDirectory,
   computeFeeStats,
   createTwapTrackerState,
   projectTwapPressure,
-  reconcileHypeTwaps,
-  selectHypeSpotPriceByAssetId,
+  reconcileActiveTwaps,
+  selectTwapMarketSources,
   summarizeTwapPressure,
+  twapMarketSegment,
+  twapRemainingFraction,
 } from "./hypurrscan";
 
 const HOUR = 3600;
@@ -64,116 +67,241 @@ describe("computeFeeStats", () => {
   });
 });
 
-describe("selectHypeSpotPriceByAssetId", () => {
-  it("maps HYPE-base spot pairs to asset id 10000 + index with the mid price", () => {
-    const meta = {
-      tokens: [
-        { name: "USDC", index: 0 },
-        { name: "HYPE", index: 150 },
-        { name: "PURR", index: 1 },
-      ],
-      universe: [
-        { index: 0, tokens: [1, 0] }, // PURR/USDC
-        { index: 107, tokens: [150, 0] }, // HYPE/USDC
-        { index: 207, tokens: [150, 268] }, // HYPE/USDT0
-      ],
-    };
-    // assetCtxs is keyed by the pair's `index` field (not its array position),
-    // and is sparse/longer than the universe on the live API.
-    const ctxs = [];
-    ctxs[0] = { midPx: "0.3" };
-    ctxs[107] = { midPx: "68" };
-    ctxs[207] = { midPx: "67.7" };
-
-    const prices = selectHypeSpotPriceByAssetId([meta, ctxs]);
-
-    expect(prices).toEqual({ 10107: 68, 10207: 67.7 });
-  });
-
-  it("returns an empty map when HYPE is absent or data is malformed", () => {
-    expect(selectHypeSpotPriceByAssetId(null)).toEqual({});
-    expect(selectHypeSpotPriceByAssetId([{ tokens: [], universe: [] }, []])).toEqual({});
+describe("twapMarketSegment", () => {
+  it("splits asset ids into perp, spot, and hip3 ranges like hypurrscan", () => {
+    expect(twapMarketSegment(0)).toBe("perp");
+    expect(twapMarketSegment(9_999)).toBe("perp");
+    expect(twapMarketSegment(10_000)).toBe("spot");
+    expect(twapMarketSegment(99_999)).toBe("spot");
+    expect(twapMarketSegment(100_000)).toBe("hip3");
+    expect(twapMarketSegment(110_065)).toBe("hip3");
+    expect(twapMarketSegment(-1)).toBeNull();
+    expect(twapMarketSegment(Number.NaN)).toBeNull();
   });
 });
 
-describe("reconcileHypeTwaps", () => {
+describe("selectTwapMarketSources", () => {
+  it("reports which universes a set of asset ids requires", () => {
+    expect(selectTwapMarketSources([5, 10_107, 110_065, 130_001, 110_003])).toEqual({
+      needsPerp: true,
+      needsSpot: true,
+      hip3DexIndexes: [1, 3],
+    });
+  });
+
+  it("handles empty or malformed input", () => {
+    expect(selectTwapMarketSources(null)).toEqual({
+      needsPerp: false,
+      needsSpot: false,
+      hip3DexIndexes: [],
+    });
+  });
+});
+
+describe("buildTwapMarketDirectory", () => {
+  const perpsByDexIndex = {
+    0: [
+      { universe: [{ name: "BTC" }, { name: "ETH" }] },
+      [{ midPx: "50000" }, { markPx: "3000" }],
+    ],
+    1: [
+      { universe: [{ name: "xyz:XYZ100" }] },
+      [{ midPx: "20000" }],
+    ],
+  };
+  const spotMetaAndAssetCtxs = [
+    {
+      tokens: [
+        { name: "USDC", index: 0 },
+        { name: "HYPE", index: 150 },
+      ],
+      universe: [{ name: "@107", index: 107, tokens: [150, 0] }],
+    },
+    [{ coin: "@107", midPx: "68" }],
+  ];
+
+  it("maps every universe onto hypurrscan's asset-id layout with display names", () => {
+    const directory = buildTwapMarketDirectory({ perpsByDexIndex, spotMetaAndAssetCtxs });
+
+    expect(directory.get(0)).toMatchObject({
+      displayName: "BTC-USD",
+      iconCoin: "BTC",
+      segment: "perp",
+      price: 50_000,
+    });
+    // Falls back to markPx when midPx is missing.
+    expect(directory.get(1)).toMatchObject({ displayName: "ETH-USD", price: 3_000 });
+    // HIP-3 dex index 1 starts at 110000 and keeps the dex-prefixed name.
+    expect(directory.get(110_000)).toMatchObject({
+      displayName: "xyz:XYZ100",
+      segment: "hip3",
+      price: 20_000,
+    });
+    // Spot pairs live at 10000 + pair index and display the base token.
+    expect(directory.get(10_107)).toMatchObject({
+      displayName: "HYPE",
+      segment: "spot",
+      price: 68,
+      isHypeSpot: true,
+    });
+  });
+
+  it("tolerates missing sources", () => {
+    expect(buildTwapMarketDirectory({}).size).toBe(0);
+    expect(buildTwapMarketDirectory({ spotMetaAndAssetCtxs: null }).size).toBe(0);
+  });
+});
+
+describe("reconcileActiveTwaps", () => {
   const now = 1_000_000_000_000;
-  const priceByAssetId = { 10107: 68 };
   const entry = (over) => ({
     hash: over.hash,
     time: over.time,
+    user: over.user ?? "0xabc",
     ended: over.ended,
-    action: { twap: { a: over.a ?? 10107, b: over.b ?? true, s: over.s ?? "100", m: over.m ?? 60 } },
+    action: {
+      twap: { a: over.a ?? 10107, b: over.b ?? true, s: over.s ?? "100", m: over.m ?? 60 },
+    },
   });
 
-  it("keeps running HYPE orders and drops finished or untracked markets", () => {
+  it("keeps running orders across every market and drops finished ones", () => {
     const twaps = [
-      entry({ hash: "a", time: now - 10 * 60 * 1000 }), // active, ends 50m out
+      entry({ hash: "a", time: now - 10 * 60 * 1000 }), // spot, ends 50m out
       entry({ hash: "b", time: now - 120 * 60 * 1000 }), // already finished
-      entry({ hash: "c", time: now, a: 10999 }), // untracked market
+      entry({ hash: "c", time: now, a: 5 }), // perp
+      entry({ hash: "d", time: now, a: 110_065 }), // hip3
     ];
 
-    const state = reconcileHypeTwaps({ ...createTwapTrackerState(), twaps, priceByAssetId, now });
-    const active = activeTwapsFromState(state);
+    const state = reconcileActiveTwaps(createTwapTrackerState(), twaps, now);
 
-    expect(active).toHaveLength(1);
-    expect(active[0]).toMatchObject({ hash: "a", isBuy: true, value: 6800 });
-    expect(active[0].end).toBe(now + 50 * 60 * 1000);
+    expect(state.activeByHash.size).toBe(3);
+    expect(state.activeByHash.get("a")).toMatchObject({
+      user: "0xabc",
+      marketId: 10_107,
+      segment: "spot",
+      isBuy: true,
+      amount: 100,
+      end: now + 50 * 60 * 1000,
+    });
+    expect(state.activeByHash.get("c").segment).toBe("perp");
+    expect(state.activeByHash.get("d").segment).toBe("hip3");
+    expect(state.endedHashes.has("b")).toBe(true);
   });
 
-  it("removes a cancelled order once it is flagged ended", () => {
-    let state = reconcileHypeTwaps({
-      ...createTwapTrackerState(),
-      twaps: [entry({ hash: "a", time: now - 5 * 60 * 1000 })],
-      priceByAssetId,
+  it("removes an order on any truthy ended flag, including the \"error\" variant", () => {
+    let state = reconcileActiveTwaps(
+      createTwapTrackerState(),
+      [entry({ hash: "a", time: now - 5 * 60 * 1000 })],
       now,
-    });
-    expect(activeTwapsFromState(state)).toHaveLength(1);
+    );
+    expect(state.activeByHash.size).toBe(1);
 
-    // Next poll reports the same order as cancelled.
-    state = reconcileHypeTwaps({
-      ...state,
-      twaps: [entry({ hash: "a", time: now - 5 * 60 * 1000, ended: true })],
-      priceByAssetId,
+    // The feed reports ended as `true` for cancellations and "error" strings.
+    state = reconcileActiveTwaps(
+      state,
+      [entry({ hash: "a", time: now - 5 * 60 * 1000, ended: "error" })],
       now,
-    });
-    expect(activeTwapsFromState(state)).toHaveLength(0);
+    );
+    expect(state.activeByHash.size).toBe(0);
     expect(state.endedHashes.has("a")).toBe(true);
+
+    // A later sighting of the same hash stays dropped.
+    state = reconcileActiveTwaps(
+      state,
+      [entry({ hash: "a", time: now - 5 * 60 * 1000 })],
+      now,
+    );
+    expect(state.activeByHash.size).toBe(0);
   });
 
   it("retains an order that scrolls out of the feed window until it expires", () => {
-    let state = reconcileHypeTwaps({
-      ...createTwapTrackerState(),
-      twaps: [entry({ hash: "a", time: now - 10 * 60 * 1000, m: 60 })],
-      priceByAssetId,
+    let state = reconcileActiveTwaps(
+      createTwapTrackerState(),
+      [entry({ hash: "a", time: now - 10 * 60 * 1000, m: 60 })],
       now,
-    });
+    );
 
     // Order no longer present in the feed, but not ended and not expired.
-    state = reconcileHypeTwaps({ ...state, twaps: [], priceByAssetId, now: now + 60_000 });
-    expect(activeTwapsFromState(state)).toHaveLength(1);
+    state = reconcileActiveTwaps(state, [], now + 60_000);
+    expect(state.activeByHash.size).toBe(1);
 
     // Now past its natural end -> pruned.
-    state = reconcileHypeTwaps({ ...state, twaps: [], priceByAssetId, now: now + 51 * 60 * 1000 });
-    expect(activeTwapsFromState(state)).toHaveLength(0);
+    state = reconcileActiveTwaps(state, [], now + 51 * 60 * 1000);
+    expect(state.activeByHash.size).toBe(0);
   });
 
-  it("freezes notional at first sighting even if the price moves", () => {
-    let state = reconcileHypeTwaps({
-      ...createTwapTrackerState(),
-      twaps: [entry({ hash: "a", time: now, s: "100", m: 60 })],
-      priceByAssetId: { 10107: 68 },
+  it("ignores malformed entries", () => {
+    const state = reconcileActiveTwaps(
+      createTwapTrackerState(),
+      [
+        entry({ hash: "a", time: now, s: "-5" }), // negative size
+        entry({ hash: "b", time: now, m: 0 }), // no duration
+        { hash: "c", time: now, action: {} }, // no twap payload
+      ],
       now,
+    );
+
+    expect(state.activeByHash.size).toBe(0);
+  });
+});
+
+describe("buildActiveTwapRows", () => {
+  const now = 1_000_000_000_000;
+
+  it("labels and values rows from the directory, tracking price updates", () => {
+    const state = reconcileActiveTwaps(
+      createTwapTrackerState(),
+      [
+        {
+          hash: "a",
+          time: now,
+          user: "0xabc",
+          action: { twap: { a: 10_107, b: false, s: "100", m: 60 } },
+        },
+      ],
+      now,
+    );
+
+    const directory = new Map([
+      [10_107, { displayName: "HYPE", iconCoin: "HYPE", price: 68, isHypeSpot: true }],
+    ]);
+    expect(buildActiveTwapRows(state, directory)[0]).toMatchObject({
+      token: "HYPE",
+      value: 6_800,
+      isBuy: false,
+      isHypeSpot: true,
     });
 
-    state = reconcileHypeTwaps({
-      ...state,
-      twaps: [entry({ hash: "a", time: now, s: "100", m: 60 })],
-      priceByAssetId: { 10107: 99 }, // price moved; value must not change
-      now,
-    });
+    // Value follows the latest price (hypurrscan recomputes per poll).
+    directory.get(10_107).price = 99;
+    expect(buildActiveTwapRows(state, directory)[0].value).toBe(9_900);
+  });
 
-    expect(activeTwapsFromState(state)[0].value).toBe(6800);
+  it("keeps unpriced markets with a null value", () => {
+    const state = reconcileActiveTwaps(
+      createTwapTrackerState(),
+      [{ hash: "a", time: now, action: { twap: { a: 42, b: true, s: "1", m: 60 } } }],
+      now,
+    );
+
+    expect(buildActiveTwapRows(state, new Map())[0]).toMatchObject({
+      token: "#42",
+      value: null,
+      isHypeSpot: false,
+    });
+  });
+});
+
+describe("twapRemainingFraction", () => {
+  const now = 1_000_000_000_000;
+
+  it("reports the linear share of the order still to execute", () => {
+    const record = { end: now + 30 * 60 * 1000, durationMs: 60 * 60 * 1000 };
+
+    expect(twapRemainingFraction(record, now)).toBeCloseTo(0.5, 6);
+    expect(twapRemainingFraction(record, now + 30 * 60 * 1000)).toBe(0);
+    expect(twapRemainingFraction(record, now - 60 * 60 * 1000)).toBe(1); // clamped
+    expect(twapRemainingFraction(null, now)).toBe(0);
   });
 });
 

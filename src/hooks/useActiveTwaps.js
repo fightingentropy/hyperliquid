@@ -1,25 +1,28 @@
 import { useEffect, useRef, useState } from "react";
-import { fetchSpotMetaAndAssetCtxs } from "../api/hyperliquid";
-import { requestJson } from "../api/request";
+import { fetchTwapMarketData } from "../api/hyperliquid";
+import { fetchTwapFeed } from "../api/hypurrscan";
 import {
-  activeTwapsFromState,
+  buildActiveTwapRows,
+  buildTwapMarketDirectory,
   createTwapTrackerState,
-  reconcileHypeTwaps,
-  selectHypeSpotPriceByAssetId,
+  reconcileActiveTwaps,
 } from "../lib/hypurrscan";
 
-const TWAP_FEED_URL = "https://api.hypurrscan.io/twap/*";
 // HypurrScan polls this feed every 5s; 7s keeps us in step without hammering it.
 const POLL_INTERVAL_MS = 7_000;
 
-// Maintains a live HYPE TWAP active-set by polling the public feed and folding
-// each snapshot into persistent state (honoring the `ended` cancellation flag),
-// the same way hypurrscan.io/dashboard does. The returned `activeTwaps` is fed to
-// the card's per-second projection.
-export function useHypeTwapPressure() {
+// Maintains the live active-TWAP set across every market by polling the public
+// feed and folding each snapshot into persistent tracker state, the same way
+// hypurrscan.io/dashboard does. Returns display rows for the Active TWAPs
+// table plus the HYPE-spot subset that feeds the buy-pressure card.
+export function useActiveTwaps() {
   const stateRef = useRef(createTwapTrackerState());
+  // Markets keep their last known label/price through a failed refresh so the
+  // table doesn't flash to placeholders on a transient error.
+  const directoryRef = useRef(new Map());
   const [snapshot, setSnapshot] = useState({
     activeTwaps: null,
+    hypeSpotTwaps: null,
     isLoading: true,
     error: null,
     asOf: 0,
@@ -31,21 +34,28 @@ export function useHypeTwapPressure() {
 
     const poll = async () => {
       try {
-        const [twaps, spotMetaAndAssetCtxs] = await Promise.all([
-          requestJson(TWAP_FEED_URL, undefined, { cacheTtlMs: 0 }),
-          fetchSpotMetaAndAssetCtxs(),
-        ]);
+        const twaps = await fetchTwapFeed();
+        const now = Date.now();
+        stateRef.current = reconcileActiveTwaps(stateRef.current, twaps, now);
+
+        const marketIds = [
+          ...new Set([...stateRef.current.activeByHash.values()].map((record) => record.marketId)),
+        ];
+        const marketData = await fetchTwapMarketData(marketIds);
 
         if (!isActive) {
           return;
         }
 
-        const priceByAssetId = selectHypeSpotPriceByAssetId(spotMetaAndAssetCtxs);
-        const now = Date.now();
-        stateRef.current = reconcileHypeTwaps({ ...stateRef.current, twaps, priceByAssetId, now });
+        for (const [marketId, market] of buildTwapMarketDirectory(marketData)) {
+          directoryRef.current.set(marketId, market);
+        }
+
+        const rows = buildActiveTwapRows(stateRef.current, directoryRef.current);
 
         setSnapshot({
-          activeTwaps: activeTwapsFromState(stateRef.current),
+          activeTwaps: rows,
+          hypeSpotTwaps: rows.filter((row) => row.isHypeSpot && Number.isFinite(row.value)),
           isLoading: false,
           error: null,
           asOf: now,

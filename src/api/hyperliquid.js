@@ -1,3 +1,4 @@
+import { selectTwapMarketSources } from "../lib/hypurrscan";
 import { getChartLookbackHours } from "../lib/marketFlow";
 import { requestJson } from "./request";
 
@@ -94,11 +95,14 @@ export async function fetchHourlyCandles({ coin, chartWindow }) {
   return payload.map(parseCandle).filter(Boolean);
 }
 
-export async function fetchPerpMetaAndAssetCtxs({ dex = "" } = {}) {
+// `maxAgeMs` lets live views (the TWAP table) demand fresher asset contexts
+// than the default; the module cache is the only cache layer so a shorter
+// max-age reliably refetches (and the refreshed entry serves everyone).
+export async function fetchPerpMetaAndAssetCtxs({ dex = "", maxAgeMs = STATIC_CACHE_TTL_MS } = {}) {
   const cacheKey = dex || "primary";
   const cached = perpMetaAndAssetCtxsCache.get(cacheKey);
 
-  if (cached?.promise && Date.now() - cached.timestamp <= STATIC_CACHE_TTL_MS) {
+  if (cached?.promise && Date.now() - cached.timestamp <= maxAgeMs) {
     return cached.promise;
   }
 
@@ -111,7 +115,7 @@ export async function fetchPerpMetaAndAssetCtxs({ dex = "" } = {}) {
         type: "metaAndAssetCtxs",
       };
 
-  const promise = requestHyperliquidInfo(requestPayload, { cacheTtlMs: STATIC_CACHE_TTL_MS }).catch(
+  const promise = requestHyperliquidInfo(requestPayload).catch(
     (error) => {
       if (perpMetaAndAssetCtxsCache.get(cacheKey)?.promise === promise) {
         perpMetaAndAssetCtxsCache.delete(cacheKey);
@@ -393,19 +397,22 @@ export async function fetchSpotClearinghouseState({ user }) {
   }, { cacheTtlMs: LIVE_CACHE_TTL_MS });
 }
 
-export async function fetchSpotMetaAndAssetCtxs() {
-  if (spotMetaAndAssetCtxsPromise && Date.now() - spotMetaAndAssetCtxsTimestamp > STATIC_CACHE_TTL_MS) {
+export async function fetchSpotMetaAndAssetCtxs({ maxAgeMs = STATIC_CACHE_TTL_MS } = {}) {
+  if (spotMetaAndAssetCtxsPromise && Date.now() - spotMetaAndAssetCtxsTimestamp > maxAgeMs) {
     spotMetaAndAssetCtxsPromise = null;
   }
 
   if (!spotMetaAndAssetCtxsPromise) {
     spotMetaAndAssetCtxsTimestamp = Date.now();
-    spotMetaAndAssetCtxsPromise = requestHyperliquidInfo({
+    const promise = requestHyperliquidInfo({
       type: "spotMetaAndAssetCtxs",
-    }, { cacheTtlMs: STATIC_CACHE_TTL_MS }).catch((error) => {
-      spotMetaAndAssetCtxsPromise = null;
+    }).catch((error) => {
+      if (spotMetaAndAssetCtxsPromise === promise) {
+        spotMetaAndAssetCtxsPromise = null;
+      }
       throw error;
     });
+    spotMetaAndAssetCtxsPromise = promise;
   }
 
   return spotMetaAndAssetCtxsPromise;
@@ -486,6 +493,56 @@ export async function fetchAllUserFills({
   }
 
   return Array.from(byKey.values());
+}
+
+// Ordered list of perp dexes; entry 0 is the primary universe (null name).
+// HIP-3 asset ids encode a dex by its index in this list.
+export async function fetchPerpDexs() {
+  return requestHyperliquidInfo({
+    type: "perpDexs",
+  }, { cacheTtlMs: STATIC_CACHE_TTL_MS });
+}
+
+const TWAP_MARKET_DATA_MAX_AGE_MS = 60_000;
+
+// Market data needed to label and price a set of TWAP asset ids: only the
+// sources the feed actually references (primary perps, spot, and the HIP-3
+// dexes in use). Sources fail independently — a missing one just leaves its
+// orders unpriced until the next poll.
+export async function fetchTwapMarketData(marketIds) {
+  const { needsPerp, needsSpot, hip3DexIndexes } = selectTwapMarketSources(marketIds);
+  const perpDexs = hip3DexIndexes.length ? await fetchPerpDexs().catch(() => null) : null;
+
+  const hip3Requests = hip3DexIndexes
+    .map((dexIndex) => ({ dexIndex, dex: perpDexs?.[dexIndex]?.name }))
+    .filter((request) => Boolean(request.dex));
+
+  const [primary, spot, ...hip3] = await Promise.allSettled([
+    needsPerp
+      ? fetchPerpMetaAndAssetCtxs({ maxAgeMs: TWAP_MARKET_DATA_MAX_AGE_MS })
+      : Promise.resolve(null),
+    needsSpot
+      ? fetchSpotMetaAndAssetCtxs({ maxAgeMs: TWAP_MARKET_DATA_MAX_AGE_MS })
+      : Promise.resolve(null),
+    ...hip3Requests.map((request) =>
+      fetchPerpMetaAndAssetCtxs({ dex: request.dex, maxAgeMs: TWAP_MARKET_DATA_MAX_AGE_MS }),
+    ),
+  ]);
+
+  const perpsByDexIndex = {};
+  if (primary.status === "fulfilled" && primary.value) {
+    perpsByDexIndex[0] = primary.value;
+  }
+  hip3.forEach((result, index) => {
+    if (result.status === "fulfilled" && result.value) {
+      perpsByDexIndex[hip3Requests[index].dexIndex] = result.value;
+    }
+  });
+
+  return {
+    perpsByDexIndex,
+    spotMetaAndAssetCtxs: spot.status === "fulfilled" ? spot.value : null,
+  };
 }
 
 export async function fetchTwapHistory({ user }) {

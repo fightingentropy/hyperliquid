@@ -16,5 +16,9 @@ export async function fetchNetworkFeeStats() {
   return computeFeeStats(feesRecent);
 }
 
-// The HYPE TWAP active-set is maintained statefully (cancellations + retention),
-// so it lives in the useHypeTwapPressure hook rather than a one-shot fetch.
+// The rolling window of recent TWAP orders across every market. Always fetched
+// fresh: the active-set is maintained statefully (cancellations + retention)
+// in the useActiveTwaps hook, which folds each snapshot into tracker state.
+export async function fetchTwapFeed() {
+  return requestJson(`${HYPURRSCAN_API}/twap/*`, undefined, { cacheTtlMs: 0 });
+}

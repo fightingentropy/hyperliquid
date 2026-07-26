@@ -3,11 +3,13 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import { handleEquityResearchRequest } from "./src/server/equityResearchService.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const projectRoot = __dirname;
 const publicRoot = path.join(projectRoot, "public");
+const localDevVarsPath = path.join(projectRoot, ".dev.vars");
 
 const SITE_HOST = "www.qwantify.io";
 const SITE_ORIGIN = `https://${SITE_HOST}`;
@@ -297,6 +299,127 @@ function qwantifyAssetProxyPlugin() {
   };
 }
 
+function readLocalResearchToken() {
+  const processToken =
+    process.env.EODHD_API_TOKEN || process.env.EODHD_API_KEY;
+
+  if (processToken) {
+    return processToken;
+  }
+
+  if (!fs.existsSync(localDevVarsPath)) {
+    return "";
+  }
+
+  const match = fs
+    .readFileSync(localDevVarsPath, "utf8")
+    .split(/\r?\n/)
+    .find((line) => /^\s*EODHD_API_(?:TOKEN|KEY)\s*=/.test(line));
+
+  if (!match) {
+    return "";
+  }
+
+  return match
+    .replace(/^[^=]+=/, "")
+    .trim()
+    .replace(/^(["'])(.*)\1$/, "$2");
+}
+
+function readNodeRequestBody(req, maxBytes = 4096) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    let size = 0;
+    let tooLarge = false;
+
+    req.on("data", (chunk) => {
+      if (tooLarge) {
+        return;
+      }
+
+      size += chunk.length;
+      if (size > maxBytes) {
+        tooLarge = true;
+        chunks.length = 0;
+        return;
+      }
+      chunks.push(chunk);
+    });
+    req.on("end", () => {
+      if (tooLarge) {
+        const error = new Error("request body is too large");
+        error.code = "request_too_large";
+        reject(error);
+        return;
+      }
+      resolve(Buffer.concat(chunks));
+    });
+    req.on("error", reject);
+  });
+}
+
+function researchApiDevPlugin() {
+  return {
+    name: "equity-research-api-dev",
+    configureServer(server) {
+      const apiToken = readLocalResearchToken();
+
+      server.middlewares.use(async (req, res, next) => {
+        const requestUrl = new URL(
+          req.url ?? "/",
+          `http://${req.headers.host ?? "127.0.0.1:4173"}`,
+        );
+
+        if (requestUrl.pathname !== "/api/research/analyze") {
+          next();
+          return;
+        }
+
+        try {
+          const headers = new Headers();
+          for (const [name, value] of Object.entries(req.headers)) {
+            if (Array.isArray(value)) {
+              value.forEach((item) => headers.append(name, item));
+            } else if (typeof value === "string") {
+              headers.set(name, value);
+            }
+          }
+
+          const body = req.method === "POST" ? await readNodeRequestBody(req) : undefined;
+          const response = await handleEquityResearchRequest(
+            new Request(requestUrl, {
+              method: req.method,
+              headers,
+              body,
+            }),
+            { apiToken },
+          );
+          const responseBody = Buffer.from(await response.arrayBuffer());
+
+          res.statusCode = response.status;
+          response.headers.forEach((value, name) => res.setHeader(name, value));
+          res.setHeader("Content-Length", responseBody.length);
+          res.end(responseBody);
+        } catch (error) {
+          const tooLarge = error?.code === "request_too_large";
+          const message = JSON.stringify({
+            error: {
+              code: tooLarge ? "request_too_large" : "local_research_error",
+              message: tooLarge
+                ? "The request body is too large."
+                : "The local equity-research adapter failed.",
+            },
+          });
+          res.statusCode = tooLarge ? 413 : 500;
+          res.setHeader("Content-Type", "application/json; charset=utf-8");
+          res.setHeader("Content-Length", Buffer.byteLength(message));
+          res.end(message);
+        }
+      });
+    },
+  };
+}
+
 function manualChunks(id) {
   if (!id.includes("node_modules")) {
     return undefined;
@@ -335,7 +458,7 @@ function manualChunks(id) {
 }
 
 export default defineConfig({
-  plugins: [react(), qwantifyAssetProxyPlugin()],
+  plugins: [react(), researchApiDevPlugin(), qwantifyAssetProxyPlugin()],
   build: {
     rollupOptions: {
       output: {

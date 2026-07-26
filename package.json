@@ -23,9 +23,10 @@
     "recharts": "^3.8.0"
   },
   "devDependencies": {
+    "@types/node": "^26.1.1",
     "@vitejs/plugin-react": "^6.0.1",
     "vite": "^8.0.1",
     "vitest": "^4.1.7",
-    "wrangler": "^4.80.0"
+    "wrangler": "^4.114.0"
   }
 }

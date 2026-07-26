@@ -139,8 +139,7 @@ const NAV_SECTIONS = [
         label: "Research",
         path: "/app/research",
         icon: BookOpen,
-        subtitle: "Public research results",
-        placeholder: true,
+        subtitle: "Auditable equity signals",
       },
     ],
   },
@@ -164,6 +163,7 @@ function resolvePageHeader(pathname) {
     { pattern: "/app/market-flow", title: "Market Flow" },
     { pattern: "/app/liquidations", title: "Liquidations" },
     { pattern: "/app/relative-strength", title: "Relative Strength" },
+    { pattern: "/app/research", title: "Equity Research" },
     { pattern: "/app/wallets", title: "Wallets" },
   ];
 

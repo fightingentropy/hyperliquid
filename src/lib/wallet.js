@@ -1,6 +1,5 @@
 const STABLE_TOKENS = new Set(["USDC", "USDH", "USDT", "USDT0", "USDE"]);
 const SPOT_QUOTE_TOKENS = ["USDC", "USDH", "USDT"];
-const PERP_DEX_ORDER = ["", "xyz", "flx", "vntl", "hyna", "km"];
 
 export const WALLET_TABS = [
   { value: "positions", label: "Positions" },
@@ -987,6 +986,10 @@ export function formatPerformanceAxisLabel(timestamp, range) {
     month: "short",
     year: "2-digit",
   });
+}
+
+function pad2(value) {
+  return String(value).padStart(2, "0");
 }
 
 export function formatPerformanceTooltip(timestamp) {

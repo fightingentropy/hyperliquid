@@ -1,3 +1,6 @@
 # Copy this file to .dev.vars for local equity-research requests.
 # Never commit the real token.
 EODHD_API_TOKEN=replace-with-your-eodhd-token
+# Localhost-only bypass for `npm run pages:dev`. Production requests always
+# require a verified Cloudflare Access JWT.
+RESEARCH_ALLOW_LOCAL_DEV=true

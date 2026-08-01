@@ -1,5 +1,8 @@
+import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import {
+  FACTOR_MODEL_DEFINITION,
+  FACTOR_MODEL_HASH,
   buildMarketSnapshot,
   buildResearchPayload,
   normalizeIsoDate,
@@ -32,6 +35,10 @@ function priceRows(count = 80, {
 }
 
 describe("equity research model", () => {
+  it("pins every result to the registered model definition hash", () => {
+    expect(createHash("sha256").update(FACTOR_MODEL_DEFINITION).digest("hex"))
+      .toBe(FACTOR_MODEL_HASH);
+  });
   it("rejects calendar dates that JavaScript would silently normalize", () => {
     expect(() => normalizeIsoDate("2025-02-30")).toThrow("Use a valid as-of date.");
   });
@@ -184,6 +191,12 @@ describe("equity research model", () => {
     expect(result.series.ticker[0].normalized_adjusted_close).toBe(100);
     expect(result.series.benchmark[0].normalized_adjusted_close).toBe(100);
     expect(result.analysis.reasoning).toContain("mechanical research output");
+    expect(result.run.factor_model_sha256).toBe(FACTOR_MODEL_HASH);
+    expect(result.model_registry).toMatchObject({
+      id: "market-factor-v2",
+      sha256: FACTOR_MODEL_HASH,
+      hypothesis_status: "unvalidated_hypothesis",
+    });
   });
 
   it("uses the same observable date as the chart baseline for both series", () => {

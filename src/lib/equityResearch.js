@@ -1,10 +1,31 @@
-export const FACTOR_MODEL_VERSION = "market-factor-v1";
+export const FACTOR_MODEL_VERSION = "market-factor-v2";
 export const FORECAST_HORIZON_SESSIONS = 20;
 export const FORECAST_TARGET =
   "next 20-session adjusted-price return minus SPY adjusted-price return";
 export const DEFAULT_BENCHMARK = "SPY";
 export const NEUTRAL_DEADBAND = 0.15;
 export const MIN_PRICE_BARS = 21;
+export const FACTOR_MODEL_DEFINITION = JSON.stringify({
+  benchmark: DEFAULT_BENCHMARK,
+  deadband: NEUTRAL_DEADBAND,
+  forecast_horizon_sessions: FORECAST_HORIZON_SESSIONS,
+  forecast_target: FORECAST_TARGET,
+  factors: [
+    ["relative_momentum_20d", 0.4, "clip(excess_return / 0.15, -1, 1)"],
+    ["relative_momentum_5d", 0.2, "clip(excess_return / 0.08, -1, 1)"],
+    ["absolute_momentum_20d", 0.2, "clip(return / 0.15, -1, 1)"],
+    ["drawdown_risk", 0.1, "clip(min(0, (drawdown + 0.10) / 0.20), -1, 1)"],
+    ["volume_confirmation", 0.1, "sign(momentum) * clip(max(0, volume_ratio - 1), 0, 1)"],
+  ],
+  version: FACTOR_MODEL_VERSION,
+});
+export const FACTOR_MODEL_HASH = "2b382a766e24eae72a253208247fe00687df2b124d0873721660699986fefd19";
+export const FACTOR_MODEL_REGISTRY_ENTRY = Object.freeze({
+  id: FACTOR_MODEL_VERSION,
+  sha256: FACTOR_MODEL_HASH,
+  hypothesis_status: "unvalidated_hypothesis",
+  definition: FACTOR_MODEL_DEFINITION,
+});
 
 const TICKER_PATTERN = /^[A-Z0-9][A-Z0-9._-]{0,31}$/;
 const FACTOR_LABELS = {
@@ -344,6 +365,7 @@ export function scoreMarketSnapshot(snapshot) {
 
   return {
     factor_model_version: FACTOR_MODEL_VERSION,
+    factor_model_sha256: FACTOR_MODEL_HASH,
     forecast_horizon_sessions: FORECAST_HORIZON_SESSIONS,
     forecast_target: FORECAST_TARGET,
     benchmark: snapshot.benchmark_ticker,
@@ -463,6 +485,7 @@ export function buildResearchPayload({
       agent: "market",
       data_provider: provider,
       factor_model_version: FACTOR_MODEL_VERSION,
+      factor_model_sha256: FACTOR_MODEL_HASH,
     },
     analysis: {
       model_name: "market",
@@ -481,6 +504,7 @@ export function buildResearchPayload({
       benchmark: snapshot.benchmark_ticker,
     },
     factor_model: factorModel,
+    model_registry: FACTOR_MODEL_REGISTRY_ENTRY,
     data_dates: {
       as_of: snapshot.as_of,
       stock_first_price: snapshot.first_price_date,
@@ -562,6 +586,8 @@ function cleanText(value, maxLength) {
   }
 
   const clean = String(value)
+    // Provider prose may contain C0/C1 control bytes that are unsafe in UI text.
+    // eslint-disable-next-line no-control-regex
     .replace(/[\u0000-\u001f\u007f-\u009f]+/g, " ")
     .replace(/\s+/g, " ")
     .trim();

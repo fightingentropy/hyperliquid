@@ -2,3 +2,9 @@ name = "hl-stats"
 compatibility_date = "2026-07-26"
 pages_build_output_dir = ".cloudflare/pages"
 compatibility_flags = ["nodejs_compat"]
+
+[[d1_databases]]
+binding = "RESEARCH_CONTROL_DB"
+database_name = "hl-stats-research-control"
+database_id = "c261604c-2f39-493a-b178-50328f348413"
+migrations_dir = "migrations"

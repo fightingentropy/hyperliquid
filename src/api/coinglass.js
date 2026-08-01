@@ -53,17 +53,13 @@ function normalizeCoinGlassUrl(url) {
 
 function getInitialDecryptKey({ responseHeaders, requestUrl, requestCacheTimestamp }) {
   const version = responseHeaders.get("v");
-  let seed = "";
-
-  if (version === "0") {
-    seed = requestCacheTimestamp;
-  } else if (version === "1") {
-    seed = normalizeCoinGlassUrl(requestUrl);
-  } else if (version === "2") {
-    seed = responseHeaders.get("time") ?? "";
-  } else {
-    seed = FIRST_KEY_SEEDS[version] ?? "";
-  }
+  const seed = version === "0"
+    ? requestCacheTimestamp
+    : version === "1"
+      ? normalizeCoinGlassUrl(requestUrl)
+      : version === "2"
+        ? responseHeaders.get("time") ?? ""
+        : FIRST_KEY_SEEDS[version] ?? "";
 
   if (!seed) {
     throw new Error("Unsupported CoinGlass encryption response.");

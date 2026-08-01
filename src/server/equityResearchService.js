@@ -14,7 +14,14 @@ const MAX_REQUEST_BYTES = 4_096;
 const PRICE_LOOKBACK_DAYS = 370;
 const NEWS_LOOKBACK_DAYS = 30;
 const NEWS_LIMIT = 10;
+const UPSTREAM_TIMEOUT_MS = 10_000;
+const MAX_PROVIDER_RESPONSE_BYTES = 2 * 1024 * 1024;
+const MAX_PROVIDER_RETRIES = 2;
 
+/**
+ * @param {Request} request
+ * @param {any} options
+ */
 export async function handleEquityResearchRequest(
   request,
   {
@@ -22,6 +29,11 @@ export async function handleEquityResearchRequest(
     fetchImpl = fetch,
     cache = null,
     waitUntil = null,
+    principal = null,
+    providerControl = null,
+    upstreamTimeoutMs = UPSTREAM_TIMEOUT_MS,
+    sleepImpl = sleep,
+    randomImpl = Math.random,
   } = {},
 ) {
   if (request.method !== "POST") {
@@ -35,6 +47,13 @@ export async function handleEquityResearchRequest(
   const originError = validateBrowserOrigin(request);
   if (originError) {
     return originError;
+  }
+
+  if (!principal) {
+    return jsonResponse(
+      { error: { code: "authentication_required", message: "Authentication is required." } },
+      401,
+    );
   }
 
   const contentLength = Number(request.headers.get("Content-Length") ?? 0);
@@ -80,6 +99,10 @@ export async function handleEquityResearchRequest(
         cache,
         waitUntil,
         cacheTtlSeconds: historicalCacheTtl(asOf),
+        providerControl,
+        upstreamTimeoutMs,
+        sleepImpl,
+        randomImpl,
       }),
       fetchEodhdJson({
         path: `/eod/${encodeURIComponent(toEodhdSymbol(benchmark))}`,
@@ -94,6 +117,10 @@ export async function handleEquityResearchRequest(
         cache,
         waitUntil,
         cacheTtlSeconds: historicalCacheTtl(asOf),
+        providerControl,
+        upstreamTimeoutMs,
+        sleepImpl,
+        randomImpl,
       }),
       fetchEodhdJson({
         path: "/news",
@@ -110,6 +137,10 @@ export async function handleEquityResearchRequest(
         waitUntil,
         cacheTtlSeconds: historicalCacheTtl(asOf),
         optional: true,
+        providerControl,
+        upstreamTimeoutMs,
+        sleepImpl,
+        randomImpl,
       }),
     ]);
 
@@ -171,6 +202,10 @@ async function fetchEodhdJson({
   waitUntil,
   cacheTtlSeconds,
   optional = false,
+  providerControl = null,
+  upstreamTimeoutMs = UPSTREAM_TIMEOUT_MS,
+  sleepImpl = sleep,
+  randomImpl = Math.random,
 }) {
   const sanitizedQuery = new URLSearchParams(params);
   const cacheUrl = `https://equity-research-cache.invalid${path}?${sanitizedQuery.toString()}`;
@@ -188,27 +223,63 @@ async function fetchEodhdJson({
 
   const upstreamQuery = new URLSearchParams(params);
   upstreamQuery.set("api_token", String(apiToken).trim());
-  let response;
+  let response = null;
+  let lastTransportError = null;
 
-  try {
-    response = await fetchImpl(`${EODHD_BASE_URL}${path}?${upstreamQuery.toString()}`, {
-      method: "GET",
-      headers: {
-        Accept: "application/json",
-        "User-Agent": "hl-stats-equity-research/1.0",
-      },
-    });
-  } catch {
+  for (let attempt = 0; attempt <= MAX_PROVIDER_RETRIES; attempt += 1) {
+    try {
+      await providerControl?.beforeCall?.();
+      response = await fetchWithTimeout(
+        fetchImpl,
+        `${EODHD_BASE_URL}${path}?${upstreamQuery.toString()}`,
+        {
+          method: "GET",
+          headers: {
+            Accept: "application/json",
+            "User-Agent": "hl-stats-equity-research/1.0",
+          },
+        },
+        upstreamTimeoutMs,
+      );
+      lastTransportError = null;
+    } catch (error) {
+      if (error instanceof EquityResearchError) throw error;
+      lastTransportError = error;
+      await providerControl?.failure?.();
+      if (attempt < MAX_PROVIDER_RETRIES) {
+        await sleepImpl(retryDelayMs(null, attempt, randomImpl));
+        continue;
+      }
+      break;
+    }
+
+    if (response.ok) {
+      await providerControl?.success?.();
+      break;
+    }
+
+    if ((response.status === 429 || response.status >= 500) && attempt < MAX_PROVIDER_RETRIES) {
+      await providerControl?.failure?.();
+      await cancelResponseBody(response);
+      await sleepImpl(retryDelayMs(response.headers.get("Retry-After"), attempt, randomImpl));
+      response = null;
+      continue;
+    }
+    break;
+  }
+
+  if (!response && lastTransportError) {
     if (optional) {
       return {
         rows: [],
         warning: "Headline context could not be loaded; the deterministic score is unaffected.",
       };
     }
-    throw new EquityResearchError("The market-data provider could not be reached.", {
-      code: "provider_unreachable",
-      status: 502,
-    });
+    const timedOut = lastTransportError?.name === "AbortError";
+    throw new EquityResearchError(
+      timedOut ? "The market-data provider timed out." : "The market-data provider could not be reached.",
+      { code: timedOut ? "provider_timeout" : "provider_unreachable", status: 502 },
+    );
   }
 
   if (!response.ok) {
@@ -243,8 +314,9 @@ async function fetchEodhdJson({
 
   let payload;
   try {
-    payload = await response.json();
-  } catch {
+    payload = await readBoundedJsonResponse(response, MAX_PROVIDER_RESPONSE_BYTES);
+  } catch (error) {
+    if (error instanceof EquityResearchError) throw error;
     throw new EquityResearchError("The market-data provider returned invalid JSON.", {
       code: "invalid_provider_payload",
       status: 502,
@@ -286,6 +358,64 @@ async function fetchEodhdJson({
     rows: payload,
     warning: null,
   };
+}
+
+async function fetchWithTimeout(fetchImpl, url, init, timeoutMs) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), Math.max(1, timeoutMs));
+  try {
+    return await fetchImpl(url, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function readBoundedJsonResponse(response, maxBytes) {
+  const contentLength = Number(response.headers.get("Content-Length") ?? 0);
+  if (Number.isFinite(contentLength) && contentLength > maxBytes) {
+    await cancelResponseBody(response);
+    throw new EquityResearchError("The market-data provider response is too large.", {
+      code: "provider_response_too_large",
+      status: 502,
+    });
+  }
+  if (!response.body) return null;
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let size = 0;
+  let text = "";
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > maxBytes) {
+      await reader.cancel();
+      throw new EquityResearchError("The market-data provider response is too large.", {
+        code: "provider_response_too_large",
+        status: 502,
+      });
+    }
+    text += decoder.decode(value, { stream: true });
+  }
+  text += decoder.decode();
+  return JSON.parse(text);
+}
+
+async function cancelResponseBody(response) {
+  await response.body?.cancel().catch(() => undefined);
+}
+
+function retryDelayMs(retryAfter, attempt, randomImpl) {
+  const retryAfterSeconds = Number(retryAfter);
+  if (Number.isFinite(retryAfterSeconds) && retryAfterSeconds >= 0) {
+    return Math.min(2_000, retryAfterSeconds * 1_000);
+  }
+  return Math.min(2_000, 250 * (2 ** attempt) + Math.floor(randomImpl() * 100));
+}
+
+function sleep(milliseconds) {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
 
 async function readJsonBody(request) {

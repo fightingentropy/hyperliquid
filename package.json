@@ -7,14 +7,20 @@
     "dev": "vite",
     "build": "vite build",
     "test": "vitest run",
+    "lint": "eslint .",
+    "typecheck": "tsc -p tsconfig.functions.json",
+    "security:audit": "node scripts/check-audit.mjs",
+    "research:validate": "node scripts/evaluate-equity-research.mjs",
+    "check": "npm run lint && npm run typecheck && npm test && npm run pages:build && npm run security:audit",
     "preview": "vite preview --host 127.0.0.1 --port 4174",
     "pages:build": "bash scripts/build-pages.sh",
-    "pages:dev": "npm run pages:build && wrangler pages dev .cloudflare/pages",
+    "pages:dev": "npm run pages:build && wrangler pages dev .cloudflare/pages --d1 RESEARCH_CONTROL_DB",
     "pages:deploy": "npm run pages:build && wrangler pages deploy .cloudflare/pages --project-name=hl-stats"
   },
   "type": "module",
   "dependencies": {
     "crypto-js": "^4.2.0",
+    "jose": "6.2.7",
     "lucide-react": "^0.577.0",
     "pako": "^2.1.0",
     "react": "^19.2.4",
@@ -23,8 +29,12 @@
     "recharts": "^3.8.0"
   },
   "devDependencies": {
+    "@eslint/js": "10.0.1",
     "@types/node": "^26.1.1",
     "@vitejs/plugin-react": "^6.0.1",
+    "eslint": "10.8.0",
+    "globals": "17.8.0",
+    "typescript": "6.0.3",
     "vite": "^8.0.1",
     "vitest": "^4.1.7",
     "wrangler": "^4.114.0"

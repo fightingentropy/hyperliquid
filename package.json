@@ -1,5 +1,5 @@
 {
-  "name": "hl-stats",
+  "name": "hyperliquid",
   "version": "0.1.0",
   "description": "Readable React rebuild of the Hyperliquid analytics workspace.",
   "private": true,

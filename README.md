@@ -1,7 +1,8 @@
-# hl-stats
+# hyperliquid
 
-This repo now serves the Qwantify Hyperliquid analytics workspace on the existing Cloudflare Pages project.
-Deploys continue targeting the existing `hl-stats` Pages project, so the production URL stays the same.
+This repo serves the Qwantify Hyperliquid analytics workspace at https://hyperliquid.erlin.org.
+Deploys target the Cloudflare Pages project `hl-stats`, which keeps its original name because
+Pages projects can't be renamed.
 
 - Local app dev: `npm run dev`
 - Pages build output: `npm run pages:build`

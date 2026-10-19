@@ -31,5 +31,5 @@ if (vulnerabilities.length) {
   // GHSA-qwww-vcr4-c8h2 affects only unstable React Server Components. This is
   // a client-only Vite SPA and does not import an RSC router. Remove this exact
   // allowance as soon as a compatible patched react-router-dom is published.
-  console.warn("Allowed GHSA-qwww-vcr4-c8h2: hl-stats does not use React Server Components.");
+  console.warn("Allowed GHSA-qwww-vcr4-c8h2: this app does not use React Server Components.");
 }

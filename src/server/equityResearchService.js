@@ -236,7 +236,7 @@ async function fetchEodhdJson({
           method: "GET",
           headers: {
             Accept: "application/json",
-            "User-Agent": "hl-stats-equity-research/1.0",
+            "User-Agent": "hyperliquid-equity-research/1.0",
           },
         },
         upstreamTimeoutMs,

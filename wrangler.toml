@@ -1,3 +1,5 @@
+# Cloudflare resource names, not the repo name: the Pages project and the D1
+# database can't be renamed, so these stay "hl-stats" after the repo rename.
 name = "hl-stats"
 compatibility_date = "2026-07-26"
 pages_build_output_dir = ".cloudflare/pages"

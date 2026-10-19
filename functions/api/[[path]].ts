@@ -8,6 +8,9 @@ const FORWARDED_ENDPOINTS = [
   /^\/api\/markets\/spot-symbol-maps$/,
   /^\/api\/markets\/genesis-info$/,
   /^\/api\/hypurrscan\/holders\/[^/]+\/distribution$/,
+  /^\/api\/team-wallets\/overview$/,
+  /^\/api\/team-wallets\/months$/,
+  /^\/api\/team-wallets\/months\/[^/]+$/,
 ];
 
 function isForwardedPath(pathname: string) {

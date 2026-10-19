@@ -165,6 +165,7 @@ function resolvePageHeader(pathname) {
     { pattern: "/app/relative-strength", title: "Relative Strength" },
     { pattern: "/app/research", title: "Equity Research" },
     { pattern: "/app/token-analytics", title: "Token Analytics" },
+    { pattern: "/app/team-wallets", title: "Team Distribution" },
     { pattern: "/app/wallets", title: "Wallets" },
   ];
 

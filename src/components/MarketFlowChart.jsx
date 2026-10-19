@@ -118,7 +118,7 @@ function TooltipBody({ active, payload, mode, assetLabel }) {
           </>
         ) : null}
 
-        {mode === "hype-comparison" ? (
+        {mode === "spot-perp-comparison" ? (
           <>
             <div className="flex items-center justify-between gap-4">
               <span className="text-muted-foreground">Perp (cum):</span>
@@ -209,6 +209,7 @@ export default function MarketFlowChart({
   chartWindow,
   mode,
   assetLabel,
+  baseLabel,
   seriesVisibility,
   onLegendClick,
   height = 360,
@@ -329,7 +330,7 @@ export default function MarketFlowChart({
             </>
           ) : null}
 
-          {mode === "hype-comparison" ? (
+          {mode === "spot-perp-comparison" ? (
             <>
               <Legend
                 verticalAlign="bottom"
@@ -346,7 +347,7 @@ export default function MarketFlowChart({
                 strokeWidth={2}
                 dot={false}
                 connectNulls
-                name="HYPE Perp"
+                name={`${baseLabel} Perp`}
                 isAnimationActive={false}
                 hide={!seriesVisibility.perp}
               />
@@ -358,7 +359,7 @@ export default function MarketFlowChart({
                 strokeWidth={2}
                 dot={false}
                 connectNulls
-                name="HYPE Spot"
+                name={`${baseLabel} Spot`}
                 isAnimationActive={false}
                 hide={!seriesVisibility.spot}
               />

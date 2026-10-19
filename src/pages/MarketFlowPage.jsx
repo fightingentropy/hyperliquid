@@ -11,12 +11,12 @@ import { usePollingResource } from "../hooks/usePollingResource";
 import {
   ASSET_OPTIONS,
   CHART_WINDOWS,
-  HYPE_MARKET_OPTIONS,
+  MARKET_TYPES,
   PARTICIPANT_WINDOWS,
   TOP_LIMITS,
   buildCumulativeSeries,
-  buildHypeComparisonSeries,
   buildIntervalSeries,
+  buildSpotPerpComparisonSeries,
   buildMarketFlowSearchParams,
   formatParticipantWindowLabel,
   getSelectedMarket,
@@ -116,18 +116,19 @@ export default function MarketFlowPage() {
     },
   );
 
-  const hypeSummariesResource = usePollingResource(
+  const pairedMarketIds = selectedMarket.pairedMarketIds;
+  const pairedSummariesResource = usePollingResource(
     () =>
       fetchMarketFlowSummaries({
-        marketIds: ["HYPE-PERP", "HYPE-SPOT"],
+        marketIds: [pairedMarketIds.perp, pairedMarketIds.spot],
         window: state.chartWindow,
       }),
-    [state.chartWindow],
+    [pairedMarketIds?.perp, pairedMarketIds?.spot, state.chartWindow],
     {
-      enabled: state.asset === "HYPE" && state.chartMode === "cumulative",
+      enabled: Boolean(pairedMarketIds) && state.chartMode === "cumulative",
       intervalMs: 60_000,
       initialData: null,
-      cacheKey: `market-flow:summaries:${state.chartWindow}`,
+      cacheKey: `market-flow:summaries:${pairedMarketIds?.perp}:${pairedMarketIds?.spot}:${state.chartWindow}`,
       staleTimeMs: 30_000,
     },
   );
@@ -145,24 +146,29 @@ export default function MarketFlowPage() {
 
   const cumulativeSeries = useMemo(() => buildCumulativeSeries(intervalSeries), [intervalSeries]);
 
-  const hypeComparisonSeries = useMemo(
+  const spotPerpComparisonSeries = useMemo(
     () =>
-      buildHypeComparisonSeries(hypeSummariesResource.data?.summaries, state.chartWindow, candlesResource.data),
-    [hypeSummariesResource.data, state.chartWindow, candlesResource.data],
+      buildSpotPerpComparisonSeries(
+        pairedSummariesResource.data?.summaries,
+        pairedMarketIds,
+        state.chartWindow,
+        candlesResource.data,
+      ),
+    [pairedSummariesResource.data, pairedMarketIds, state.chartWindow, candlesResource.data],
   );
 
   const chartVariant =
     state.chartMode === "interval"
       ? "interval"
-      : state.asset === "HYPE"
-        ? "hype-comparison"
+      : pairedMarketIds
+        ? "spot-perp-comparison"
         : "cumulative";
 
   const chartData =
     chartVariant === "interval"
       ? intervalSeries
-      : chartVariant === "hype-comparison"
-        ? hypeComparisonSeries
+      : chartVariant === "spot-perp-comparison"
+        ? spotPerpComparisonSeries
         : cumulativeSeries;
 
   const chartTitle =
@@ -171,14 +177,14 @@ export default function MarketFlowPage() {
       : `Net flow per ${state.chartWindow === "30d" ? "4h" : "hour"} (last ${state.chartWindow})`;
 
   const chartError =
-    chartVariant === "hype-comparison"
-      ? hypeSummariesResource.error
+    chartVariant === "spot-perp-comparison"
+      ? pairedSummariesResource.error
       : batchResource.error || candlesResource.error;
 
   const chartLoading =
     batchResource.isLoading ||
     candlesResource.isLoading ||
-    (chartVariant === "hype-comparison" && hypeSummariesResource.isLoading);
+    (chartVariant === "spot-perp-comparison" && pairedSummariesResource.isLoading);
 
   const participantTitle =
     state.participantsView === "total" ? "Participant total volume" : "Participant net flow";
@@ -222,8 +228,8 @@ export default function MarketFlowPage() {
 
       <div>
         <p className="text-sm text-muted-foreground">
-          Participant market flow from Hyperliquid trade data: buy vs sell pressure across HYPE
-          spot & perps, plus a curated set of perps and index markets.
+          Participant market flow from Hyperliquid trade data: buy vs sell pressure across spot
+          and perp markets, plus a curated set of index and equity markets.
         </p>
 
         <ButtonGroup
@@ -234,21 +240,22 @@ export default function MarketFlowPage() {
           onChange={(asset) =>
             updateState({
               asset,
+              marketType: "perp",
               chartMode: "interval",
             })
           }
         />
 
-        {state.asset === "HYPE" ? (
+        {pairedMarketIds ? (
           <div className="mt-4 flex flex-wrap items-center gap-3">
             <ButtonGroup
               kind="segmented"
-              options={HYPE_MARKET_OPTIONS.map((option) => ({
-                value: option.value,
-                label: option.label,
+              options={MARKET_TYPES.map((marketType) => ({
+                value: marketType,
+                label: `${selectedMarket.baseLabel} ${marketType === "spot" ? "Spot" : "Perp"}`,
               }))}
-              value={state.hypeMarketId}
-              onChange={(hypeMarketId) => updateState({ hypeMarketId })}
+              value={selectedMarket.marketType}
+              onChange={(marketType) => updateState({ marketType })}
             />
 
             {state.chartMode === "cumulative" ? (
@@ -344,8 +351,8 @@ export default function MarketFlowPage() {
             <div className="rounded-sm border border-border bg-muted/40 p-4 text-sm text-muted-foreground">
               {routeErrorMessage(
                 chartError,
-                chartVariant === "hype-comparison"
-                  ? "Unable to load HYPE spot/perp chart data."
+                chartVariant === "spot-perp-comparison"
+                  ? `Unable to load ${selectedMarket.baseLabel} spot/perp chart data.`
                   : "Unable to load chart data.",
               )}
             </div>
@@ -361,6 +368,7 @@ export default function MarketFlowPage() {
                   chartWindow={state.chartWindow}
                   mode={chartVariant}
                   assetLabel={selectedMarket.assetLabel}
+                  baseLabel={selectedMarket.baseLabel}
                   seriesVisibility={seriesVisibility}
                   onLegendClick={handleLegendClick}
                 />

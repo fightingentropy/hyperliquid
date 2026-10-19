@@ -1,15 +1,38 @@
 import { formatBucketLabel, formatTooltipTimestamp, pad2 } from "./formatters";
 
-export const ASSET_OPTIONS = [
-  { value: "HYPE", label: "HYPE" },
-  { value: "XYZ100", label: "XYZ100" },
-  { value: "XYZ:SP500", label: "S&P500" },
+// Mirrors the market list on qwantify.io/market-flow. `marketId` is what
+// /analytics/market-flow accepts (unknown ids get a 400 "Invalid marketId");
+// `candleCoin` prices the chart, and spot markets reuse their perp's candles.
+export const MARKET_FLOW_MARKETS = [
+  { marketId: "HYPE-PERP", asset: "HYPE", marketType: "perp", candleCoin: "HYPE" },
+  { marketId: "HYPE-SPOT", asset: "HYPE", marketType: "spot", candleCoin: "HYPE" },
+  { marketId: "LIT-PERP", asset: "LIT", marketType: "perp", candleCoin: "LIT" },
+  { marketId: "XYZ100-PERP", asset: "XYZ100", marketType: "perp", candleCoin: "xyz:XYZ100" },
+  { marketId: "BTC-PERP", asset: "BTC", marketType: "perp", candleCoin: "BTC" },
+  { marketId: "BTC-SPOT", asset: "BTC", marketType: "spot", candleCoin: "BTC" },
+  { marketId: "ETH-PERP", asset: "ETH", marketType: "perp", candleCoin: "ETH" },
+  { marketId: "SOL-PERP", asset: "SOL", marketType: "perp", candleCoin: "SOL" },
+  { marketId: "SP500-PERP", asset: "SP500", marketType: "perp", candleCoin: "xyz:SP500" },
+  { marketId: "MU-PERP", asset: "MU", marketType: "perp", candleCoin: "xyz:MU" },
+  { marketId: "SPCX-PERP", asset: "SPCX", marketType: "perp", candleCoin: "xyz:SPCX" },
+  { marketId: "SNDK-PERP", asset: "SNDK", marketType: "perp", candleCoin: "xyz:SNDK" },
+  { marketId: "SKHX-PERP", asset: "SKHX", marketType: "perp", candleCoin: "xyz:SKHX" },
 ];
 
-export const HYPE_MARKET_OPTIONS = [
-  { value: "HYPE-PERP", label: "HYPE Perp" },
-  { value: "HYPE-SPOT", label: "HYPE Spot" },
-];
+const ASSET_LABELS = {
+  SP500: "S&P500",
+};
+
+// Asset values that older links used before the market list was rebuilt.
+const LEGACY_ASSET_ALIASES = {
+  "XYZ:SP500": "SP500",
+};
+
+export const ASSET_OPTIONS = [...new Set(MARKET_FLOW_MARKETS.map((market) => market.asset))].map(
+  (asset) => ({ value: asset, label: ASSET_LABELS[asset] ?? asset }),
+);
+
+export const MARKET_TYPES = ["perp", "spot"];
 
 export const CHART_WINDOWS = ["24h", "7d", "30d"];
 export const PARTICIPANT_WINDOWS = ["1h", "4h", "24h", "7d", "30d"];
@@ -17,7 +40,7 @@ export const TOP_LIMITS = [10, 25, 50, 100];
 
 export const DEFAULT_MARKET_FLOW_STATE = {
   asset: "HYPE",
-  hypeMarketId: "HYPE-PERP",
+  marketType: "perp",
   chartWindow: "7d",
   chartMode: "interval",
   participantWindow: "7d",
@@ -27,7 +50,8 @@ export const DEFAULT_MARKET_FLOW_STATE = {
 
 const SEARCH_KEYS = {
   asset: "asset",
-  hypeMarket: "hypeMarket",
+  marketType: "type",
+  legacyHypeMarket: "hypeMarket",
   chart: "chart",
   chartMode: "chartMode",
   window: "window",
@@ -45,18 +69,28 @@ function pickNumber(value, allowedValues, fallback) {
   return allowedValues.includes(parsed) ? parsed : fallback;
 }
 
+function parseMarketType(searchParams) {
+  if (searchParams.get(SEARCH_KEYS.legacyHypeMarket)?.toUpperCase() === "HYPE-SPOT") {
+    return "spot";
+  }
+
+  return pickString(
+    searchParams.get(SEARCH_KEYS.marketType)?.toLowerCase(),
+    MARKET_TYPES,
+    DEFAULT_MARKET_FLOW_STATE.marketType,
+  );
+}
+
 export function parseMarketFlowState(searchParams) {
+  const rawAsset = searchParams.get(SEARCH_KEYS.asset)?.trim().toUpperCase();
+
   return {
     asset: pickString(
-      searchParams.get(SEARCH_KEYS.asset)?.toUpperCase(),
+      LEGACY_ASSET_ALIASES[rawAsset] ?? rawAsset,
       ASSET_OPTIONS.map((option) => option.value),
       DEFAULT_MARKET_FLOW_STATE.asset,
     ),
-    hypeMarketId: pickString(
-      searchParams.get(SEARCH_KEYS.hypeMarket)?.toUpperCase(),
-      HYPE_MARKET_OPTIONS.map((option) => option.value),
-      DEFAULT_MARKET_FLOW_STATE.hypeMarketId,
-    ),
+    marketType: parseMarketType(searchParams),
     chartWindow: pickString(
       searchParams.get(SEARCH_KEYS.chart),
       CHART_WINDOWS,
@@ -92,8 +126,8 @@ export function buildMarketFlowSearchParams(state) {
     params.set(SEARCH_KEYS.asset, state.asset);
   }
 
-  if (state.hypeMarketId !== DEFAULT_MARKET_FLOW_STATE.hypeMarketId) {
-    params.set(SEARCH_KEYS.hypeMarket, state.hypeMarketId);
+  if (state.marketType !== DEFAULT_MARKET_FLOW_STATE.marketType) {
+    params.set(SEARCH_KEYS.marketType, state.marketType);
   }
 
   if (state.chartWindow !== DEFAULT_MARKET_FLOW_STATE.chartWindow) {
@@ -120,18 +154,25 @@ export function buildMarketFlowSearchParams(state) {
 }
 
 export function getSelectedMarket(state) {
-  switch (state.asset) {
-    case "XYZ100":
-      return { marketId: "XYZ100-PERP", candleCoin: "xyz:XYZ100", assetLabel: "XYZ100" };
-    case "XYZ:SP500":
-      return { marketId: "US500-PERP", candleCoin: "xyz:SP500", assetLabel: "S&P500" };
-    default:
-      return {
-        marketId: state.hypeMarketId,
-        candleCoin: "HYPE",
-        assetLabel: state.hypeMarketId === "HYPE-SPOT" ? "HYPE Spot" : "HYPE",
-      };
-  }
+  const assetMarkets = MARKET_FLOW_MARKETS.filter((market) => market.asset === state.asset);
+  const perpMarket = assetMarkets.find((market) => market.marketType === "perp");
+  const spotMarket = assetMarkets.find((market) => market.marketType === "spot");
+  const market =
+    assetMarkets.find((market) => market.marketType === state.marketType) ??
+    assetMarkets[0] ??
+    MARKET_FLOW_MARKETS[0];
+  const baseLabel = ASSET_LABELS[market.asset] ?? market.asset;
+
+  return {
+    marketId: market.marketId,
+    marketType: market.marketType,
+    candleCoin: market.candleCoin,
+    baseLabel,
+    assetLabel: market.marketType === "spot" ? `${baseLabel} Spot` : baseLabel,
+    // Assets traded as both spot and perp get the toggle and the split cumulative chart.
+    pairedMarketIds:
+      perpMarket && spotMarket ? { perp: perpMarket.marketId, spot: spotMarket.marketId } : null,
+  };
 }
 
 export function getChartLookbackHours(chartWindow) {
@@ -251,9 +292,13 @@ export function buildCumulativeSeries(intervalSeries) {
   });
 }
 
-export function buildHypeComparisonSeries(summaries, chartWindow, candles) {
-  const perpSeries = buildIntervalSeries(summaries?.["HYPE-PERP"], chartWindow, candles);
-  const spotSeries = buildIntervalSeries(summaries?.["HYPE-SPOT"], chartWindow, candles);
+export function buildSpotPerpComparisonSeries(summaries, pairedMarketIds, chartWindow, candles) {
+  if (!pairedMarketIds) {
+    return [];
+  }
+
+  const perpSeries = buildIntervalSeries(summaries?.[pairedMarketIds.perp], chartWindow, candles);
+  const spotSeries = buildIntervalSeries(summaries?.[pairedMarketIds.spot], chartWindow, candles);
 
   if (!perpSeries.length && !spotSeries.length) {
     return [];

@@ -6,6 +6,7 @@ const MarketFlowPage = lazy(() => import("./pages/MarketFlowPage"));
 const LiquidationMapPage = lazy(() => import("./pages/LiquidationMapPage"));
 const RelativeStrengthPage = lazy(() => import("./pages/RelativeStrengthPage"));
 const ResearchPage = lazy(() => import("./pages/ResearchPage"));
+const TokenAnalyticsPage = lazy(() => import("./pages/TokenAnalyticsPage"));
 const WalletLookupPage = lazy(() => import("./pages/WalletLookupPage"));
 const WalletPage = lazy(() => import("./pages/WalletPage"));
 
@@ -21,6 +22,7 @@ export default function App() {
           <Route path="liquidations" element={<LiquidationMapPage />} />
           <Route path="relative-strength" element={<RelativeStrengthPage />} />
           <Route path="research" element={<ResearchPage />} />
+          <Route path="token-analytics" element={<TokenAnalyticsPage />} />
           <Route path="wallets" element={<WalletLookupPage />} />
           <Route path="wallets/:address" element={<WalletPage />} />
           <Route path="*" element={<Navigate to="/app/market-flow" replace />} />

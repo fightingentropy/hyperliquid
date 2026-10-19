@@ -497,6 +497,13 @@ export async function fetchAllUserFills({
 
 // Ordered list of perp dexes; entry 0 is the primary universe (null name).
 // HIP-3 asset ids encode a dex by its index in this list.
+// Mid price per coin, keyed by perp name ("HYPE") or spot index ("@107").
+export async function fetchAllMids() {
+  return requestHyperliquidInfo({
+    type: "allMids",
+  }, { cacheTtlMs: LIVE_CACHE_TTL_MS });
+}
+
 export async function fetchPerpDexs() {
   return requestHyperliquidInfo({
     type: "perpDexs",

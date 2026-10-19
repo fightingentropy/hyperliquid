@@ -5,6 +5,9 @@ const FORWARDED_ENDPOINTS = [
   /^\/api\/wallets\/[^/]+\/notional-deltas$/,
   /^\/api\/analytics\/market-flow\/batch$/,
   /^\/api\/analytics\/market-flow\/summaries$/,
+  /^\/api\/team-wallets\/overview$/,
+  /^\/api\/team-wallets\/months$/,
+  /^\/api\/team-wallets\/months\/[^/]+$/,
 ];
 
 function isForwardedPath(pathname: string) {

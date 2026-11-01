@@ -10,5 +10,5 @@
     "strict": true,
     "target": "ES2022"
   },
-  "include": ["functions/**/*.ts", "src/server/**/*.js", "src/lib/equityResearch.js", "worker-configuration.d.ts"]
+  "include": ["functions/**/*.ts", "src/server/**/*.js", "src/lib/equityResearch.js", "src/lib/liquidationSymbols.js", "worker-configuration.d.ts"]
 }

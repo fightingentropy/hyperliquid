@@ -1,9 +1,6 @@
 import { ExternalLink, RefreshCw } from "lucide-react";
 import { useMemo, useState } from "react";
-import {
-  fetchHyperliquidLiquidationMap,
-  HYPERLIQUID_LIQUIDATION_SYMBOLS,
-} from "../api/coinglass";
+import { fetchLiquidationMap, HYPERLIQUID_LIQUIDATION_SYMBOLS } from "../api/liquidations";
 import LiquidationMapChart, {
   buildLiquidationChartModel,
 } from "../components/LiquidationMapChart";
@@ -12,7 +9,10 @@ import { usePollingResource } from "../hooks/usePollingResource";
 import { cx } from "../lib/cx";
 
 const POLL_INTERVAL_MS = 60_000;
-const COINGLASS_SOURCE_URL = "https://www.coinglass.com/hyperliquid-liquidation-map";
+const HYPERLIQUID_API_DOCS_URL =
+  "https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/info-endpoint/perpetuals";
+// The wallet list keeps leaderboard accounts with at least this much account value.
+const MIN_WALLET_ACCOUNT_VALUE_LABEL = "$1M";
 
 function formatPrice(value) {
   if (!Number.isFinite(value)) {
@@ -36,7 +36,7 @@ function formatToken(value, symbol) {
 
 function formatTime(timestamp) {
   if (!Number.isFinite(timestamp) || timestamp <= 0) {
-    return "Live";
+    return "—";
   }
 
   return new Intl.DateTimeFormat(undefined, {
@@ -44,6 +44,19 @@ function formatTime(timestamp) {
     minute: "2-digit",
     second: "2-digit",
   }).format(new Date(timestamp));
+}
+
+function describeSource(data) {
+  const wallets = Number.isFinite(data?.walletsTracked)
+    ? `${Intl.NumberFormat().format(data.walletsTracked)} tracked wallets`
+    : "Tracked wallets";
+  const parts = ["Hyperliquid", `${wallets} ≥ ${MIN_WALLET_ACCOUNT_VALUE_LABEL}`];
+
+  if (Number.isFinite(data?.asOf) && data.asOf > 0) {
+    parts.push(`updated ${formatTime(data.asOf)}`);
+  }
+
+  return parts.join(" · ");
 }
 
 function routeErrorMessage(error, fallback) {
@@ -55,11 +68,11 @@ export default function LiquidationMapPage() {
   const [refreshNonce, setRefreshNonce] = useState(0);
 
   const { data, error, isLoading, isRefreshing } = usePollingResource(
-    () => fetchHyperliquidLiquidationMap({ symbol }),
+    () => fetchLiquidationMap({ symbol }),
     [symbol, refreshNonce],
     {
       intervalMs: POLL_INTERVAL_MS,
-      cacheKey: `coinglass-liq-map:${symbol}:${refreshNonce}`,
+      cacheKey: `liq-map:${symbol}:${refreshNonce}`,
       staleTimeMs: 0,
     },
   );
@@ -73,8 +86,9 @@ export default function LiquidationMapPage() {
         <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div className="max-w-3xl">
             <p className="text-sm text-muted-foreground">
-              Hyperliquid whale liquidation levels reconstructed from CoinGlass map data. The
-              chart shows cumulative long and short liquidation leverage around the current price.
+              Liquidation levels of large Hyperliquid wallets, read from Hyperliquid&apos;s public
+              API. The chart shows cumulative long and short liquidation size around the current
+              price.
             </p>
           </div>
 
@@ -112,12 +126,12 @@ export default function LiquidationMapPage() {
             </button>
 
             <a
-              href={COINGLASS_SOURCE_URL}
+              href={HYPERLIQUID_API_DOCS_URL}
               target="_blank"
               rel="noreferrer noopener"
               className="inline-flex h-9 w-9 items-center justify-center rounded-sm border border-border bg-card text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground"
-              title="Open CoinGlass source"
-              aria-label="Open CoinGlass source"
+              title="Open Hyperliquid API docs"
+              aria-label="Open Hyperliquid API docs"
             >
               <ExternalLink className="size-4" aria-hidden="true" />
             </a>
@@ -161,9 +175,10 @@ export default function LiquidationMapPage() {
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-lg font-light text-foreground">Hyperliquid liquidation map</h2>
-              <p className="text-sm text-muted-foreground">
-                {data?.source ?? "CoinGlass"} data from{" "}
-                {data?.endpoint ?? "/api/hyperliquid/topPosition/liqMap"}
+              <p className="text-sm text-muted-foreground">{describeSource(data)}</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Covers the tracked large wallets only, not every position on Hyperliquid. Each
+                wallet is re-read about every 5 minutes.
               </p>
             </div>
 

@@ -97,7 +97,7 @@ const NAV_SECTIONS = [
         label: "Liquidations",
         path: "/app/liquidations",
         icon: Flame,
-        subtitle: "Real-time liquidation feed",
+        subtitle: "Liquidation levels of large wallets",
       },
       {
         label: "Team Wallets",

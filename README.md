@@ -7,6 +7,8 @@ and wallet pages follow their Qwantify counterparts and read the same Qwantify A
 Deploys target the Cloudflare Pages project `hl-stats`, which keeps its original name because
 Pages projects can't be renamed.
 
+Unofficial: not affiliated with Hyperliquid. Analytics only, not investment advice.
+
 - Local app dev: `npm run dev`
 - Pages build output: `npm run pages:build`
 - Pages local preview: `npm run pages:dev`

@@ -173,7 +173,11 @@ export default function RelativeStrengthChart({
   return (
     <section className="qf-rs-panel rounded-sm border border-border bg-card">
       <div className="qf-rs-panel__surface">
-        <div className="qf-rs-ranking" aria-label="Relative strength ranking">
+        <div
+          className="qf-rs-ranking"
+          aria-label="Relative strength ranking"
+          style={{ "--qf-rs-rows": Math.ceil(assets.length / 2) }}
+        >
           {assets.map((asset) => {
             const isFocused = asset.symbol === focusSymbol;
 

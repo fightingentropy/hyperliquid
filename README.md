@@ -1,6 +1,9 @@
 # hyperliquid
 
-This repo serves the Qwantify Hyperliquid analytics workspace at https://hyperliquid.erlin.org.
+This repo serves a React rebuild of pages from Qwantify (https://www.qwantify.io), a Hyperliquid
+analytics site, at https://hyperliquid.erlin.org. The market-flow, token-analytics, team-wallet
+and wallet pages follow their Qwantify counterparts and read the same Qwantify API
+(`api.qwantify.io`) through the same-origin Pages Function in `functions/api/[[path]].ts`.
 Deploys target the Cloudflare Pages project `hl-stats`, which keeps its original name because
 Pages projects can't be renamed.
 

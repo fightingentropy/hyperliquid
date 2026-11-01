@@ -15,7 +15,11 @@
     "preview": "vite preview --host 127.0.0.1 --port 4174",
     "pages:build": "bash scripts/build-pages.sh",
     "pages:dev": "npm run pages:build && wrangler pages dev .cloudflare/pages --d1 RESEARCH_CONTROL_DB",
-    "pages:deploy": "npm run pages:build && wrangler pages deploy .cloudflare/pages --project-name=hl-stats"
+    "pages:deploy": "npm run pages:build && wrangler pages deploy .cloudflare/pages --project-name=hl-stats",
+    "liq:wallets": "node scripts/liquidations/build-wallet-list.mjs",
+    "liq:build": "cd workers/liq-sweeper && wrangler build --experimental-new-config --experimental-cf-build-output",
+    "liq:dry-run": "npm run liq:build && cd workers/liq-sweeper && cf deploy --prebuilt --dry-run",
+    "liq:deploy": "npm run liq:build && cd workers/liq-sweeper && cf deploy --prebuilt"
   },
   "type": "module",
   "dependencies": {
@@ -30,11 +34,12 @@
     "@eslint/js": "10.0.1",
     "@types/node": "^26.1.1",
     "@vitejs/plugin-react": "^6.0.1",
+    "cf": "1.0.0-beta.17",
     "eslint": "10.8.0",
     "globals": "17.8.0",
     "typescript": "6.0.3",
     "vite": "^8.0.1",
     "vitest": "^4.1.7",
-    "wrangler": "^4.114.0"
+    "wrangler": "4.147.0"
   }
 }

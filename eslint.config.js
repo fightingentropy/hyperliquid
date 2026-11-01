@@ -4,8 +4,8 @@ import globals from "globals";
 export default [
   {
     ignores: [
-      ".cloudflare/**",
-      ".wrangler/**",
+      "**/.cloudflare/**",
+      "**/.wrangler/**",
       "dist/**",
       "node_modules/**",
       "worker-configuration.d.ts",

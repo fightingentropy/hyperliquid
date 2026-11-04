@@ -199,7 +199,7 @@ export default function TeamWalletsTable({ rows, price, loading, error }) {
                 <tr key={row.id}>
                   <td>
                     <Link
-                      to={`/app/wallets/${row.address}`}
+                      to={`/wallets/${row.address}`}
                       className="qf-team-table__wallet"
                       title={row.address}
                     >

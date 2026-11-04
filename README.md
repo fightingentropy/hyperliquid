@@ -17,7 +17,7 @@ Unofficial: not affiliated with Hyperliquid. Analytics only, not investment advi
 
 ## Liquidation map
 
-`/app/liquidations` shows where large Hyperliquid wallets would be liquidated, per coin, as
+`/liquidations` shows where large Hyperliquid wallets would be liquidated, per coin, as
 cumulative long and short size around the current price. It uses only Hyperliquid's official
 public API (`https://api.hyperliquid.xyz/info`):
 
@@ -81,7 +81,7 @@ when a pass completes.
 
 ## Equity Research
 
-`/app/research` absorbs the deterministic market-factor research tool from the
+`/research` absorbs the deterministic market-factor research tool from the
 AI Hedge Fund project into the Hyperliquid interface. It keeps the documented
 equities/SPY methodology, normalized price chart, factor attribution, evidence
 dates, headline metadata, and browser-local run history. It does not place

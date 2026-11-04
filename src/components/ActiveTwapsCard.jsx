@@ -51,7 +51,7 @@ function TwapRow({ row }) {
       <td className="px-4 py-2.5 text-right font-mono tabular-nums">{formatAmount(row.amount)}</td>
       <td className="px-4 py-2.5 text-right">
         <Link
-          to={`/app/wallets/${row.user}`}
+          to={`/wallets/${row.user}`}
           className="font-mono text-xs text-muted-foreground transition-colors hover:text-foreground"
           title={row.user}
         >

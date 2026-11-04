@@ -66,67 +66,67 @@ const NAV_SECTIONS = [
     items: [
       {
         label: "Explorer",
-        path: "/app",
+        path: "/explorer",
         icon: Compass,
         subtitle: "Search addresses and transactions",
       },
       {
         label: "Market Flow",
-        path: "/app/market-flow",
+        path: "/market-flow",
         icon: MarketFlowIcon,
         subtitle: "Buy/sell pressure tracking",
       },
       {
         label: "Relative Strength",
-        path: "/app/relative-strength",
+        path: "/relative-strength",
         icon: Activity,
         subtitle: "Compare market momentum",
       },
       {
         label: "Watchlist",
-        path: "/app/watch",
+        path: "/watch",
         icon: Eye,
         subtitle: "Coins you follow",
       },
       {
         label: "Liquidations",
-        path: "/app/liquidations",
+        path: "/liquidations",
         icon: Flame,
         subtitle: "Liquidation levels of large wallets",
       },
       {
         label: "Team Wallets",
-        path: "/app/team-wallets",
+        path: "/team-wallets",
         icon: Users2,
         subtitle: "Monthly team distributions",
       },
       {
         label: "Entities",
-        path: "/app/entities",
+        path: "/entities",
         icon: Users,
         subtitle: "Profiles and relationships",
       },
       {
         label: "Wallets",
-        path: "/app/wallets",
+        path: "/wallets",
         icon: Wallet,
         subtitle: "Holdings and flows",
       },
       {
         label: "Tracked Wallets",
-        path: "/app/tracked",
+        path: "/tracked",
         icon: Radar,
         subtitle: "Positioning, flows and trades",
       },
       {
         label: "Token Analytics",
-        path: "/app/token-analytics",
+        path: "/token-analytics",
         icon: PieChart,
         subtitle: "Distribution insights",
       },
       {
         label: "Toolbox",
-        path: "/app/toolbox",
+        path: "/toolbox",
         icon: Wrench,
         subtitle: "Strategy simulators and analyses",
         expandable: true,
@@ -138,7 +138,7 @@ const NAV_SECTIONS = [
     items: [
       {
         label: "Research",
-        path: "/app/research",
+        path: "/research",
         icon: BookOpen,
         subtitle: "Auditable equity signals",
       },
@@ -147,7 +147,7 @@ const NAV_SECTIONS = [
 ];
 
 function resolvePageHeader(pathname) {
-  const walletMatch = matchPath("/app/wallets/:address", pathname);
+  const walletMatch = matchPath("/wallets/:address", pathname);
 
   if (walletMatch) {
     const walletAddress = decodePathParam(walletMatch.params.address);
@@ -160,18 +160,18 @@ function resolvePageHeader(pathname) {
   }
 
   const routeTitles = [
-    { pattern: "/app", title: "Explorer" },
-    { pattern: "/app/market-flow", title: "Market Flow" },
-    { pattern: "/app/liquidations", title: "Liquidations" },
-    { pattern: "/app/relative-strength", title: "Relative Strength" },
-    { pattern: "/app/watch", title: "Watchlist" },
-    { pattern: "/app/research", title: "Equity Research" },
-    { pattern: "/app/token-analytics", title: "Token Analytics" },
-    { pattern: "/app/team-wallets", title: "Team Distribution" },
-    { pattern: "/app/entities", title: "Entities" },
-    { pattern: "/app/entities/:entityId", title: "Entity" },
-    { pattern: "/app/tracked", title: "Tracked Wallets" },
-    { pattern: "/app/wallets", title: "Wallets" },
+    { pattern: "/explorer", title: "Explorer" },
+    { pattern: "/market-flow", title: "Market Flow" },
+    { pattern: "/liquidations", title: "Liquidations" },
+    { pattern: "/relative-strength", title: "Relative Strength" },
+    { pattern: "/watch", title: "Watchlist" },
+    { pattern: "/research", title: "Equity Research" },
+    { pattern: "/token-analytics", title: "Token Analytics" },
+    { pattern: "/team-wallets", title: "Team Distribution" },
+    { pattern: "/entities", title: "Entities" },
+    { pattern: "/entities/:entityId", title: "Entity" },
+    { pattern: "/tracked", title: "Tracked Wallets" },
+    { pattern: "/wallets", title: "Wallets" },
   ];
 
   for (const route of routeTitles) {
@@ -194,7 +194,7 @@ function resolvePageHeader(pathname) {
 function Brand({ className, onNavigate }) {
   return (
     <Link
-      to="/app"
+      to="/explorer"
       className={cx("qf-brand", className)}
       onClick={onNavigate}
     >
@@ -222,7 +222,7 @@ function NavItem({ collapsed, item, onNavigate }) {
       onClick={onNavigate}
       aria-label={collapsed ? item.label : undefined}
       title={collapsed ? item.label : undefined}
-      end={item.path === "/app" || item.path === "/app/wallets"}
+      end={item.path === "/wallets"}
     >
       {({ isActive }) => (
         <>

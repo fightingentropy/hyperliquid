@@ -91,7 +91,7 @@ function EmptyNote({ children }) {
 
 function WalletLink({ address, name }) {
   return (
-    <Link to={`/app/wallets/${address}`} className="qf-quiet-link font-medium">
+    <Link to={`/wallets/${address}`} className="qf-quiet-link font-medium">
       {name}
     </Link>
   );
@@ -221,7 +221,7 @@ function LiquidationTable({ rows }) {
                   </span>
                 </div>
                 <div className="text-xs text-muted-foreground">
-                  <Link to={`/app/wallets/${row.address}`} className="qf-quiet-link">
+                  <Link to={`/wallets/${row.address}`} className="qf-quiet-link">
                     {row.name}
                   </Link>
                 </div>
@@ -275,7 +275,7 @@ function SharedCounterparties({ rows }) {
       <span className="uppercase tracking-wide text-muted-foreground">Shared counterparties</span>
       {shared.map((party) => (
         <div key={party.address} className="text-muted-foreground">
-          <Link to={`/app/wallets/${party.address}`} className="qf-quiet-link font-mono">
+          <Link to={`/wallets/${party.address}`} className="qf-quiet-link font-mono">
             {party.address.slice(0, 6)}…{party.address.slice(-4)}
           </Link>{" "}
           {party.wallets
@@ -539,7 +539,7 @@ export default function TrackedWalletsPage() {
         {wallets.map((wallet) => (
           <Link
             key={wallet.address}
-            to={`/app/wallets/${wallet.address}`}
+            to={`/wallets/${wallet.address}`}
             className="qf-quiet-link rounded-sm border border-border px-3 py-1.5 text-xs transition-colors hover:bg-muted/50"
           >
             {walletDisplayName(wallet)}

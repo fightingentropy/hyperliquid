@@ -104,7 +104,7 @@ export default function WalletPage() {
   }, [walletAddress]);
 
   const handleWalletJump = (nextWalletAddress) => {
-    navigate(`/app/wallets/${encodeURIComponent(nextWalletAddress)}`);
+    navigate(`/wallets/${encodeURIComponent(nextWalletAddress)}`);
   };
 
   const resolveResource = usePollingResource(

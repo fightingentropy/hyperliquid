@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import WalletPickerPanel from "../components/WalletPickerPanel";
 
 export default function WalletLookupPage() {
@@ -16,7 +16,7 @@ export default function WalletLookupPage() {
   }, []);
 
   const handleWalletJump = (nextWalletAddress) => {
-    navigate(`/app/wallets/${encodeURIComponent(nextWalletAddress)}`);
+    navigate(`/wallets/${encodeURIComponent(nextWalletAddress)}`);
   };
 
   return (
@@ -25,10 +25,16 @@ export default function WalletLookupPage() {
         value={walletInput}
         onChange={setWalletInput}
         onSubmit={handleWalletJump}
+        showWallets={false}
       />
 
       <div className="rounded-sm border border-border bg-card px-4 py-6 text-sm text-muted-foreground">
-        Choose one of your pinned wallets above or paste any EVM address to open its wallet view.
+        Paste any EVM address to open its wallet view. The wallets you track, with their
+        positioning and flows, are under{" "}
+        <Link to="/tracked" className="text-foreground underline-offset-2 hover:underline">
+          Tracked Wallets
+        </Link>
+        .
       </div>
     </div>
   );

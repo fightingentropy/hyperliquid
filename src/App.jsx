@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import AppShell from "./components/AppShell";
 import { lazyPage } from "./lib/lazyPage";
 
@@ -16,14 +16,23 @@ const EntitiesPage = lazyPage(() => import("./pages/EntitiesPage"));
 const EntityPage = lazyPage(() => import("./pages/EntityPage"));
 const TrackedWalletsPage = lazyPage(() => import("./pages/TrackedWalletsPage"));
 
+// Everything used to live under /app; keep old links and bookmarks working.
+function LegacyAppRedirect() {
+  const location = useLocation();
+  const rest = location.pathname.replace(/^\/app(?=\/|$)/, "");
+  const target = !rest || rest === "/" ? "/explorer" : rest;
+  return <Navigate to={`${target}${location.search}${location.hash}`} replace />;
+}
+
 export default function App() {
   return (
     <Suspense fallback={null}>
       <Routes>
-        <Route path="/" element={<Navigate to="/app/market-flow" replace />} />
+        <Route path="/app/*" element={<LegacyAppRedirect />} />
 
-        <Route path="/app" element={<AppShell />}>
-          <Route index element={<WalletLookupPage />} />
+        <Route element={<AppShell />}>
+          <Route index element={<Navigate to="/market-flow" replace />} />
+          <Route path="explorer" element={<WalletLookupPage />} />
           <Route path="market-flow" element={<MarketFlowPage />} />
           <Route path="liquidations" element={<LiquidationMapPage />} />
           <Route path="relative-strength" element={<RelativeStrengthPage />} />
@@ -36,10 +45,8 @@ export default function App() {
           <Route path="tracked" element={<TrackedWalletsPage />} />
           <Route path="wallets" element={<WalletLookupPage />} />
           <Route path="wallets/:address" element={<WalletPage />} />
-          <Route path="*" element={<Navigate to="/app/market-flow" replace />} />
+          <Route path="*" element={<Navigate to="/market-flow" replace />} />
         </Route>
-
-        <Route path="*" element={<Navigate to="/app/market-flow" replace />} />
       </Routes>
     </Suspense>
   );

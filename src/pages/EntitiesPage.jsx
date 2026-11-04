@@ -108,7 +108,7 @@ export default function EntitiesPage() {
             {visible.map((entity) => (
               <tr key={entity.id} className="border-b border-border/60 last:border-b-0 hover:bg-muted/30">
                 <td className="px-4 py-3">
-                  <Link to={`/app/entities/${entity.id}`} className="font-medium hover:underline">
+                  <Link to={`/entities/${entity.id}`} className="font-medium hover:underline">
                     {entity.name}
                   </Link>
                 </td>

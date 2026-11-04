@@ -1103,7 +1103,7 @@ function renderWalletParty(address, currentWalletAddress) {
 
   return (
     <Link
-      to={`/app/wallets/${encodeURIComponent(address)}`}
+      to={`/wallets/${encodeURIComponent(address)}`}
       className="font-mono text-xs underline-offset-4 transition hover:underline"
     >
       {shortAddress(address)}

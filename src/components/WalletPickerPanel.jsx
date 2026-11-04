@@ -18,6 +18,7 @@ export default function WalletPickerPanel({
   onChange,
   onSubmit,
   activeAddress = "",
+  showWallets = true,
 }) {
   const { wallets, addWallet, removeWallet } = useWallets();
   const [modalOpen, setModalOpen] = useState(false);
@@ -45,55 +46,57 @@ export default function WalletPickerPanel({
   return (
     <section className="rounded-sm border border-border bg-card px-4 py-4">
       <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-        <div className="space-y-2">
-          <div className="text-[11px] uppercase tracking-[0.28em] text-muted-foreground">
-            My Wallets
-          </div>
+        {showWallets ? (
+          <div className="space-y-2">
+            <div className="text-[11px] uppercase tracking-[0.28em] text-muted-foreground">
+              My Wallets
+            </div>
 
-          <div className="flex flex-wrap gap-2">
-            {wallets.map((wallet) => {
-              const isActive =
-                normalizedActiveAddress.length > 0 &&
-                wallet.address.toLowerCase() === normalizedActiveAddress;
+            <div className="flex flex-wrap gap-2">
+              {wallets.map((wallet) => {
+                const isActive =
+                  normalizedActiveAddress.length > 0 &&
+                  wallet.address.toLowerCase() === normalizedActiveAddress;
 
-              return (
-                <Link
-                  key={wallet.address}
-                  to={`/app/wallets/${wallet.address}`}
-                  className={cx(
-                    "qf-wallet-chip group inline-flex min-h-10 items-center gap-1.5 rounded-sm border px-3 text-sm transition",
-                    isActive
-                      ? "is-active border-border bg-[#202024]"
-                      : "border-border hover:bg-[#202024]",
-                  )}
-                  title={wallet.address}
-                >
-                  <span>{getWalletLabel(wallet)}</span>
-                  {!wallet.isDefault ? (
-                    <button
-                      type="button"
-                      onClick={(event) => handleRemove(event, wallet.address)}
-                      aria-label={`Remove ${getWalletLabel(wallet)}`}
-                      className="inline-flex size-4 items-center justify-center rounded-sm text-muted-foreground transition hover:text-foreground"
-                    >
-                      <X className="size-3" />
-                    </button>
+                return (
+                  <Link
+                    key={wallet.address}
+                    to={`/wallets/${wallet.address}`}
+                    className={cx(
+                      "qf-wallet-chip group inline-flex min-h-10 items-center gap-1.5 rounded-sm border px-3 text-sm transition",
+                      isActive
+                        ? "is-active border-border bg-[#202024]"
+                        : "border-border hover:bg-[#202024]",
+                    )}
+                    title={wallet.address}
+                  >
+                    <span>{getWalletLabel(wallet)}</span>
+                    {!wallet.isDefault ? (
+                      <button
+                        type="button"
+                        onClick={(event) => handleRemove(event, wallet.address)}
+                        aria-label={`Remove ${getWalletLabel(wallet)}`}
+                        className="inline-flex size-4 items-center justify-center rounded-sm text-muted-foreground transition hover:text-foreground"
+                      >
+                        <X className="size-3" />
+                      </button>
                   ) : null}
-                </Link>
-              );
-            })}
+                  </Link>
+                );
+              })}
 
-            <button
-              type="button"
-              onClick={() => setModalOpen(true)}
-              aria-label="Add wallet"
-              title="Add wallet"
-              className="inline-flex size-10 items-center justify-center rounded-sm border border-dashed border-border text-muted-foreground transition hover:border-border hover:bg-[#202024] hover:text-foreground"
-            >
-              <Plus className="size-4" />
-            </button>
+              <button
+                type="button"
+                onClick={() => setModalOpen(true)}
+                aria-label="Add wallet"
+                title="Add wallet"
+                className="inline-flex size-10 items-center justify-center rounded-sm border border-dashed border-border text-muted-foreground transition hover:border-border hover:bg-[#202024] hover:text-foreground"
+              >
+                <Plus className="size-4" />
+              </button>
+            </div>
           </div>
-        </div>
+        ) : null}
 
         <form
           onSubmit={handleSubmit}
@@ -127,13 +130,15 @@ export default function WalletPickerPanel({
         </form>
       </div>
 
-      <WalletFormModal
-        open={modalOpen}
-        onClose={() => setModalOpen(false)}
-        onSubmit={({ address, label }) => addWallet(address, label)}
-        title="Add wallet"
-        submitLabel="Save wallet"
-      />
+      {showWallets ? (
+        <WalletFormModal
+          open={modalOpen}
+          onClose={() => setModalOpen(false)}
+          onSubmit={({ address, label }) => addWallet(address, label)}
+          title="Add wallet"
+          submitLabel="Save wallet"
+        />
+      ) : null}
     </section>
   );
 }

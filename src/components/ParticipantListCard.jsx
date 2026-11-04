@@ -66,7 +66,7 @@ export default function ParticipantListCard({
               <Link
                 key={`${row.wallet}-${index}`}
                 className="-mx-2 flex items-center justify-between gap-4 rounded-sm border-b border-border px-2 py-3 transition-colors last:border-b-0 hover:bg-muted/30"
-                to={`/app/wallets/${encodeURIComponent(row.wallet.trim())}`}
+                to={`/wallets/${encodeURIComponent(row.wallet.trim())}`}
                 title="View wallet summary"
               >
                 <div className="flex min-w-0 flex-1 items-center gap-3">

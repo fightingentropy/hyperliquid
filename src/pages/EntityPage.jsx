@@ -206,7 +206,7 @@ export default function EntityPage() {
     return (
       <div className="rounded-sm border border-border bg-card p-6 text-sm text-muted-foreground">
         Failed to load this entity: {entityResource.error.message}{" "}
-        <Link to="/app/entities" className="underline">
+        <Link to="/entities" className="underline">
           Back to entities
         </Link>
       </div>
@@ -227,7 +227,7 @@ export default function EntityPage() {
     <div className="flex flex-col gap-5">
       <div className="flex flex-col gap-2">
         <Link
-          to="/app/entities"
+          to="/entities"
           className="flex w-fit items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft className="size-3.5" />
@@ -318,7 +318,7 @@ export default function EntityPage() {
                 <tr key={row.address} className="border-b border-border/60 last:border-b-0 hover:bg-muted/30">
                   <td className="px-4 py-3">
                     <Link
-                      to={`/app/wallets/${row.address}`}
+                      to={`/wallets/${row.address}`}
                       className="font-mono text-xs hover:underline"
                       title={row.address}
                     >

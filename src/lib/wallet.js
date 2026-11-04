@@ -32,6 +32,10 @@ export const PINNED_WALLETS = [
     address: "0x082e843a431aef031264dc232693dd710aedca88",
     label: "100m$ hype long",
   },
+  {
+    address: "0xda744273f80b22412417f7cfe0503f3d721f987d",
+    label: "Flood",
+  },
 ];
 
 export const PERFORMANCE_METRIC_OPTIONS = [

@@ -9,6 +9,7 @@ import {
   Compass,
   Copy,
   ExternalLink,
+  Eye,
   Flame,
   Menu,
   Moon,
@@ -88,6 +89,12 @@ const NAV_SECTIONS = [
         subtitle: "Compare market momentum",
       },
       {
+        label: "Watchlist",
+        path: "/app/watch",
+        icon: Eye,
+        subtitle: "Coins you follow",
+      },
+      {
         label: "Execution Bot",
         path: "/app/execution-bots",
         icon: Bot,
@@ -163,6 +170,7 @@ function resolvePageHeader(pathname) {
     { pattern: "/app/market-flow", title: "Market Flow" },
     { pattern: "/app/liquidations", title: "Liquidations" },
     { pattern: "/app/relative-strength", title: "Relative Strength" },
+    { pattern: "/app/watch", title: "Watchlist" },
     { pattern: "/app/research", title: "Equity Research" },
     { pattern: "/app/token-analytics", title: "Token Analytics" },
     { pattern: "/app/team-wallets", title: "Team Distribution" },

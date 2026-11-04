@@ -10,6 +10,7 @@ const TokenAnalyticsPage = lazy(() => import("./pages/TokenAnalyticsPage"));
 const TeamDistributionPage = lazy(() => import("./pages/TeamDistributionPage"));
 const WalletLookupPage = lazy(() => import("./pages/WalletLookupPage"));
 const WalletPage = lazy(() => import("./pages/WalletPage"));
+const WatchPage = lazy(() => import("./pages/WatchPage"));
 
 export default function App() {
   return (
@@ -22,6 +23,7 @@ export default function App() {
           <Route path="market-flow" element={<MarketFlowPage />} />
           <Route path="liquidations" element={<LiquidationMapPage />} />
           <Route path="relative-strength" element={<RelativeStrengthPage />} />
+          <Route path="watch" element={<WatchPage />} />
           <Route path="research" element={<ResearchPage />} />
           <Route path="token-analytics" element={<TokenAnalyticsPage />} />
           <Route path="team-wallets" element={<TeamDistributionPage />} />

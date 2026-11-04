@@ -4,6 +4,8 @@ import {
   buildTwapMarketDirectory,
   computeFeeStats,
   createTwapTrackerState,
+  filterHypeTwaps,
+  projectTwapFlow,
   projectTwapPressure,
   reconcileActiveTwaps,
   selectTwapMarketSources,
@@ -128,6 +130,7 @@ describe("buildTwapMarketDirectory", () => {
       iconCoin: "BTC",
       segment: "perp",
       price: 50_000,
+      isHype: false,
     });
     // Falls back to markPx when midPx is missing.
     expect(directory.get(1)).toMatchObject({ displayName: "ETH-USD", price: 3_000 });
@@ -142,8 +145,20 @@ describe("buildTwapMarketDirectory", () => {
       displayName: "HYPE",
       segment: "spot",
       price: 68,
+      isHype: true,
       isHypeSpot: true,
     });
+  });
+
+  it("marks the HYPE perp, on the main dex and HIP-3 dexes, as HYPE but not spot", () => {
+    const directory = buildTwapMarketDirectory({
+      perpsByDexIndex: {
+        0: [{ universe: [{ name: "BTC" }, { name: "HYPE" }] }, [{ midPx: "1" }, { midPx: "84" }]],
+        4: [{ universe: [{ name: "hyna:HYPE" }] }, [{ midPx: "84" }]],
+      },
+    });
+    expect(directory.get(1)).toMatchObject({ displayName: "HYPE-USD", isHype: true, isHypeSpot: false });
+    expect(directory.get(140_000)).toMatchObject({ isHype: true, isHypeSpot: false });
   });
 
   it("tolerates missing sources", () => {
@@ -302,6 +317,29 @@ describe("twapRemainingFraction", () => {
     expect(twapRemainingFraction(record, now + 30 * 60 * 1000)).toBe(0);
     expect(twapRemainingFraction(record, now - 60 * 60 * 1000)).toBe(1); // clamped
     expect(twapRemainingFraction(null, now)).toBe(0);
+  });
+});
+
+describe("projectTwapFlow and filterHypeTwaps", () => {
+  const now = 1_000_000_000_000;
+  const minute = 60 * 1000;
+  const order = (over) => ({ start: now, end: now + 60 * minute, durationMs: 60 * minute, value: 6000, isBuy: true, isHype: true, segment: "perp", ...over });
+
+  it("splits the window's flow into buys and sells", () => {
+    const flow = projectTwapFlow([order({}), order({ isBuy: false, value: 2000 })], now, 30 * minute);
+    expect(flow).toEqual({ buy: 3000, sell: 1000, net: 2000, buyPct: 75 });
+    expect(projectTwapFlow([], now, minute)).toEqual({ buy: 0, sell: 0, net: 0, buyPct: 50 });
+  });
+
+  it("uses every HYPE market for All and only spot pairs for Spot, like hypurrscan", () => {
+    const rows = [
+      order({ hash: "perp" }),
+      order({ hash: "spot", segment: "spot" }),
+      order({ hash: "btc", isHype: false }),
+      order({ hash: "unpriced", value: null }),
+    ];
+    expect(filterHypeTwaps(rows, "all").map((row) => row.hash)).toEqual(["perp", "spot"]);
+    expect(filterHypeTwaps(rows, "spot").map((row) => row.hash)).toEqual(["spot"]);
   });
 });
 

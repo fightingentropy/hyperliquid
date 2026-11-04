@@ -147,6 +147,7 @@ export function buildTwapMarketDirectory({ perpsByDexIndex, spotMetaAndAssetCtxs
         iconCoin: name,
         segment: dexIndex === 0 ? "perp" : "hip3",
         price: contextPrice(assetCtxs?.[index]),
+        isHype: name.split(":").pop() === "HYPE",
         isHypeSpot: false,
       });
     });
@@ -181,6 +182,7 @@ export function buildTwapMarketDirectory({ perpsByDexIndex, spotMetaAndAssetCtxs
         iconCoin: displayName,
         segment: "spot",
         price: contextPrice(ctxByCoin.get(pair?.name)),
+        isHype: baseToken?.name === "HYPE",
         isHypeSpot: baseToken?.name === "HYPE",
       });
     });
@@ -273,6 +275,7 @@ export function buildActiveTwapRows(state, directory) {
       token: market?.displayName ?? `#${record.marketId}`,
       iconCoin: market?.iconCoin ?? "",
       value: price === null ? null : record.amount * price,
+      isHype: Boolean(market?.isHype),
       isHypeSpot: Boolean(market?.isHypeSpot),
     });
   }
@@ -290,25 +293,47 @@ export function twapRemainingFraction(record, now) {
   return Math.min(1, Math.max(0, (record.end - now) / record.durationMs));
 }
 
-// Net signed notional (buys positive, sells negative) that the active TWAPs will
-// execute within the next `windowMs`, assuming each order executes linearly over
-// its duration.
-export function projectTwapPressure(activeTwaps, now, windowMs) {
-  if (!Array.isArray(activeTwaps)) {
-    return 0;
-  }
+// Buy and sell notional the active TWAPs will execute within the next
+// `windowMs`, assuming each order executes linearly over its duration. Same
+// math as hypurrscan.io/dashboard's TWAP Buy Pressure tiles.
+export function projectTwapFlow(activeTwaps, now, windowMs) {
+  let buy = 0;
+  let sell = 0;
 
-  return activeTwaps.reduce((sum, twap) => {
-    if (twap.end <= now) {
-      return sum;
+  for (const twap of Array.isArray(activeTwaps) ? activeTwaps : []) {
+    if (!(twap.end > now) || !(twap.durationMs > 0) || !Number.isFinite(twap.value)) {
+      continue;
     }
 
-    const segmentEnd = Math.min(twap.end, now + windowMs);
-    const overlapMs = Math.max(0, segmentEnd - now);
+    const overlapMs = Math.max(0, Math.min(twap.end, now + windowMs) - now);
     const notional = (twap.value / twap.durationMs) * overlapMs;
+    if (twap.isBuy) {
+      buy += notional;
+    } else {
+      sell += notional;
+    }
+  }
 
-    return sum + (twap.isBuy ? notional : -notional);
-  }, 0);
+  const total = buy + sell;
+  return { buy, sell, net: buy - sell, buyPct: total > 0 ? (buy / total) * 100 : 50 };
+}
+
+// Net signed notional (buys positive, sells negative) over the next `windowMs`.
+export function projectTwapPressure(activeTwaps, now, windowMs) {
+  return projectTwapFlow(activeTwaps, now, windowMs).net;
+}
+
+// hypurrscan's All / Spot toggle: "all" is every HYPE market (perp, spot pairs,
+// HIP-3), "spot" only the HYPE spot pairs.
+export const TWAP_PRESSURE_SCOPES = [
+  { value: "all", label: "All" },
+  { value: "spot", label: "Spot" },
+];
+
+export function filterHypeTwaps(rows, scope) {
+  return (Array.isArray(rows) ? rows : []).filter(
+    (row) => row.isHype && Number.isFinite(row.value) && (scope !== "spot" || row.segment === "spot"),
+  );
 }
 
 // Projected net flow over the next hour and next day.

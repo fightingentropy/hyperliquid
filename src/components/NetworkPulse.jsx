@@ -6,7 +6,7 @@ import NetworkFeesCard from "./NetworkFeesCard";
 import TwapPressureCard from "./TwapPressureCard";
 
 // Live HypurrScan dashboard stats: network-wide 24h fees, the projected HYPE
-// spot TWAP buy/sell pressure, and the network-wide active TWAP table.
+// TWAP buy/sell pressure (all HYPE markets or spot only), and the network-wide active TWAP table.
 export default function NetworkPulse() {
   const feesResource = usePollingResource(fetchNetworkFeeStats, [], {
     intervalMs: 300_000,
@@ -26,7 +26,7 @@ export default function NetworkPulse() {
           error={feesResource.error}
         />
         <TwapPressureCard
-          activeTwaps={twaps.hypeSpotTwaps}
+          activeTwaps={twaps.hypeTwaps}
           loading={twaps.isLoading}
           error={twaps.error}
         />

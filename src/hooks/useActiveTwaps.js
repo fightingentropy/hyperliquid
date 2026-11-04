@@ -14,7 +14,7 @@ const POLL_INTERVAL_MS = 7_000;
 // Maintains the live active-TWAP set across every market by polling the public
 // feed and folding each snapshot into persistent tracker state, the same way
 // hypurrscan.io/dashboard does. Returns display rows for the Active TWAPs
-// table plus the HYPE-spot subset that feeds the buy-pressure card.
+// table plus the HYPE subset (every HYPE market) that feeds the buy-pressure card.
 export function useActiveTwaps() {
   const stateRef = useRef(createTwapTrackerState());
   // Markets keep their last known label/price through a failed refresh so the
@@ -22,7 +22,7 @@ export function useActiveTwaps() {
   const directoryRef = useRef(new Map());
   const [snapshot, setSnapshot] = useState({
     activeTwaps: null,
-    hypeSpotTwaps: null,
+    hypeTwaps: null,
     isLoading: true,
     error: null,
     asOf: 0,
@@ -55,7 +55,7 @@ export function useActiveTwaps() {
 
         setSnapshot({
           activeTwaps: rows,
-          hypeSpotTwaps: rows.filter((row) => row.isHypeSpot && Number.isFinite(row.value)),
+          hypeTwaps: rows.filter((row) => row.isHype && Number.isFinite(row.value)),
           isLoading: false,
           error: null,
           asOf: now,

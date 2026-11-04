@@ -66,6 +66,14 @@ export function formatCompactSignedCurrency(value) {
   return `${sign}${formatCompactCurrency(Math.abs(value))}`;
 }
 
+export function formatCompactCurrency2(value) {
+  if (!Number.isFinite(value)) {
+    return "—";
+  }
+
+  return value === 0 ? "$0" : `$${compactCurrency2.format(value)}`;
+}
+
 export function formatCompactSignedCurrency2(value) {
   if (!Number.isFinite(value)) {
     return "—";

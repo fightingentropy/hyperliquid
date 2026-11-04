@@ -24,7 +24,8 @@ function formatMillions(value) {
     return "$0M";
   }
 
-  return `$${Intl.NumberFormat(undefined, { maximumFractionDigits: 1 }).format(value / 1_000_000)}M`;
+  const millions = Intl.NumberFormat("en-US", { maximumFractionDigits: 1 }).format(Math.abs(value) / 1_000_000);
+  return `${value < 0 ? "-" : ""}$${millions}M`;
 }
 
 function formatPriceTick(value) {
@@ -37,7 +38,7 @@ function formatPriceTick(value) {
   return `$${Intl.NumberFormat(undefined, { maximumFractionDigits }).format(value)}`;
 }
 
-function TooltipBody({ active, payload, mode, assetLabel }) {
+function TooltipBody({ active, payload, mode, assetLabel, bucketMs }) {
   if (!active || !payload?.length) {
     return null;
   }
@@ -48,12 +49,19 @@ function TooltipBody({ active, payload, mode, assetLabel }) {
     return null;
   }
 
+  // The latest bucket is still filling, as Qwantify marks it.
+  const bucketStart = Date.parse(point.bucketStart ?? "");
+  const inProgress = Number.isFinite(bucketStart) && bucketStart + bucketMs > Date.now();
+
   const combinedCumulative = (point.cumPerpUsd ?? 0) + (point.cumSpotUsd ?? 0);
   const combinedInterval = (point.netPerpUsd ?? 0) + (point.netSpotUsd ?? 0);
 
   return (
     <div className="rounded-sm border border-border bg-card p-3 text-xs shadow-lg">
-      <div className="mb-2 font-medium text-foreground">{point.tooltipLabel}</div>
+      <div className="mb-2 font-medium text-foreground">
+        {point.tooltipLabel}
+        {inProgress ? <span className="font-normal text-muted-foreground"> · in progress</span> : null}
+      </div>
 
       <div className="space-y-1">
         {Number.isFinite(point.closePrice) ? (
@@ -251,7 +259,7 @@ export default function MarketFlowChart({
             axisLine={false}
             tickFormatter={formatPriceTick}
             width={58}
-            domain={["dataMin", "dataMax"]}
+            domain={["auto", "auto"]}
             hide={!seriesVisibility.price}
           />
           <ReferenceLine
@@ -261,7 +269,15 @@ export default function MarketFlowChart({
             strokeDasharray="3 3"
             strokeOpacity={0.5}
           />
-          <Tooltip content={<TooltipBody mode={mode} assetLabel={assetLabel} />} />
+          <Tooltip
+            content={
+              <TooltipBody
+                mode={mode}
+                assetLabel={assetLabel}
+                bucketMs={(chartWindow === "30d" ? 4 : 1) * 60 * 60 * 1000}
+              />
+            }
+          />
 
           {mode === "interval" ? (
             <>

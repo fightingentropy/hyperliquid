@@ -4,10 +4,11 @@ import { fetchHourlyCandles } from "../api/hyperliquid";
 import { fetchMarketFlowBatch, fetchMarketFlowSummaries } from "../api/marketFlow";
 import ButtonGroup from "../components/ButtonGroup";
 import DeferredMount from "../components/DeferredMount";
-import MetricCard from "../components/MetricCard";
 import NetworkPulse from "../components/NetworkPulse";
 import ParticipantListCard from "../components/ParticipantListCard";
 import { usePollingResource } from "../hooks/usePollingResource";
+import { cx } from "../lib/cx";
+import { formatCompactCurrency2, formatCompactSignedCurrency2 } from "../lib/formatters";
 import {
   ASSET_OPTIONS,
   CHART_WINDOWS,
@@ -25,35 +26,71 @@ import {
 
 const MarketFlowChart = lazy(() => import("../components/MarketFlowChart"));
 
-function metricTone(value) {
-  if (!Number.isFinite(value) || value === 0) {
-    return "neutral";
-  }
-
-  return value > 0 ? "positive" : "negative";
-}
-
 function routeErrorMessage(error, fallback) {
   return error instanceof Error ? error.message : fallback;
 }
 
-function formatMarketFlowSignedCurrency(value) {
-  if (!Number.isFinite(value)) {
-    return "—";
+const WINDOW_LABELS = { "1h": "1 hour", "4h": "4 hours", "24h": "24 hours", "7d": "7 days", "30d": "30 days" };
+
+function signedTone(value) {
+  if (!Number.isFinite(value) || value === 0) {
+    return "text-foreground";
   }
-
-  const sign = value > 0 ? "+" : value < 0 ? "-" : "";
-  const formattedValue = new Intl.NumberFormat("en-US", {
-    maximumFractionDigits: 0,
-  }).format(Math.abs(value));
-
-  return `$${sign}${formattedValue}`;
+  return value > 0 ? "text-profit" : "text-loss";
 }
 
-function formatDeltaValue(deltas, windowValue) {
-  const value = deltas?.[windowValue]?.netUsd;
-
-  return Number.isFinite(value) ? formatMarketFlowSignedCurrency(Math.round(value)) : "—";
+// Net flow per window with the bought/sold split, as Qwantify shows it. A tile
+// is also the participant-window picker for the rankings below.
+function FlowWindowTiles({ deltas, selected, onSelect, loading }) {
+  return (
+    <section className="rounded-sm border border-border bg-card">
+      <div className="flex flex-wrap items-center justify-between gap-2 px-4 pt-4">
+        <h2 className="text-sm font-medium text-foreground">Net flow by window</h2>
+        <p className="text-xs text-muted-foreground">Select a window to rank participants below</p>
+      </div>
+      <div className="grid grid-cols-2 gap-2 p-4 md:grid-cols-3 lg:grid-cols-5">
+        {PARTICIPANT_WINDOWS.map((windowValue) => {
+          const delta = deltas?.[windowValue];
+          const buy = delta?.buyUsd;
+          const sell = delta?.sellUsd;
+          const total = (buy ?? 0) + (sell ?? 0);
+          const buyPct = total > 0 ? (buy / total) * 100 : 50;
+          const isSelected = windowValue === selected;
+          return (
+            <button
+              key={windowValue}
+              type="button"
+              onClick={() => onSelect(windowValue)}
+              aria-pressed={isSelected}
+              className={cx(
+                "flex flex-col gap-2 rounded-sm border p-3 text-left transition-colors",
+                isSelected ? "border-border bg-muted" : "border-transparent hover:bg-muted/50",
+              )}
+            >
+              <span className="text-xs text-muted-foreground">{WINDOW_LABELS[windowValue]}</span>
+              <span className={cx("text-xl font-light", signedTone(delta?.netUsd))}>
+                {delta ? formatCompactSignedCurrency2(delta.netUsd) : loading ? "Loading…" : "—"}
+              </span>
+              <span className="flex h-1.5 w-full overflow-hidden rounded-full bg-muted" aria-hidden="true">
+                {total > 0 ? (
+                  <>
+                    <span style={{ width: `${buyPct}%`, backgroundColor: "var(--flow-buy)" }} />
+                    <span style={{ width: "2px", backgroundColor: "var(--card)" }} />
+                    <span style={{ flex: 1, backgroundColor: "var(--flow-sell)" }} />
+                  </>
+                ) : null}
+              </span>
+              <span className="text-xs text-muted-foreground">
+                Bought <span className="text-foreground">{delta ? formatCompactCurrency2(buy) : "—"}</span>
+                <br />
+                Sold <span className="text-foreground">{delta ? formatCompactCurrency2(sell) : "—"}</span>
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </section>
+  );
 }
 
 function ChartLoadingState({ height = 360 }) {
@@ -228,8 +265,8 @@ export default function MarketFlowPage() {
 
       <div>
         <p className="text-sm text-muted-foreground">
-          Participant market flow from Hyperliquid trade data: buy vs sell pressure across spot
-          and perp markets, plus a curated set of index and equity markets.
+          Buys minus sells from Hyperliquid fills, maker and taker, across spot and perp markets
+          plus a curated set of index markets. Refreshes every minute.
         </p>
 
         <ButtonGroup
@@ -274,49 +311,23 @@ export default function MarketFlowPage() {
         </div>
       ) : null}
 
-      <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
-        <MetricCard
-          label="Net delta 1h"
-          value={formatDeltaValue(deltas, "1h")}
-          tone={metricTone(deltas?.["1h"]?.netUsd)}
-          loading={batchResource.isLoading && !summary}
-          surface="market-flow"
-        />
-        <MetricCard
-          label="Net delta 4h"
-          value={formatDeltaValue(deltas, "4h")}
-          tone={metricTone(deltas?.["4h"]?.netUsd)}
-          loading={batchResource.isLoading && !summary}
-          surface="market-flow"
-        />
-        <MetricCard
-          label="Net delta 1D"
-          value={formatDeltaValue(deltas, "24h")}
-          tone={metricTone(deltas?.["24h"]?.netUsd)}
-          loading={batchResource.isLoading && !summary}
-          surface="market-flow"
-        />
-        <MetricCard
-          label="Net delta 7d"
-          value={formatDeltaValue(deltas, "7d")}
-          tone={metricTone(deltas?.["7d"]?.netUsd)}
-          loading={batchResource.isLoading && !summary}
-          surface="market-flow"
-        />
-        <MetricCard
-          label="Net delta 30d"
-          value={formatDeltaValue(deltas, "30d")}
-          tone={metricTone(deltas?.["30d"]?.netUsd)}
-          loading={batchResource.isLoading && !summary}
-          surface="market-flow"
-        />
-      </section>
+      <FlowWindowTiles
+        deltas={deltas}
+        selected={state.participantWindow}
+        onSelect={(participantWindow) => updateState({ participantWindow })}
+        loading={batchResource.isLoading && !summary}
+      />
 
       <section className="rounded-sm border border-border bg-card">
         <div className="p-6 pb-2">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-2">
               <h2 className="text-lg font-light text-foreground">{chartTitle}</h2>
+              {Number.isFinite(deltas?.[state.chartWindow]?.netUsd) ? (
+                <span className={cx("text-sm", signedTone(deltas[state.chartWindow].netUsd))}>
+                  {formatCompactSignedCurrency2(deltas[state.chartWindow].netUsd)}
+                </span>
+              ) : null}
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
@@ -375,6 +386,10 @@ export default function MarketFlowPage() {
               </Suspense>
             </DeferredMount>
           ) : null}
+          <p className="mt-3 text-xs text-muted-foreground">
+            Maker and taker fills, bucketed by {state.chartWindow === "30d" ? "4 hours" : "hour"} in UTC. Price is
+            the bucket close.
+          </p>
         </div>
       </section>
 

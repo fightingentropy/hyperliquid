@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   fetchAllClearinghouseStates,
   fetchAllMids,
+  fetchClearinghouseState,
   fetchAllUserFills,
   fetchDelegatorSummary,
   fetchSpotClearinghouseState,
@@ -17,6 +18,29 @@ import { buildSpotPriceMap } from "../lib/wallet";
 // perp dex, spot, staking, a week of fills and ledger updates). Three at a time
 // keeps a dozen tracked wallets well inside the 1200/minute budget.
 const WALLET_CONCURRENCY = 3;
+// "positions" mode (market-flow leaders, ~50 wallets) skips staking, fills and
+// ledger and reads only the main and xyz perp dexes plus spot: ~6 weight each.
+const POSITIONS_CONCURRENCY = 4;
+
+async function loadPositions(address, isCancelled) {
+  const retry = (load) => withRetry(load, { isCancelled });
+  const [main, xyz, spotState] = await Promise.all([
+    retry(() => fetchClearinghouseState({ user: address, dex: "" })),
+    retry(() => fetchClearinghouseState({ user: address, dex: "xyz" })),
+    retry(() => fetchSpotClearinghouseState({ user: address })),
+  ]);
+  return {
+    clearinghouseEntries: [
+      { dex: "", state: main },
+      { dex: "xyz", state: xyz },
+    ],
+    spotState,
+    stakingSummary: null,
+    fills: [],
+    ledger: [],
+    lastTradeAt: null,
+  };
+}
 
 async function loadWallet(address, since, isCancelled) {
   const retry = (load) => withRetry(load, { isCancelled });
@@ -45,7 +69,7 @@ async function loadWallet(address, since, isCancelled) {
   };
 }
 
-export function useTrackedWalletData(wallets) {
+export function useTrackedWalletData(wallets, { mode = "full" } = {}) {
   const walletKey = wallets.map((wallet) => wallet.address.toLowerCase()).join(",");
   const [refreshToken, setRefreshToken] = useState(0);
   const [state, setState] = useState({ pricing: null, byAddress: {}, failed: {}, loadedAt: null, error: null, since: null });
@@ -76,15 +100,18 @@ export function useTrackedWalletData(wallets) {
           hypeMid: Number(mids?.HYPE),
           prices: buildSpotPriceMap(spotMetaAndAssetCtxs),
           spotPairNames: buildSpotPairNames(spotMetaAndAssetCtxs),
+          mids,
         },
       }));
 
-      await runWithConcurrency(addresses, WALLET_CONCURRENCY, async (address) => {
+      const concurrency = mode === "positions" ? POSITIONS_CONCURRENCY : WALLET_CONCURRENCY;
+      await runWithConcurrency(addresses, concurrency, async (address) => {
         if (cancelled) {
           return;
         }
         try {
-          const data = await loadWallet(address, since, isCancelled);
+          const data =
+            mode === "positions" ? await loadPositions(address, isCancelled) : await loadWallet(address, since, isCancelled);
           if (!cancelled) {
             setState((previous) => ({ ...previous, byAddress: { ...previous.byAddress, [address]: data } }));
           }
@@ -107,7 +134,7 @@ export function useTrackedWalletData(wallets) {
     return () => {
       cancelled = true;
     };
-  }, [walletKey, refreshToken]);
+  }, [walletKey, refreshToken, mode]);
 
   const refresh = useCallback(() => setRefreshToken((token) => token + 1), []);
 

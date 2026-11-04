@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { cx } from "../lib/cx";
 import {
+  formatCompactSignedCurrency2,
   formatCount,
   formatCurrency,
   formatPercent,
@@ -42,6 +43,12 @@ export default function ParticipantListCard({
     <section className="rounded-sm border border-border bg-card">
       <div className="p-6 pb-4">
         <h3 className="text-lg font-light text-foreground">{title}</h3>
+        {mode === "net" && rows.length ? (
+          <div className={cx("mt-2 text-sm", toneClassName)}>
+            {formatCompactSignedCurrency2(rows.reduce((sum, row) => sum + (Number(row.netUsd) || 0), 0))}{" "}
+            <span className="text-muted-foreground">across top {rows.length}</span>
+          </div>
+        ) : null}
         {mode === "total" && totalVolume !== null ? (
           <div className="mt-2 text-sm text-muted-foreground">
             Total volume (maker + taker): {formatCurrency(totalVolume, 2)}

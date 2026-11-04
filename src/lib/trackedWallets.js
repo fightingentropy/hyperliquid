@@ -12,6 +12,11 @@ export const MAX_FLOW_WINDOW_MS = Math.max(...FLOW_WINDOWS.map((window) => windo
 // asset land in one row.
 const SPOT_ALIASES = { UBTC: "BTC", UETH: "ETH", USOL: "SOL" };
 
+export function spotTokenSymbol(token) {
+  const upper = String(token ?? "").toUpperCase();
+  return SPOT_ALIASES[upper] ?? upper;
+}
+
 // Hyperliquid's system addresses: 0x2000…<token index> bridges a spot token to
 // HyperEVM, 0x2222…2222 bridges HYPE.
 export function isHyperEvmSystemAddress(address) {
@@ -400,12 +405,19 @@ export function buildSharedCounterparties(capitalFlows) {
 
 // --- Risk --------------------------------------------------------------------
 
+// Dust positions (a few dollars) can sit right next to liquidation and say nothing.
+export const MIN_LIQUIDATION_VALUE_USD = 100;
+export const MIN_RISK_SIGNAL_USD = 10_000;
+
 export function buildLiquidationWatch(snapshots) {
   const rows = [];
   for (const snapshot of snapshots) {
     for (const position of snapshot.positions ?? []) {
       const liq = position.liquidationPrice;
       const mark = position.markPrice;
+      if (!(position.positionValueUsd >= MIN_LIQUIDATION_VALUE_USD)) {
+        continue;
+      }
       if (!Number.isFinite(liq) || liq <= 0 || !Number.isFinite(mark) || mark <= 0) {
         continue;
       }
@@ -500,7 +512,7 @@ export function buildSignals({ positioning, netFlows, liquidationWatch, snapshot
     });
   }
 
-  const nearLiq = liquidationWatch.find((row) => row.distancePct < 20);
+  const nearLiq = liquidationWatch.find((row) => row.distancePct < 20 && row.valueUsd >= MIN_RISK_SIGNAL_USD);
   if (nearLiq) {
     signals.push({
       kind: "risk",

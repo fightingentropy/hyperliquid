@@ -10,11 +10,11 @@ import {
 } from "../api/hyperliquid";
 import { fetchEntity, fetchEntityWallets } from "../api/qwantify";
 import { usePollingResource } from "../hooks/usePollingResource";
+import { runWithConcurrency, withRetry } from "../lib/async";
 import {
   MIN_DISPLAY_HYPE,
   normalizeEntity,
   normalizeEntityWallets,
-  runWithConcurrency,
   summarizeEntityBalances,
   summarizeWalletBalance,
 } from "../lib/entities";
@@ -25,26 +25,8 @@ import { EntityDescription, EntityTypeBadge } from "./EntitiesPage";
 // Staking is a heavier Hyperliquid request, so it runs afterwards, two at a time.
 const BALANCE_CONCURRENCY = 3;
 const STAKING_CONCURRENCY = 2;
-const RETRY_DELAYS_MS = [3_000, 8_000];
 
 const hypeAmount = new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 });
-
-function wait(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-async function withRetry(load, isCancelled) {
-  for (let attempt = 0; ; attempt += 1) {
-    try {
-      return await load();
-    } catch (error) {
-      if (attempt >= RETRY_DELAYS_MS.length || isCancelled()) {
-        throw error;
-      }
-      await wait(RETRY_DELAYS_MS[attempt]);
-    }
-  }
-}
 
 function useEntityBalances(wallets) {
   const walletKey = wallets.map((wallet) => wallet.address).join(",");
@@ -99,7 +81,7 @@ function useEntityBalances(wallets) {
                 fetchClearinghouseState({ user: address, dex: "xyz" }),
                 fetchSpotClearinghouseState({ user: address }),
               ]),
-            isCancelled,
+            { isCancelled },
           );
           if (!cancelled) {
             updateSnapshot(address, {
@@ -124,7 +106,7 @@ function useEntityBalances(wallets) {
         try {
           const stakingSummary = await withRetry(
             () => fetchDelegatorSummary({ user: address }),
-            isCancelled,
+            { isCancelled },
           );
           if (!cancelled) {
             updateSnapshot(address, { stakingSummary });

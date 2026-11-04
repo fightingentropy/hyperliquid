@@ -459,11 +459,12 @@ const USER_FILLS_MAX_PAGES = 10;
 // qwantify uses, which has no fills API of its own: both read this endpoint.
 export async function fetchAllUserFills({
   user,
+  startTime: initialStartTime = 0,
   maxPages = USER_FILLS_MAX_PAGES,
   fetchPage = fetchUserFillsByTime,
 }) {
   const byKey = new Map();
-  let startTime = 0;
+  let startTime = initialStartTime;
 
   for (let page = 0; page < maxPages; page += 1) {
     const batch = await fetchPage({ user, startTime });

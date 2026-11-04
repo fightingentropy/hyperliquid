@@ -15,6 +15,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   PieChart,
+  Radar,
   Sun,
   Users,
   Users2,
@@ -112,6 +113,12 @@ const NAV_SECTIONS = [
         subtitle: "Holdings and flows",
       },
       {
+        label: "Tracked Wallets",
+        path: "/app/tracked",
+        icon: Radar,
+        subtitle: "Positioning, flows and trades",
+      },
+      {
         label: "Token Analytics",
         path: "/app/token-analytics",
         icon: PieChart,
@@ -163,6 +170,7 @@ function resolvePageHeader(pathname) {
     { pattern: "/app/team-wallets", title: "Team Distribution" },
     { pattern: "/app/entities", title: "Entities" },
     { pattern: "/app/entities/:entityId", title: "Entity" },
+    { pattern: "/app/tracked", title: "Tracked Wallets" },
     { pattern: "/app/wallets", title: "Wallets" },
   ];
 

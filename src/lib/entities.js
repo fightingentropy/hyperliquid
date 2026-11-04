@@ -1,5 +1,7 @@
 import { buildHoldingsSnapshot, buildPositionSnapshot, toNumber } from "./wallet";
 
+export { runWithConcurrency } from "./async";
+
 // Dust below this shows as "0 HYPE" at two decimals, so it isn't counted.
 export const MIN_DISPLAY_HYPE = 0.01;
 
@@ -123,18 +125,4 @@ export function summarizeEntityBalances(balances) {
     unrealizedPnlUsd: sum("unrealizedPnlUsd"),
     stakingWalletCount: loaded.filter((balance) => (balance.stakedHype ?? 0) >= MIN_DISPLAY_HYPE).length,
   };
-}
-
-// Runs `task` over `items` with at most `limit` in flight, so a 46-wallet
-// entity doesn't fire hundreds of Hyperliquid requests at once.
-export async function runWithConcurrency(items, limit, task) {
-  let next = 0;
-  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
-    while (next < items.length) {
-      const index = next;
-      next += 1;
-      await task(items[index], index);
-    }
-  });
-  await Promise.all(workers);
 }

@@ -10,6 +10,30 @@ body {
   margin: 0;
 }
 
+/* Diverging pair for buy/long vs sell/short in charts. Validated for color-blind
+   separation (worst ΔE 19.2 dark, deutan); the app's green/red fails (ΔE 4.6). */
+:root {
+  --flow-buy: #2a78d6;
+  --flow-sell: #e34948;
+}
+
+:root[data-theme="dark"],
+.dark {
+  --flow-buy: #3987e5;
+  --flow-sell: #e66767;
+}
+
+/* Links that read as text (wallet names in tables); the global link rule is orange. */
+.qf-quiet-link,
+.qf-quiet-link:visited {
+  color: var(--foreground);
+}
+
+.qf-quiet-link:hover {
+  color: var(--foreground);
+  text-decoration: underline;
+}
+
 :root {
   --qf-sidebar-width: 18rem;
   --qf-sidebar-collapsed-width: 3.25rem;

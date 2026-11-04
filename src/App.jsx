@@ -14,6 +14,7 @@ const WalletPage = lazyPage(() => import("./pages/WalletPage"));
 const WatchPage = lazyPage(() => import("./pages/WatchPage"));
 const EntitiesPage = lazyPage(() => import("./pages/EntitiesPage"));
 const EntityPage = lazyPage(() => import("./pages/EntityPage"));
+const TrackedWalletsPage = lazyPage(() => import("./pages/TrackedWalletsPage"));
 
 export default function App() {
   return (
@@ -32,6 +33,7 @@ export default function App() {
           <Route path="team-wallets" element={<TeamDistributionPage />} />
           <Route path="entities" element={<EntitiesPage />} />
           <Route path="entities/:entityId" element={<EntityPage />} />
+          <Route path="tracked" element={<TrackedWalletsPage />} />
           <Route path="wallets" element={<WalletLookupPage />} />
           <Route path="wallets/:address" element={<WalletPage />} />
           <Route path="*" element={<Navigate to="/app/market-flow" replace />} />

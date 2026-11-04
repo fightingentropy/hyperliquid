@@ -26,7 +26,7 @@ export const PINNED_WALLETS = [
   },
   {
     address: "0x519c721de735f7c9e6146d167852e60d60496a47",
-    label: "big hype short",
+    label: "btc short + stock longs",
   },
   {
     address: "0x082e843a431aef031264dc232693dd710aedca88",

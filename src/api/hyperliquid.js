@@ -567,3 +567,105 @@ export async function fetchUserNonFundingLedgerUpdates({ user, startTime, endTim
     endTime,
   }, { cacheTtlMs: LIVE_CACHE_TTL_MS });
 }
+
+function parseWatchMarket(universe, assetCtxs, { dex = "", marketType = "crypto" } = {}) {
+  return universe
+    .map((asset, index) => {
+      const ctx = assetCtxs[index] ?? {};
+      const coin = asset.name;
+
+      return {
+        symbol: dex === XYZ_DEX ? getXyzDisplaySymbol(coin) : coin,
+        coin,
+        marketType,
+        markPx: Number(ctx.markPx ?? 0),
+        midPx: Number(ctx.midPx ?? ctx.markPx ?? 0),
+        prevDayPx: Number(ctx.prevDayPx ?? 0),
+        dayNtlVlm: Number(ctx.dayNtlVlm ?? 0),
+        openInterest: Number(ctx.openInterest ?? 0),
+        fundingRate: Number(ctx.funding ?? 0),
+        isDelisted: Boolean(asset.isDelisted),
+      };
+    })
+    .filter(
+      (market) =>
+        market.symbol &&
+        market.coin &&
+        !market.isDelisted &&
+        Number.isFinite(market.markPx) &&
+        market.markPx > 0,
+    );
+}
+
+// Watchlist snapshot: one row per tradable market with everything the watch
+// table shows (price, previous-day price for 24h change, volume, open
+// interest, funding). Primary perps take priority when a symbol exists on
+// both the main dex and a HIP-3 or xyz dex.
+export async function fetchWatchMarkets() {
+  const [primary, xyz] = await Promise.all([
+    fetchPerpMetaAndAssetCtxs(),
+    fetchPerpMetaAndAssetCtxs({ dex: XYZ_DEX }).catch(() => null),
+  ]);
+
+  const markets = [
+    ...parseWatchMarket(primary?.[0]?.universe ?? [], primary?.[1] ?? []),
+    ...(xyz
+      ? parseWatchMarket(xyz[0]?.universe ?? [], xyz[1] ?? [], {
+          dex: XYZ_DEX,
+          marketType: "tradfi",
+        })
+      : []),
+  ];
+
+  const seen = new Set();
+  const uniqueMarkets = markets.filter((market) => {
+    const key = market.symbol.toUpperCase();
+    if (seen.has(key)) {
+      return false;
+    }
+    seen.add(key);
+    return true;
+  });
+
+  return {
+    asOf: Date.now(),
+    markets: uniqueMarkets,
+  };
+}
+
+const WATCH_SPARKLINE_LOOKBACK_HOURS = 25;
+
+// 24 hourly closes per coin for the watch table's sparklines. One request per
+// coin, served through the shared request cache so several lists or tabs
+// polling the same coins stay cheap.
+export async function fetchWatchSparklines(coins) {
+  const symbols = Array.isArray(coins) ? coins.filter(Boolean) : [];
+  const startTime = Date.now() - WATCH_SPARKLINE_LOOKBACK_HOURS * 60 * 60 * 1000;
+
+  const results = await Promise.allSettled(
+    symbols.map(async (symbol) => {
+      const payload = await requestHyperliquidInfo({
+        type: "candleSnapshot",
+        req: {
+          coin: symbol,
+          interval: "1h",
+          startTime,
+        },
+      }, { cacheTtlMs: CHART_CACHE_TTL_MS });
+
+      if (!Array.isArray(payload)) {
+        return [];
+      }
+
+      return payload.map(parseCandle).filter(Boolean);
+    }),
+  );
+
+  const sparklines = {};
+  symbols.forEach((symbol, index) => {
+    const result = results[index];
+    sparklines[symbol] = result.status === "fulfilled" ? result.value : [];
+  });
+
+  return sparklines;
+}

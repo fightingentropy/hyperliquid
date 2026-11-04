@@ -2,7 +2,6 @@ import { Suspense, useEffect, useMemo, useState } from "react";
 import {
   Activity,
   BookOpen,
-  Bot,
   Check,
   ChevronDown,
   ChevronRight,
@@ -71,12 +70,6 @@ const NAV_SECTIONS = [
         subtitle: "Search addresses and transactions",
       },
       {
-        label: "Verify Position",
-        path: "/app/positions/verify",
-        icon: Check,
-        subtitle: "Check a Hyperliquid position proof",
-      },
-      {
         label: "Market Flow",
         path: "/app/market-flow",
         icon: MarketFlowIcon,
@@ -93,12 +86,6 @@ const NAV_SECTIONS = [
         path: "/app/watch",
         icon: Eye,
         subtitle: "Coins you follow",
-      },
-      {
-        label: "Execution Bot",
-        path: "/app/execution-bots",
-        icon: Bot,
-        subtitle: "Plan setup and execution analytics",
       },
       {
         label: "Liquidations",
@@ -174,6 +161,8 @@ function resolvePageHeader(pathname) {
     { pattern: "/app/research", title: "Equity Research" },
     { pattern: "/app/token-analytics", title: "Token Analytics" },
     { pattern: "/app/team-wallets", title: "Team Distribution" },
+    { pattern: "/app/entities", title: "Entities" },
+    { pattern: "/app/entities/:entityId", title: "Entity" },
     { pattern: "/app/wallets", title: "Wallets" },
   ];
 

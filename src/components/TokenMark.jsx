@@ -3,7 +3,8 @@ import { useState } from "react";
 // Token icons saved under public/hyperliquid/coins/. Crypto perps come from
 // Hyperliquid (app.hyperliquid.xyz/coins/<COIN>.svg); xyz__ tradfi perps from
 // HypurrScan (hypurrscan.io/perps/<NAME>.svg). Keep this in sync with the files
-// in that directory — names that aren't listed fall back to a colored badge.
+// in that directory. Anything not listed loads Hyperliquid's own icon for the
+// market (same artwork), and falls back to a colored badge if there is none.
 const LOCAL_TOKEN_ICONS = new Set([
   "AAVE",
   "ADA",
@@ -146,8 +147,23 @@ function getTokenFallbackStyle(normalizedCoin) {
   };
 }
 
+const HYPERLIQUID_ICON_BASE = "https://app.hyperliquid.xyz/coins/";
+
+// Hyperliquid names icons after the market as the API spells it: "BTC",
+// "kPEPE", "xyz:SKHX". Spot pairs ("@107", "PURR/USDC") have no perp icon.
+export function hyperliquidIconUrl(coin) {
+  const raw = String(coin ?? "").trim();
+  if (!raw || raw.startsWith("@") || raw.includes("/")) {
+    return "";
+  }
+  const separator = raw.indexOf(":");
+  const name = separator > 0 ? `${raw.slice(0, separator).toLowerCase()}:${raw.slice(separator + 1)}` : raw;
+  return `${HYPERLIQUID_ICON_BASE}${encodeURI(name)}.svg`;
+}
+
 export default function TokenMark({ coin }) {
-  const [imageFailed, setImageFailed] = useState(false);
+  // Sources that failed to load, so a reused row showing a new coin starts fresh.
+  const [failedSources, setFailedSources] = useState(() => new Set());
   const normalizedCoin = String(coin ?? "").replace(/^[a-z0-9]+:/i, "").trim().toUpperCase();
   const label = normalizedCoin.slice(0, normalizedCoin.length <= 3 ? 2 : 1).toUpperCase();
   const rawCoin = String(coin ?? "").trim();
@@ -155,18 +171,19 @@ export default function TokenMark({ coin }) {
   const iconName = rawIconName.startsWith("xyz__")
     ? `xyz__${rawIconName.slice("xyz__".length).toUpperCase()}`
     : rawIconName.toUpperCase();
-  const iconSrc = iconName ? `/hyperliquid/coins/${iconName}.svg` : "";
-  const hasLocalIcon = LOCAL_TOKEN_ICONS.has(iconName);
+  const localSrc = iconName && LOCAL_TOKEN_ICONS.has(iconName) ? `/hyperliquid/coins/${iconName}.svg` : "";
+  const iconSrc = [localSrc, hyperliquidIconUrl(rawCoin)].find((src) => src && !failedSources.has(src));
 
-  if (hasLocalIcon && iconSrc && !imageFailed) {
+  if (iconSrc) {
     return (
       <span className="qf-position-token qf-position-token--image">
         <img
+          key={iconSrc}
           src={iconSrc}
           alt=""
           aria-hidden="true"
           loading="lazy"
-          onError={() => setImageFailed(true)}
+          onError={() => setFailedSources((previous) => new Set(previous).add(iconSrc))}
         />
       </span>
     );

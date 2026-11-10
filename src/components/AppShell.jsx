@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { Link, NavLink, Outlet, matchPath, useLocation } from "react-router-dom";
 import { cx } from "../lib/cx";
+import { readStorageItem, writeStorageItem } from "../lib/safeStorage";
 import { useWallets } from "../hooks/useWallets";
 import WalletFormModal from "./WalletFormModal";
 
@@ -296,7 +297,7 @@ export default function AppShell() {
       return false;
     }
 
-    return window.localStorage.getItem(SIDEBAR_COLLAPSE_STORAGE_KEY) === "1";
+    return readStorageItem(SIDEBAR_COLLAPSE_STORAGE_KEY) === "1";
   });
   const [copiedWalletAddress, setCopiedWalletAddress] = useState("");
   const [saveModalOpen, setSaveModalOpen] = useState(false);
@@ -322,7 +323,7 @@ export default function AppShell() {
       return;
     }
 
-    window.localStorage.setItem(
+    writeStorageItem(
       SIDEBAR_COLLAPSE_STORAGE_KEY,
       sidebarCollapsed ? "1" : "0",
     );

@@ -6,6 +6,7 @@ import DeferredMount from "../components/DeferredMount";
 import MetricCard from "../components/MetricCard";
 import RelativeStrengthConfigModal from "../components/RelativeStrengthConfigModal";
 import { usePollingResource } from "../hooks/usePollingResource";
+import { readStorageItem, writeStorageItem } from "../lib/safeStorage";
 import { formatPercent, formatSignedPercent } from "../lib/formatters";
 import {
   DEFAULT_RELATIVE_STRENGTH_FOCUS,
@@ -51,7 +52,7 @@ function readStoredRelativeStrengthModel() {
   }
 
   try {
-    const parsed = JSON.parse(window.localStorage.getItem(RELATIVE_STRENGTH_MODEL_STORAGE_KEY));
+    const parsed = JSON.parse(readStorageItem(RELATIVE_STRENGTH_MODEL_STORAGE_KEY));
 
     if (!parsed || typeof parsed !== "object") {
       return fallback;
@@ -82,7 +83,7 @@ function writeStoredRelativeStrengthModel(model) {
     return;
   }
 
-  window.localStorage.setItem(RELATIVE_STRENGTH_MODEL_STORAGE_KEY, JSON.stringify(model));
+  writeStorageItem(RELATIVE_STRENGTH_MODEL_STORAGE_KEY, JSON.stringify(model));
 }
 
 function metricTone(value) {

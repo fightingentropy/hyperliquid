@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { readStorageItem, writeStorageItem } from "../lib/safeStorage";
 import { PINNED_WALLETS, isValidEvmAddress } from "../lib/wallet";
 
 const STORAGE_KEY = "hl-custom-wallets";
@@ -14,7 +15,7 @@ function readStorage() {
   }
 
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
+    const raw = readStorageItem(STORAGE_KEY);
     if (!raw) {
       return [];
     }
@@ -40,7 +41,7 @@ function writeStorage(wallets) {
     return;
   }
 
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(wallets));
+  writeStorageItem(STORAGE_KEY, JSON.stringify(wallets));
   window.dispatchEvent(new Event(CHANGE_EVENT));
 }
 

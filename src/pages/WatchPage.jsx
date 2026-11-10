@@ -3,6 +3,7 @@ import { Plus, Trash2, X } from "lucide-react";
 import { fetchWatchMarkets, fetchWatchSparklines } from "../api/hyperliquid";
 import WatchSparkline from "../components/WatchSparkline";
 import { usePollingResource } from "../hooks/usePollingResource";
+import { getBrowserStorage } from "../lib/safeStorage";
 import {
   formatCompactCurrency,
   formatCurrency,
@@ -82,7 +83,7 @@ function SparklineCell({ points, isLoading }) {
 }
 
 export default function WatchPage() {
-  const [model, setModel] = useState(() => readStoredWatchlistModel(typeof window !== "undefined" ? window.localStorage : null));
+  const [model, setModel] = useState(() => readStoredWatchlistModel(getBrowserStorage("localStorage")));
   const [newListName, setNewListName] = useState("");
   const [isCreatingList, setIsCreatingList] = useState(false);
   const [coinInput, setCoinInput] = useState("");
@@ -93,7 +94,7 @@ export default function WatchPage() {
   const activeList = getActiveWatchlist(model);
 
   useEffect(() => {
-    writeStoredWatchlistModel(model, typeof window !== "undefined" ? window.localStorage : null);
+    writeStoredWatchlistModel(model, getBrowserStorage("localStorage"));
   }, [model]);
 
   const marketsResource = usePollingResource(

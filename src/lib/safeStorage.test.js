@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { readStorageItem, resetStorageFallbackForTests, writeStorageItem } from "./safeStorage";
+import { getBrowserStorage, readStorageItem, resetStorageFallbackForTests, writeStorageItem } from "./safeStorage";
 
 function blockedStorage() {
   const blocked = () => {
@@ -42,5 +42,17 @@ describe("safeStorage", () => {
     writeStorageItem("k", "2");
     expect(data.get("k")).toBe("2");
     expect(readStorageItem("k")).toBe("2");
+  });
+
+  it("getBrowserStorage returns null when the storage getter throws", () => {
+    vi.stubGlobal("window", {
+      get sessionStorage() {
+        throw new DOMException("blocked", "SecurityError");
+      },
+      localStorage: { ok: true },
+    });
+
+    expect(getBrowserStorage("sessionStorage")).toBeNull();
+    expect(getBrowserStorage("localStorage")).toEqual({ ok: true });
   });
 });

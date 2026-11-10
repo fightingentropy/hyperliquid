@@ -27,3 +27,13 @@ export function writeStorageItem(key, value) {
 export function resetStorageFallbackForTests() {
   memoryFallback.clear();
 }
+
+// Reading window.localStorage / window.sessionStorage can itself throw a
+// SecurityError when site data is blocked. Returns null instead.
+export function getBrowserStorage(kind = "localStorage") {
+  try {
+    return typeof window !== "undefined" ? (window[kind] ?? null) : null;
+  } catch {
+    return null;
+  }
+}

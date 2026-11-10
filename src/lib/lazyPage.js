@@ -1,4 +1,5 @@
 import { lazy } from "react";
+import { getBrowserStorage } from "./safeStorage.js";
 
 const RELOAD_KEY = "qf-page-load-reload-at";
 const RELOAD_COOLDOWN_MS = 10_000;
@@ -33,7 +34,7 @@ export function loadWithReloadOnce(load, { storage, reload, now = Date.now } = {
 export function lazyPage(load) {
   return lazy(() =>
     loadWithReloadOnce(load, {
-      storage: typeof window !== "undefined" ? window.sessionStorage : null,
+      storage: getBrowserStorage("sessionStorage"),
       reload: typeof window !== "undefined" ? () => window.location.reload() : null,
     }),
   );

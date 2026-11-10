@@ -581,10 +581,16 @@ export function buildAssetPerformanceRows(fills) {
 
   return Array.from(groups.values()).map((row) => ({
     ...row,
-    winRate: row.tradeCount > 0 ? (row.winningTrades / row.tradeCount) * 100 : 0,
+    winRate: winRatePercent(row.winningTrades, row.losingTrades),
     avgWin: row.winningTrades > 0 ? row.grossWins / row.winningTrades : 0,
     avgLoss: row.losingTrades > 0 ? -row.grossLosses / row.losingTrades : 0,
   }));
+}
+
+// Win rate over closing fills only: opening fills (zero closedPnl) are neither wins nor losses.
+function winRatePercent(wins, losses) {
+  const closed = wins + losses;
+  return closed > 0 ? (wins / closed) * 100 : 0;
 }
 
 export function buildTradeStatistics(fills) {
@@ -615,7 +621,7 @@ export function buildTradeStatistics(fills) {
     totalTrades,
     winningTrades,
     losingTrades,
-    winRate: totalTrades > 0 ? (winningTrades / totalTrades) * 100 : 0,
+    winRate: winRatePercent(winningTrades, losingTrades),
     avgWin: winningTrades > 0 ? grossWins / winningTrades : 0,
     avgLoss: losingTrades > 0 ? -grossLosses / losingTrades : 0,
     largestWin,

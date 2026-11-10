@@ -180,3 +180,15 @@ describe("summarizeTradeData", () => {
     expect(summary.endTime).toBe(500);
   });
 });
+
+describe("win rate ignores opening fills", () => {
+  it("counts only fills with realized PnL", async () => {
+    const { buildTradeStatistics, buildAssetPerformanceRows } = await import("./wallet");
+    const fills = [
+      ...Array.from({ length: 10 }, () => ({ coin: "BTC", closedPnl: "5", sz: "1", px: "1", side: "B", time: 1 })),
+      ...Array.from({ length: 10 }, () => ({ coin: "BTC", closedPnl: "0", sz: "1", px: "1", side: "B", time: 1 })),
+    ];
+    expect(buildTradeStatistics(fills).winRate).toBe(100);
+    expect(buildAssetPerformanceRows(fills)[0].winRate).toBe(100);
+  });
+});

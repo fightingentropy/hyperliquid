@@ -486,11 +486,14 @@ export async function fetchAllUserFills({
       }
     }
 
-    // Stop on the last (partial) page, or if the window can't advance.
-    if (batch.length < USER_FILLS_PAGE_SIZE || added === 0 || maxTime <= startTime) {
+    // Stop on the last (partial) page, or when a page adds nothing new. The next
+    // page restarts AT the last millisecond seen (not +1) so fills sharing that
+    // millisecond that were cut off at the page boundary are fetched; the
+    // already-seen ones are removed by the dedupe above.
+    if (batch.length < USER_FILLS_PAGE_SIZE || added === 0) {
       break;
     }
-    startTime = maxTime + 1;
+    startTime = maxTime;
   }
 
   return Array.from(byKey.values());

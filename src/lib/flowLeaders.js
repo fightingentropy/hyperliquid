@@ -1,4 +1,5 @@
 import { formatPrice } from "./formatters";
+import { getAverageEntry } from "./marketFlow";
 import { MIN_RISK_SIGNAL_USD, describeCoin, spotTokenSymbol, walletDisplayName } from "./trackedWallets";
 import { toNumber } from "./wallet";
 
@@ -46,7 +47,7 @@ export function buildLeaders(batch) {
         totalUsd: toNumber(row.totalUsd),
         netSize,
         tradeCount: toNumber(row.tradeCount),
-        avgEntry: netSize ? Math.abs(netUsd / netSize) : null,
+        avgEntry: getAverageEntry({ netUsd, netSize, totalUsd: toNumber(row.totalUsd) }),
       };
       leaders.push({ ...entry, style: flowStyle(entry) });
     });
@@ -128,10 +129,12 @@ export function formatTradePrice(value) {
     : formatPrice(value);
 }
 
-// Volume-weighted price the cohort traded at: net notional over net size.
+// Price the cohort traded at: net notional over net size, over the one-sided
+// wallets only. Wallets that traded both ways have no meaningful single price.
 export function cohortAverageEntry(leaders) {
-  const notional = leaders.reduce((sum, leader) => sum + Math.abs(leader.netUsd), 0);
-  const size = leaders.reduce((sum, leader) => sum + Math.abs(leader.netSize), 0);
+  const oneSided = leaders.filter((leader) => leader.avgEntry !== null && leader.avgEntry !== undefined);
+  const notional = oneSided.reduce((sum, leader) => sum + Math.abs(leader.netUsd), 0);
+  const size = oneSided.reduce((sum, leader) => sum + Math.abs(leader.netSize), 0);
   return size > 0 ? notional / size : null;
 }
 

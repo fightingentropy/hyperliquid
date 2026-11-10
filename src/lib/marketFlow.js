@@ -363,8 +363,21 @@ export function getAverageTradeSize(row) {
   return row.totalUsd / row.tradeCount;
 }
 
+// Net notional over net size is only a price when the wallet traded one way.
+// For a wallet that both bought and sold it is a meaningless blend, so callers
+// should show nothing for it.
+const AVERAGE_ENTRY_ONE_SIDED_RATIO = 0.99;
+
+export function isOneSidedFlow(row) {
+  const netUsd = Math.abs(Number(row?.netUsd));
+  const totalUsd = Number(row?.totalUsd);
+
+  return Number.isFinite(netUsd) && Number.isFinite(totalUsd) && totalUsd > 0
+    && netUsd / totalUsd >= AVERAGE_ENTRY_ONE_SIDED_RATIO;
+}
+
 export function getAverageEntry(row) {
-  if (!row?.netUsd || !row?.netSize) {
+  if (!row?.netUsd || !row?.netSize || !isOneSidedFlow(row)) {
     return null;
   }
 

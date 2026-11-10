@@ -140,3 +140,13 @@ describe("market-flow series builders", () => {
     });
   });
 });
+
+describe("getAverageEntry", () => {
+  it("returns a price for one-sided wallets only", async () => {
+    const { getAverageEntry } = await import("./marketFlow");
+    expect(getAverageEntry({ netUsd: 1000, totalUsd: 1000, netSize: 100 })).toBe(10);
+    // Bought 100 @ 10, sold 90 @ 12: net 80 over 10 units is not a price.
+    expect(getAverageEntry({ netUsd: -80, totalUsd: 2080, netSize: 10 })).toBeNull();
+    expect(getAverageEntry({ netUsd: 1000, netSize: 100 })).toBeNull();
+  });
+});

@@ -43,7 +43,8 @@ describe("flowLeaders", () => {
       ["seller", 1, null, "one-sided"],
     ]);
     expect(leaders[0].avgEntry).toBe(90);
-    expect(cohortAverageEntry(leaders.filter((leader) => leader.cohort === "buyer"))).toBeCloseTo(13_000_000 / 150_000, 6);
+    expect(cohortAverageEntry(leaders.filter((leader) => leader.cohort === "buyer"))).toBeCloseTo(90, 6); // the two-sided wallet is excluded
+    expect(leaders[1].avgEntry).toBeNull();
   });
 
   it("measures exposure to one asset across perps and spot", () => {

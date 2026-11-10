@@ -126,4 +126,23 @@ describe("equity-research walk-forward evaluator", () => {
     data.observations[0].outcome_date = "2023-07-31";
     expect(() => evaluateWalkForward(data)).toThrow("exactly one test fold");
   });
+
+  it("excludes signal dates whose outcome window overlaps the previous period", () => {
+    const { observations, folds } = fixture();
+    // Add weekly signals inside the first monthly window (2024-01-31..2024-02-28).
+    const overlapping = observations
+      .filter((row) => row.signal_date === "2024-01-31")
+      .map((row) => ({ ...row, signal_date: "2024-02-07", outcome_date: "2024-03-06" }));
+    const result = evaluateWalkForward({
+      observations: [...observations, ...overlapping],
+      folds,
+      bootstrapSamples: 100,
+    });
+    const baseline = evaluateWalkForward({ observations, folds, bootstrapSamples: 100 });
+
+    expect(result.coverage.overlapping_signal_dates_excluded).toBe(1);
+    expect(result.coverage.rebalance_period_count).toBe(4);
+    expect(result.coverage.observation_count).toBe(24);
+    expect(result.performance).toEqual(baseline.performance);
+  });
 });

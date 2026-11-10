@@ -27,7 +27,8 @@ export function evaluateWalkForward({
   bootstrapSeed = 7_331,
 }) {
   const normalizedFolds = normalizeFolds(folds);
-  const rows = normalizeObservations(observations, normalizedFolds);
+  const allRows = normalizeObservations(observations, normalizedFolds);
+  const { rows, excludedSignalDates } = dropOverlappingSignalDates(allRows);
   const costRate = finiteNonNegative(transactionCostBps, "transactionCostBps") / 10_000;
   const canonical = calculatePortfolio(rows, CANONICAL_FACTOR_WEIGHTS, costRate);
   const netReturns = canonical.periods.map((period) => period.net_excess_return);
@@ -55,10 +56,12 @@ export function evaluateWalkForward({
       portfolio: "gross-exposure-normalized signed factor score",
       transaction_cost_bps: transactionCostBps,
       turnover_definition: "sum of absolute security-weight changes, including initial entry",
+      period_spacing: "signal dates whose outcome window overlaps the previous retained period are excluded, so compounded periods do not overlap",
       confidence_interval: "seeded non-parametric bootstrap of rebalance-period mean net excess return",
     },
     coverage: {
       observation_count: rows.length,
+      overlapping_signal_dates_excluded: excludedSignalDates,
       security_count: new Set(rows.map((row) => row.security_id)).size,
       rebalance_period_count: canonical.periods.length,
       delisted_observation_count: delisted.length,
@@ -180,6 +183,30 @@ function normalizeObservations(observations, folds) {
       fold_id: matchingFolds[0].id,
     };
   });
+}
+
+// Each period's outcome covers a forward window. A later signal date inside
+// that window would share returns with the earlier period, so compounding and
+// the bootstrap would treat overlapping returns as independent. Keep a signal
+// date only if it falls on or after the latest outcome date of the previous
+// retained period; the exclusions are counted in the report.
+function dropOverlappingSignalDates(rows) {
+  const byDate = groupBy(rows, (row) => row.signal_date);
+  const kept = new Set();
+  let previousOutcome = null;
+  let excluded = 0;
+  for (const signalDate of [...byDate.keys()].sort()) {
+    if (previousOutcome !== null && signalDate < previousOutcome) {
+      excluded += 1;
+      continue;
+    }
+    kept.add(signalDate);
+    previousOutcome = byDate.get(signalDate).map((row) => row.outcome_date).sort().at(-1);
+  }
+  return {
+    rows: rows.filter((row) => kept.has(row.signal_date)),
+    excludedSignalDates: excluded,
+  };
 }
 
 function calculatePortfolio(rows, weights, costRate) {

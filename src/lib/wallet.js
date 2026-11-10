@@ -451,6 +451,16 @@ export function buildHoldingsSnapshot({ spotState, subAccounts, spotMetaAndAsset
   };
 }
 
+// HYPE price used to value staked HYPE. A missing or non-positive mid is an
+// error, not zero, so staked value is never silently reported as $0.
+export function resolveHypeMid(mids) {
+  const price = Number(mids?.HYPE);
+  if (!Number.isFinite(price) || price <= 0) {
+    throw new Error("HYPE price is unavailable, so staked HYPE cannot be valued.");
+  }
+  return price;
+}
+
 export function buildWalletMetrics({ portfolio, holdingsSnapshot, stakingSummary, hypeMid, positionSnapshot }) {
   const spotUsd = holdingsSnapshot?.totalValueUsd ?? 0;
   const stakedTokens =

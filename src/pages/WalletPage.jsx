@@ -2,9 +2,9 @@ import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   fetchAllClearinghouseStates,
+  fetchAllMids,
   fetchAllOpenOrders,
   fetchDelegatorSummary,
-  fetchHourlyCandles,
   fetchPortfolio,
   fetchSpotClearinghouseState,
   fetchAllUserFills,
@@ -49,6 +49,7 @@ import {
   getAllTimeStart,
   isValidEvmAddress,
   normalizePortfolio,
+  resolveHypeMid,
 } from "../lib/wallet";
 import { formatCurrency, shortAddress } from "../lib/formatters";
 
@@ -140,11 +141,12 @@ export default function WalletPage() {
 
   const holdingsBundleResource = usePollingResource(
     async () => {
-      const [spotMetaAndAssetCtxs, spotState, subAccounts, stakingSummary] = await Promise.all([
+      const [spotMetaAndAssetCtxs, spotState, subAccounts, stakingSummary, mids] = await Promise.all([
         fetchSpotMetaAndAssetCtxs(),
         fetchSpotClearinghouseState({ user: walletAddress }),
         fetchSubAccounts({ user: walletAddress }),
         fetchDelegatorSummary({ user: walletAddress }),
+        fetchAllMids(),
       ]);
 
       return {
@@ -152,6 +154,7 @@ export default function WalletPage() {
         spotState,
         subAccounts,
         stakingSummary,
+        hypeMid: resolveHypeMid(mids),
       };
     },
     [walletAddress],
@@ -159,17 +162,6 @@ export default function WalletPage() {
       enabled: validAddress,
       cacheKey: `${walletCachePrefix}:holdings-bundle`,
       staleTimeMs: 15_000,
-    },
-  );
-
-  const hypePriceResource = usePollingResource(
-    () => fetchHourlyCandles({ coin: "HYPE", chartWindow: "24h" }),
-    [walletAddress],
-    {
-      enabled: validAddress,
-      initialData: [],
-      cacheKey: "wallet:hype-candles:24h",
-      staleTimeMs: 60_000,
     },
   );
 
@@ -255,10 +247,7 @@ export default function WalletPage() {
     [positionsResource.data],
   );
 
-  const hypeMid =
-    hypePriceResource.data.length > 0
-      ? hypePriceResource.data[hypePriceResource.data.length - 1].closePrice
-      : 0;
+  const hypeMid = holdingsBundleResource.data?.hypeMid ?? 0;
 
   const holdingsSnapshot = useMemo(() => {
     if (!holdingsBundleResource.data) {

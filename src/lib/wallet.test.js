@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildPositionSnapshot, buildWalletMetrics } from "./wallet";
+import { buildPositionSnapshot, buildWalletMetrics, resolveHypeMid } from "./wallet";
 
 describe("wallet model builders", () => {
   it("aggregates position exposure without losing side or funding data", () => {
@@ -55,5 +55,17 @@ describe("wallet model builders", () => {
 
     expect(metrics.realizedDelta24hPct).toBeNull();
     expect(metrics.realizedDelta7dPct).toBeNull();
+  });
+});
+
+describe("resolveHypeMid", () => {
+  it("returns the HYPE mid price", () => {
+    expect(resolveHypeMid({ HYPE: "42.5" })).toBe(42.5);
+  });
+
+  it("throws instead of valuing staked HYPE at zero when the price is missing", () => {
+    expect(() => resolveHypeMid({})).toThrow("HYPE price is unavailable");
+    expect(() => resolveHypeMid(null)).toThrow("HYPE price is unavailable");
+    expect(() => resolveHypeMid({ HYPE: "0" })).toThrow("HYPE price is unavailable");
   });
 });

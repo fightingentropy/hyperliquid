@@ -1,5 +1,7 @@
 const QWANTIFY_API = "https://api.qwantify.io/api";
 
+const UPSTREAM_TIMEOUT_MS = 10_000;
+
 const FORWARDED_ENDPOINTS = [
   /^\/api\/wallets\/resolve$/,
   /^\/api\/wallets\/[^/]+\/notional-deltas$/,
@@ -60,19 +62,38 @@ export async function onRequest(context: { request: Request }) {
     });
   }
 
-  const upstreamResponse = await fetch(buildUpstreamUrl(url), {
-    method: request.method,
-    headers: {
-      Accept: "application/json",
-    },
-    cf: {
-      cacheEverything: true,
-      cacheTtl: 60,
-    },
-  });
+  let upstreamResponse: Response;
+  try {
+    upstreamResponse = await fetch(buildUpstreamUrl(url), {
+      method: request.method,
+      headers: {
+        Accept: "application/json",
+      },
+      signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
+      cf: {
+        cacheEverything: true,
+        cacheTtl: 60,
+        // Only successful upstream responses are cached at the edge.
+        cacheTtlByStatus: { "200-299": 60, "300-599": -1 },
+      },
+    });
+  } catch {
+    const headers = new Headers({
+      "Content-Type": "application/json",
+      "Cache-Control": "no-store",
+    });
+    applyCors(headers, origin);
+    return new Response(JSON.stringify({ message: "Upstream unavailable" }), {
+      status: 502,
+      headers,
+    });
+  }
 
   const headers = new Headers(upstreamResponse.headers);
-  headers.set("Cache-Control", "public, max-age=60");
+  headers.set(
+    "Cache-Control",
+    upstreamResponse.ok ? "public, max-age=60" : "no-store",
+  );
   applyCors(headers, origin);
 
   return new Response(request.method === "HEAD" ? null : upstreamResponse.body, {

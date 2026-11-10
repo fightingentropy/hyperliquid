@@ -422,7 +422,9 @@ function groupBy(values, key) {
   const grouped = new Map();
   values.forEach((value) => {
     const groupKey = key(value);
-    grouped.set(groupKey, [...(grouped.get(groupKey) ?? []), value]);
+    const group = grouped.get(groupKey);
+    if (group) group.push(value);
+    else grouped.set(groupKey, [value]);
   });
   return grouped;
 }

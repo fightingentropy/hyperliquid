@@ -155,4 +155,24 @@ describe("equity-research walk-forward evaluator", () => {
     expect(result.coverage.observation_count).toBe(24);
     expect(result.performance).toEqual(baseline.performance);
   });
+
+  it("evaluates a large single-date universe in linear time", () => {
+    const { folds } = fixture();
+    const observations = Array.from({ length: 20_000 }, (_, i) => ({
+      security_id: `s${i}`,
+      ticker: `T${i}`,
+      signal_date: "2024-01-31",
+      outcome_date: "2024-02-28",
+      active_at_signal: true,
+      factor_scores: factorScores(((i * 7919) % 200 - 100) / 100),
+      benchmark_return: 0,
+      forward_return: ((i * 31) % 100) / 1000,
+      regime: "risk_on",
+    }));
+    const started = performance.now();
+    const result = evaluateWalkForward({ observations, folds, bootstrapSamples: 10 });
+    expect(result.coverage.observation_count).toBe(20_000);
+    // Copying the group array on every insert took several seconds here.
+    expect(performance.now() - started).toBeLessThan(3000);
+  }, 30_000);
 });

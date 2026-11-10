@@ -1,6 +1,27 @@
 const REQUEST_CACHE = new Map();
 const IN_FLIGHT_REQUESTS = new Map();
 const REQUEST_CACHE_MAX_ENTRIES = 200;
+const REQUEST_TIMEOUT_MS = 15_000;
+
+function fetchWithTimeout(url, init) {
+  const controller = new AbortController();
+  const timer = setTimeout(
+    () => controller.abort(new Error(`Request timed out after ${REQUEST_TIMEOUT_MS / 1000}s`)),
+    REQUEST_TIMEOUT_MS,
+  );
+  const callerSignal = init?.signal;
+  if (callerSignal) {
+    if (callerSignal.aborted) {
+      controller.abort(callerSignal.reason);
+    } else {
+      callerSignal.addEventListener("abort", () => controller.abort(callerSignal.reason), {
+        once: true,
+      });
+    }
+  }
+
+  return { controller, timer, request: fetch(url, { ...init, signal: controller.signal }) };
+}
 
 function buildRequestCacheKey(url, init) {
   const method = String(init?.method ?? "GET").toUpperCase();
@@ -79,19 +100,23 @@ export async function requestJson(url, init, options = {}) {
     }
   }
 
-  const requestPromise = fetch(url, init).then(async (response) => {
-    if (!response.ok) {
-      const message = await readErrorMessage(response);
-      throw new Error(message);
-    }
+  // The timer stays armed until the body is read, so a stalled body also aborts.
+  const { timer, request } = fetchWithTimeout(url, init);
+  const requestPromise = request
+    .then(async (response) => {
+      if (!response.ok) {
+        const message = await readErrorMessage(response);
+        throw new Error(message);
+      }
 
-    const payload = await response.json();
-    if (cacheKey && cacheTtlMs > 0) {
-      writeCachedJson(cacheKey, payload, cacheTtlMs);
-    }
+      const payload = await response.json();
+      if (cacheKey && cacheTtlMs > 0) {
+        writeCachedJson(cacheKey, payload, cacheTtlMs);
+      }
 
-    return payload;
-  });
+      return payload;
+    })
+    .finally(() => clearTimeout(timer));
 
   if (cacheKey && dedupe) {
     IN_FLIGHT_REQUESTS.set(cacheKey, requestPromise);

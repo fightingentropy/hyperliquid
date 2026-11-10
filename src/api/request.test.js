@@ -26,4 +26,32 @@ describe("requestJson", () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
+
+  it("times out a stalled request so the deduped entry is released", async () => {
+    vi.useFakeTimers();
+    try {
+      const stalledFetch = (url, init) =>
+        new Promise((resolve, reject) => {
+          init?.signal?.addEventListener("abort", () => reject(init.signal.reason));
+        });
+      const fetchMock = vi
+        .fn()
+        .mockImplementationOnce(stalledFetch)
+        .mockResolvedValueOnce(jsonResponse({ ok: true }));
+      vi.stubGlobal("fetch", fetchMock);
+
+      const first = requestJson("/stalled");
+      const second = requestJson("/stalled");
+      const firstResult = expect(first).rejects.toBeDefined();
+      const secondResult = expect(second).rejects.toBeDefined();
+      await vi.advanceTimersByTimeAsync(15_001);
+      await firstResult;
+      await secondResult;
+
+      await expect(requestJson("/stalled")).resolves.toEqual({ ok: true });
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

@@ -27,7 +27,7 @@ import {
   getResearchHistory,
   recordResearchRun,
 } from "../lib/equityResearchHistory";
-import { todayIso } from "../lib/equityResearch";
+import { FACTOR_MODEL_VERSION, todayIso } from "../lib/equityResearch";
 
 const EXAMPLE_TICKERS = ["TSLA", "AAPL", "NVDA"];
 const FACTOR_LABELS = {
@@ -135,7 +135,7 @@ export default function ResearchPage() {
         <div className="qf-research-model-badge">
           <BrainCircuit aria-hidden="true" />
           <span>
-            <strong>market-factor-v1</strong>
+            <strong>{FACTOR_MODEL_VERSION}</strong>
             <small>Deterministic · 20 sessions</small>
           </span>
         </div>

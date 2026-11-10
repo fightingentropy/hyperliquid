@@ -49,7 +49,7 @@ export function evaluateWalkForward({
     model: {
       version: FACTOR_MODEL_VERSION,
       sha256: FACTOR_MODEL_HASH,
-      frozen_before_test: true,
+      frozen_before_test: normalizedFolds.every((fold) => fold.training_end < fold.test_start),
     },
     methodology: {
       target: "next 20-session stock return minus benchmark return",
@@ -69,7 +69,7 @@ export function evaluateWalkForward({
         (row) => row.terminal_return_included === true,
       ),
       renamed_security_ids: renamedSecurityIds,
-      point_in_time_universe: true,
+      point_in_time_universe: rows.every((row) => row.active_at_signal === true),
     },
     folds: normalizedFolds.map((fold) => {
       const periods = canonical.periods.filter((period) => period.fold_id === fold.id);
@@ -140,8 +140,8 @@ function normalizeObservations(observations, folds) {
     if (outcomeDate <= signalDate) {
       throw new Error(`Observation ${index} uses an outcome that is not after its signal.`);
     }
-    if (observation?.active_at_signal === false) {
-      throw new Error(`Observation ${index} was not in the point-in-time universe.`);
+    if (observation?.active_at_signal !== true) {
+      throw new Error(`Observation ${index} is not confirmed as in the point-in-time universe (active_at_signal must be true).`);
     }
 
     const matchingFolds = folds.filter(
@@ -180,6 +180,7 @@ function normalizeObservations(observations, folds) {
       regime: nonEmpty(observation?.regime ?? "unclassified", "regime"),
       event,
       terminal_return_included: observation?.terminal_return_included === true,
+      active_at_signal: true,
       fold_id: matchingFolds[0].id,
     };
   });

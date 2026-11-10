@@ -44,6 +44,7 @@ function fixture() {
         benchmark_return: periodIndex % 2 === 0 ? 0.01 : -0.005,
         forward_return: (periodIndex % 2 === 0 ? 0.01 : -0.005) + futureExcess,
         regime,
+        active_at_signal: true,
         event: delisted ? "delisted" : renamed ? "renamed" : "active",
         terminal_return_included: delisted,
       };
@@ -111,6 +112,15 @@ describe("equity-research walk-forward evaluator", () => {
     const data = fixture();
     data.observations[0].outcome_date = data.observations[0].signal_date;
     expect(() => evaluateWalkForward(data)).toThrow("not after its signal");
+  });
+
+  it("rejects observations that do not assert point-in-time membership", () => {
+    const missing = fixture();
+    delete missing.observations[0].active_at_signal;
+    expect(() => evaluateWalkForward(missing)).toThrow("active_at_signal must be true");
+    const falsy = fixture();
+    falsy.observations[0].active_at_signal = "yes";
+    expect(() => evaluateWalkForward(falsy)).toThrow("active_at_signal must be true");
   });
 
   it("rejects survivorship-biased delisting rows", () => {

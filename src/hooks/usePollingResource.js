@@ -49,6 +49,21 @@ function pruneResourceCache() {
   });
 }
 
+// Tags each load so a slow earlier response cannot overwrite a newer one.
+export function createLatestLoadGate() {
+  let latestId = 0;
+
+  return {
+    begin() {
+      latestId += 1;
+      return latestId;
+    },
+    isLatest(id) {
+      return id === latestId;
+    },
+  };
+}
+
 export function usePollingResource(request, dependencies, options = {}) {
   const {
     enabled = true,
@@ -110,8 +125,11 @@ export function usePollingResource(request, dependencies, options = {}) {
 
     let isActive = true;
     let intervalId;
+    const loadGate = createLatestLoadGate();
 
     const load = async (isRefresh) => {
+      const loadId = loadGate.begin();
+
       if (!isRefresh) {
         const cachedData = readCachedResource(cacheKey, staleTimeMs);
         if (cachedData !== undefined) {
@@ -136,7 +154,7 @@ export function usePollingResource(request, dependencies, options = {}) {
       try {
         const data = await requestRef.current();
 
-        if (!isActive) {
+        if (!isActive || !loadGate.isLatest(loadId)) {
           return;
         }
 
@@ -149,7 +167,7 @@ export function usePollingResource(request, dependencies, options = {}) {
           hasLoaded: true,
         });
       } catch (error) {
-        if (!isActive) {
+        if (!isActive || !loadGate.isLatest(loadId)) {
           return;
         }
 

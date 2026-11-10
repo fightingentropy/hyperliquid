@@ -255,8 +255,35 @@ describe("equity research service", () => {
     expect(response.status).toBe(200);
     expect(fetchImpl).toHaveBeenCalledTimes(6);
     expect(providerControl.beforeCall).toHaveBeenCalledTimes(6);
-    expect(providerControl.failure).toHaveBeenCalledTimes(3);
-    expect(providerControl.success).toHaveBeenCalledTimes(3);
+    // Only the two price calls feed the circuit; the optional news call does not.
+    expect(providerControl.failure).toHaveBeenCalledTimes(2);
+    expect(providerControl.success).toHaveBeenCalledTimes(2);
     expect(sleepImpl).toHaveBeenCalledTimes(3);
+  });
+
+  it("does not let optional news failures or successes move the provider circuit", async () => {
+    const providerControl = {
+      beforeCall: vi.fn(async () => {}),
+      failure: vi.fn(async () => {}),
+      success: vi.fn(async () => {}),
+    };
+    const fetchImpl = vi.fn(async (url) => {
+      const parsed = new URL(url);
+      if (parsed.pathname.endsWith("/news")) return new Response("down", { status: 503 });
+      return Response.json(parsed.pathname.includes("SPY.US") ? providerRows({ flat: true }) : providerRows());
+    });
+    const response = await handleEquityResearchRequest(
+      request({ ticker: "TEST", as_of: "2025-04-10" }),
+      authenticated({
+        apiToken: "secret-token",
+        fetchImpl,
+        sleepImpl: vi.fn(async () => {}),
+        providerControl,
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(providerControl.failure).not.toHaveBeenCalled();
+    expect(providerControl.success).toHaveBeenCalledTimes(2);
   });
 });

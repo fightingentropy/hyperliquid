@@ -225,6 +225,10 @@ async function fetchEodhdJson({
   upstreamQuery.set("api_token", String(apiToken).trim());
   let response = null;
   let lastTransportError = null;
+  // The optional news call must not move the shared provider circuit: its
+  // failures could open it for the price calls, and its successes could mask
+  // a real outage. It still goes through beforeCall (budget and open circuit).
+  const breaker = optional ? null : providerControl;
 
   for (let attempt = 0; attempt <= MAX_PROVIDER_RETRIES; attempt += 1) {
     try {
@@ -245,7 +249,7 @@ async function fetchEodhdJson({
     } catch (error) {
       if (error instanceof EquityResearchError) throw error;
       lastTransportError = error;
-      await providerControl?.failure?.();
+      await breaker?.failure?.();
       if (attempt < MAX_PROVIDER_RETRIES) {
         await sleepImpl(retryDelayMs(null, attempt, randomImpl));
         continue;
@@ -254,12 +258,12 @@ async function fetchEodhdJson({
     }
 
     if (response.ok) {
-      await providerControl?.success?.();
+      await breaker?.success?.();
       break;
     }
 
     if ((response.status === 429 || response.status >= 500) && attempt < MAX_PROVIDER_RETRIES) {
-      await providerControl?.failure?.();
+      await breaker?.failure?.();
       await cancelResponseBody(response);
       await sleepImpl(retryDelayMs(response.headers.get("Retry-After"), attempt, randomImpl));
       response = null;

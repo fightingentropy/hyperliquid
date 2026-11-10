@@ -12,6 +12,7 @@ import { fetchEntity, fetchEntityWallets } from "../api/qwantify";
 import { usePollingResource } from "../hooks/usePollingResource";
 import { runWithConcurrency, withRetry } from "../lib/async";
 import {
+  describeNetWorthCoverage,
   MIN_DISPLAY_HYPE,
   normalizeEntity,
   normalizeEntityWallets,
@@ -191,8 +192,6 @@ export default function EntityPage() {
   const failedCount = Object.keys(failed).length;
   const balancesDone = summary.loadedCount + Object.values(failed).filter((parts) => parts.includes("balances")).length;
   const stakingDone = summary.stakingLoadedCount + Object.values(failed).filter((parts) => parts.includes("staking")).length;
-  const isLoadingBalances = wallets.length > 0 && balancesDone < wallets.length;
-  const isLoadingStaking = wallets.length > 0 && stakingDone < wallets.length;
 
   const rows = useMemo(
     () =>
@@ -217,11 +216,12 @@ export default function EntityPage() {
     return <div className="text-sm text-muted-foreground">Loading entity…</div>;
   }
 
-  const progress = isLoadingBalances
-    ? `Loading balances: ${balancesDone} of ${wallets.length} wallets`
-    : isLoadingStaking
-      ? `Loading staked HYPE: ${stakingDone} of ${wallets.length} wallets`
-      : `All ${wallets.length} wallets`;
+  const progress = describeNetWorthCoverage({
+    walletCount: wallets.length,
+    balancesDone,
+    stakingLoaded: summary.stakingLoadedCount,
+    stakingFailed: stakingDone - summary.stakingLoadedCount,
+  });
 
   return (
     <div className="flex flex-col gap-5">

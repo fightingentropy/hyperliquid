@@ -126,3 +126,25 @@ export function summarizeEntityBalances(balances) {
     stakingWalletCount: loaded.filter((balance) => (balance.stakedHype ?? 0) >= MIN_DISPLAY_HYPE).length,
   };
 }
+
+// Caption for the entity net-worth card. Net worth only includes staked HYPE for
+// wallets whose staking lookup finished, so say so while it loads or when some
+// lookups failed instead of reading as a complete total.
+export function describeNetWorthCoverage({
+  walletCount,
+  balancesDone,
+  stakingLoaded,
+  stakingFailed,
+}) {
+  if (balancesDone < walletCount) {
+    return `Loading balances: ${balancesDone} of ${walletCount} wallets`;
+  }
+  const stakingDone = stakingLoaded + stakingFailed;
+  if (stakingDone < walletCount) {
+    return `Excludes staked HYPE for now · loading staking: ${stakingDone} of ${walletCount} wallets`;
+  }
+  if (stakingFailed > 0) {
+    return `Excludes staked HYPE for ${stakingFailed} of ${walletCount} wallet${walletCount === 1 ? "" : "s"} (staking lookup failed)`;
+  }
+  return `All ${walletCount} wallets`;
+}

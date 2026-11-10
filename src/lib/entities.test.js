@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  describeNetWorthCoverage,
   filterEntities,
   isLinkText,
   normalizeEntities,
@@ -170,5 +171,29 @@ describe("entities", () => {
     });
     expect(peak).toBe(2);
     expect(done.sort()).toEqual([1, 2, 3, 4, 5]);
+  });
+});
+
+describe("describeNetWorthCoverage", () => {
+  const base = { walletCount: 3, balancesDone: 3, stakingLoaded: 3, stakingFailed: 0 };
+
+  it("says all wallets only when every staking lookup succeeded", () => {
+    expect(describeNetWorthCoverage(base)).toBe("All 3 wallets");
+  });
+
+  it("flags the total as excluding staking while staking loads", () => {
+    expect(describeNetWorthCoverage({ ...base, stakingLoaded: 1 })).toContain("Excludes staked HYPE");
+  });
+
+  it("flags failed staking lookups after loading finishes", () => {
+    const text = describeNetWorthCoverage({ ...base, stakingLoaded: 2, stakingFailed: 1 });
+    expect(text).toContain("Excludes staked HYPE for 1 of 3 wallets");
+    expect(text).not.toContain("All 3");
+  });
+
+  it("reports balance progress first", () => {
+    expect(describeNetWorthCoverage({ ...base, balancesDone: 1, stakingLoaded: 0 })).toBe(
+      "Loading balances: 1 of 3 wallets",
+    );
   });
 });

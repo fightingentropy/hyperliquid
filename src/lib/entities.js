@@ -135,13 +135,17 @@ export function describeNetWorthCoverage({
   balancesDone,
   stakingLoaded,
   stakingFailed,
+  balancesFailed = 0,
 }) {
   if (balancesDone < walletCount) {
     return `Loading balances: ${balancesDone} of ${walletCount} wallets`;
   }
+  // Wallets whose balances failed have no net worth entry, so staking is not
+  // awaited for them; otherwise the caption would stay on "loading" forever.
+  const stakingExpected = walletCount - balancesFailed;
   const stakingDone = stakingLoaded + stakingFailed;
-  if (stakingDone < walletCount) {
-    return `Excludes staked HYPE for now · loading staking: ${stakingDone} of ${walletCount} wallets`;
+  if (stakingDone < stakingExpected) {
+    return `Excludes staked HYPE for now · loading staking: ${stakingDone} of ${stakingExpected} wallets`;
   }
   if (stakingFailed > 0) {
     return `Excludes staked HYPE for ${stakingFailed} of ${walletCount} wallet${walletCount === 1 ? "" : "s"} (staking lookup failed)`;

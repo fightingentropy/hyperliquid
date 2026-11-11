@@ -190,8 +190,12 @@ export default function EntityPage() {
     [wallets, balances],
   );
   const failedCount = Object.keys(failed).length;
-  const balancesDone = summary.loadedCount + Object.values(failed).filter((parts) => parts.includes("balances")).length;
-  const stakingDone = summary.stakingLoadedCount + Object.values(failed).filter((parts) => parts.includes("staking")).length;
+  const balancesFailed = Object.values(failed).filter((parts) => parts.includes("balances")).length;
+  const balancesDone = summary.loadedCount + balancesFailed;
+  // Only wallets with loaded balances count toward staking progress.
+  const stakingFailedCount = wallets.filter(
+    (wallet) => balances[wallet.address] && failed[wallet.address]?.includes("staking"),
+  ).length;
 
   const rows = useMemo(
     () =>
@@ -220,7 +224,8 @@ export default function EntityPage() {
     walletCount: wallets.length,
     balancesDone,
     stakingLoaded: summary.stakingLoadedCount,
-    stakingFailed: stakingDone - summary.stakingLoadedCount,
+    stakingFailed: stakingFailedCount,
+    balancesFailed,
   });
 
   return (

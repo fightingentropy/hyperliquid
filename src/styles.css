@@ -34,6 +34,17 @@ body {
   text-decoration: underline;
 }
 
+/* Wallet column of the unstaking queue: narrow on phones so the amount fits. */
+.qf-unstaking-wallet {
+  max-width: 8rem;
+}
+
+@media (min-width: 640px) {
+  .qf-unstaking-wallet {
+    max-width: 16rem;
+  }
+}
+
 :root {
   --qf-sidebar-width: 18rem;
   --qf-sidebar-collapsed-width: 3.25rem;

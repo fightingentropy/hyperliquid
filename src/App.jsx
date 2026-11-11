@@ -15,6 +15,7 @@ const WatchPage = lazyPage(() => import("./pages/WatchPage"));
 const EntitiesPage = lazyPage(() => import("./pages/EntitiesPage"));
 const EntityPage = lazyPage(() => import("./pages/EntityPage"));
 const TrackedWalletsPage = lazyPage(() => import("./pages/TrackedWalletsPage"));
+const UnstakingPage = lazyPage(() => import("./pages/UnstakingPage"));
 
 // Everything used to live under /app; keep old links and bookmarks working.
 function LegacyAppRedirect() {
@@ -35,6 +36,7 @@ export default function App() {
           <Route path="explorer" element={<WalletLookupPage />} />
           <Route path="market-flow" element={<MarketFlowPage />} />
           <Route path="liquidations" element={<LiquidationMapPage />} />
+          <Route path="unstaking" element={<UnstakingPage />} />
           <Route path="relative-strength" element={<RelativeStrengthPage />} />
           <Route path="watch" element={<WatchPage />} />
           <Route path="research" element={<ResearchPage />} />

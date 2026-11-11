@@ -10,6 +10,7 @@ import {
   ExternalLink,
   Eye,
   Flame,
+  Hourglass,
   Menu,
   Moon,
   PanelLeftClose,
@@ -96,6 +97,12 @@ const NAV_SECTIONS = [
         subtitle: "Liquidation levels of large wallets",
       },
       {
+        label: "Unstaking",
+        path: "/unstaking",
+        icon: Hourglass,
+        subtitle: "HYPE leaving staking",
+      },
+      {
         label: "Team Wallets",
         path: "/team-wallets",
         icon: Users2,
@@ -164,6 +171,7 @@ function resolvePageHeader(pathname) {
     { pattern: "/explorer", title: "Explorer" },
     { pattern: "/market-flow", title: "Market Flow" },
     { pattern: "/liquidations", title: "Liquidations" },
+    { pattern: "/unstaking", title: "Unstaking Queue" },
     { pattern: "/relative-strength", title: "Relative Strength" },
     { pattern: "/watch", title: "Watchlist" },
     { pattern: "/research", title: "Equity Research" },

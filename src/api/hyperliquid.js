@@ -508,6 +508,13 @@ export async function fetchAllMids() {
   }, { cacheTtlMs: LIVE_CACHE_TTL_MS });
 }
 
+// Every validator with its name, stake and status.
+export async function fetchValidatorSummaries() {
+  return requestHyperliquidInfo({
+    type: "validatorSummaries",
+  }, { cacheTtlMs: STATIC_CACHE_TTL_MS });
+}
+
 export async function fetchPerpDexs() {
   return requestHyperliquidInfo({
     type: "perpDexs",

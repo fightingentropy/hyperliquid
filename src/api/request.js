@@ -10,17 +10,18 @@ function fetchWithTimeout(url, init) {
     REQUEST_TIMEOUT_MS,
   );
   const callerSignal = init?.signal;
+  let detach = () => {};
   if (callerSignal) {
     if (callerSignal.aborted) {
       controller.abort(callerSignal.reason);
     } else {
-      callerSignal.addEventListener("abort", () => controller.abort(callerSignal.reason), {
-        once: true,
-      });
+      const onAbort = () => controller.abort(callerSignal.reason);
+      callerSignal.addEventListener("abort", onAbort, { once: true });
+      detach = () => callerSignal.removeEventListener("abort", onAbort);
     }
   }
 
-  return { controller, timer, request: fetch(url, { ...init, signal: controller.signal }) };
+  return { controller, timer, detach, request: fetch(url, { ...init, signal: controller.signal }) };
 }
 
 function buildRequestCacheKey(url, init) {
@@ -101,7 +102,7 @@ export async function requestJson(url, init, options = {}) {
   }
 
   // The timer stays armed until the body is read, so a stalled body also aborts.
-  const { timer, request } = fetchWithTimeout(url, init);
+  const { timer, detach, request } = fetchWithTimeout(url, init);
   const requestPromise = request
     .then(async (response) => {
       if (!response.ok) {
@@ -116,7 +117,10 @@ export async function requestJson(url, init, options = {}) {
 
       return payload;
     })
-    .finally(() => clearTimeout(timer));
+    .finally(() => {
+      clearTimeout(timer);
+      detach();
+    });
 
   if (cacheKey && dedupe) {
     IN_FLIGHT_REQUESTS.set(cacheKey, requestPromise);

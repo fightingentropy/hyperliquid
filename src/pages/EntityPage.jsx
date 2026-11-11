@@ -190,7 +190,7 @@ export default function EntityPage() {
     [wallets, balances],
   );
   const failedCount = Object.keys(failed).length;
-  const balancesFailed = Object.values(failed).filter((parts) => parts.includes("balances")).length;
+  const balancesFailed = wallets.filter((wallet) => failed[wallet.address]?.includes("balances")).length;
   const balancesDone = summary.loadedCount + balancesFailed;
   // Only wallets with loaded balances count toward staking progress.
   const stakingFailedCount = wallets.filter(

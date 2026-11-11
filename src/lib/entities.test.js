@@ -202,6 +202,15 @@ describe("describeNetWorthCoverage", () => {
     expect(text).not.toContain("loading staking");
   });
 
+  it("flags wallets whose balances failed instead of claiming all wallets", () => {
+    const partial = describeNetWorthCoverage({ ...base, stakingLoaded: 2, balancesFailed: 1 });
+    expect(partial).toContain("Excludes 1 of 3 wallets (balances failed)");
+    expect(partial).not.toContain("All 3");
+    const none = describeNetWorthCoverage({ ...base, stakingLoaded: 0, balancesFailed: 3 });
+    expect(none).toContain("Excludes 3 of 3 wallets");
+    expect(none).not.toContain("All 3");
+  });
+
   it("reports balance progress first", () => {
     expect(describeNetWorthCoverage({ ...base, balancesDone: 1, stakingLoaded: 0 })).toBe(
       "Loading balances: 1 of 3 wallets",

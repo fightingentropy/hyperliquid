@@ -1,8 +1,4 @@
-import {
-  buildHoldingsSnapshot,
-  buildPositionSnapshot,
-  toNumber,
-} from "./wallet";
+import { buildHoldingsSnapshot, buildPositionSnapshot, toNumber } from "./wallet";
 
 export { runWithConcurrency } from "./async";
 
@@ -35,9 +31,7 @@ export function normalizeEntities(payload) {
 }
 
 export function filterEntities(entities, { query = "", type = "all" } = {}) {
-  const needle = String(query ?? "")
-    .trim()
-    .toLowerCase();
+  const needle = String(query ?? "").trim().toLowerCase();
 
   return entities.filter((entity) => {
     if (type !== "all" && entity.type !== type) {
@@ -106,8 +100,7 @@ export function summarizeWalletBalance({
     spotUsd: holdings.totalValueUsd,
     stakedHype,
     stakedUsd,
-    totalUsd:
-      positions.accountValueUsd + holdings.totalValueUsd + (stakedUsd ?? 0),
+    totalUsd: positions.accountValueUsd + holdings.totalValueUsd + (stakedUsd ?? 0),
     openPositions: positions.positions.length,
     notionalUsd: positions.totalNotionalUsd,
     unrealizedPnlUsd: positions.totalUnrealizedPnlUsd,
@@ -116,11 +109,8 @@ export function summarizeWalletBalance({
 
 export function summarizeEntityBalances(balances) {
   const loaded = balances.filter(Boolean);
-  const sum = (key) =>
-    loaded.reduce((total, balance) => total + (balance[key] ?? 0), 0);
-  const stakingLoaded = loaded.filter(
-    (balance) => balance.stakedHype !== null,
-  ).length;
+  const sum = (key) => loaded.reduce((total, balance) => total + (balance[key] ?? 0), 0);
+  const stakingLoaded = loaded.filter((balance) => balance.stakedHype !== null).length;
 
   return {
     loadedCount: loaded.length,
@@ -133,9 +123,7 @@ export function summarizeEntityBalances(balances) {
     openPositions: sum("openPositions"),
     notionalUsd: sum("notionalUsd"),
     unrealizedPnlUsd: sum("unrealizedPnlUsd"),
-    stakingWalletCount: loaded.filter(
-      (balance) => (balance.stakedHype ?? 0) >= MIN_DISPLAY_HYPE,
-    ).length,
+    stakingWalletCount: loaded.filter((balance) => (balance.stakedHype ?? 0) >= MIN_DISPLAY_HYPE).length,
   };
 }
 

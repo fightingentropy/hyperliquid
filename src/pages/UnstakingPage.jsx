@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { fetchAllMids, fetchValidatorSummaries } from "../api/hyperliquid";
 import { fetchGlobalAliases, fetchUnstakingQueue } from "../api/hypurrscan";
 import ButtonGroup from "../components/ButtonGroup";
+import UnstakingChart from "../components/UnstakingChart";
 import { usePollingResource } from "../hooks/usePollingResource";
 import { useWallets } from "../hooks/useWallets";
 import { cx } from "../lib/cx";
@@ -12,6 +13,7 @@ import {
   UNSTAKING_SORTS,
   UNSTAKING_VIEWS,
   UNSTAKING_WINDOWS,
+  bucketUnstakingByHour,
   buildWalletNames,
   formatUnstakingDuration,
   normalizeValidatorNames,
@@ -24,6 +26,7 @@ const QUEUE_POLL_MS = 60_000;
 const PRICE_POLL_MS = 60_000;
 const ALIASES_STALE_MS = 60 * 60_000;
 const PAGE_SIZE = 100;
+const CHART_HEIGHT = 280;
 const HYPURRSCAN_UNSTAKING_URL = "https://hypurrscan.io/staking#unstaking";
 
 const hypeFormatter = new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 });
@@ -206,6 +209,17 @@ export default function UnstakingPage() {
     [entries, now, view, sort],
   );
   const visibleRows = rows.slice(0, limit);
+
+  // The chart moves on the minute, not every countdown tick.
+  const chartNow = Math.floor(now / 60_000) * 60_000;
+  const buckets = useMemo(
+    () => bucketUnstakingByHour(entries, chartNow, { view }),
+    [entries, chartNow, view],
+  );
+  const peakBucket = buckets.reduce(
+    (peak, bucket) => (bucket.amount > (peak?.amount ?? 0) ? bucket : peak),
+    null,
+  );
   const oldestTime = entries?.length ? entries[0].time : null;
 
   const upcomingCaption = entries
@@ -296,6 +310,49 @@ export default function UnstakingPage() {
         </div>
       ) : null}
 
+      {/* The view switch scopes both the chart and the table below it. */}
+      <div className="flex">
+        <ButtonGroup
+          kind="segmented"
+          size="sm"
+          options={UNSTAKING_VIEWS}
+          value={view}
+          onChange={changeView}
+        />
+      </div>
+
+      <section className="rounded-sm border border-border bg-card text-card-foreground">
+        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 px-5 py-4">
+          <h2 className="text-xs font-light uppercase tracking-wide text-muted-foreground">
+            {isPast ? "Released per hour" : "Unlocks per hour"}
+          </h2>
+          <span className="text-xs text-muted-foreground">
+            HYPE · {isPast ? "past 7 days" : "next 7 days"}
+            {peakBucket
+              ? ` · peak ${formatCompactHype(peakBucket.amount)} at ${formatDay(peakBucket.start)}`
+              : ""}
+          </span>
+        </div>
+
+        <div className="border-t border-border px-2 py-4 sm:px-4">
+          {entries ? (
+            <UnstakingChart
+              buckets={buckets}
+              price={price}
+              height={CHART_HEIGHT}
+              label={`HYPE ${isPast ? "released" : "unlocking"} per hour over the ${isPast ? "past" : "next"} 7 days`}
+            />
+          ) : (
+            <div
+              className="flex items-center justify-center text-sm text-muted-foreground"
+              style={{ height: CHART_HEIGHT }}
+            >
+              {loading ? "Loading chart…" : "Unable to load the unstaking queue."}
+            </div>
+          )}
+        </div>
+      </section>
+
       <section className="rounded-sm border border-border bg-card text-card-foreground">
         <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
           <div className="flex items-baseline gap-3">
@@ -307,22 +364,13 @@ export default function UnstakingPage() {
             ) : null}
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <ButtonGroup
-              kind="segmented"
-              size="sm"
-              options={UNSTAKING_VIEWS}
-              value={view}
-              onChange={changeView}
-            />
-            <ButtonGroup
-              kind="segmented"
-              size="sm"
-              options={UNSTAKING_SORTS[view]}
-              value={sort}
-              onChange={changeSort}
-            />
-          </div>
+          <ButtonGroup
+            kind="segmented"
+            size="sm"
+            options={UNSTAKING_SORTS[view]}
+            value={sort}
+            onChange={changeSort}
+          />
         </div>
 
         <div className="max-h-[620px] overflow-auto border-t border-border">

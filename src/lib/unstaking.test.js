@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  bucketUnstakingByHour,
   buildWalletNames,
   formatUnstakingDuration,
   normalizeAliases,
@@ -110,6 +111,54 @@ describe("selectUnstakingRows", () => {
     const source = [...entries];
     selectUnstakingRows(source, NOW, { sort: "amount" });
     expect(source).toEqual(entries);
+  });
+});
+
+describe("bucketUnstakingByHour", () => {
+  // Half past the hour, so the window's first and last buckets are partial.
+  const now = NOW + 30 * MINUTE;
+
+  it("buckets the next 7 days by hour, starting with the current hour", () => {
+    const buckets = bucketUnstakingByHour(
+      [
+        entry(20 * MINUTE, 1), // already released
+        entry(40 * MINUTE, 2),
+        entry(50 * MINUTE, 3),
+        entry(HOUR, 4),
+        entry(7 * DAY + 30 * MINUTE, 5), // exactly 7 days out
+        entry(7 * DAY + 31 * MINUTE, 6), // past the window
+      ],
+      now,
+    );
+
+    expect(buckets).toHaveLength(7 * 24 + 1);
+    expect(buckets[0]).toEqual({ start: NOW, amount: 5, count: 2 });
+    expect(buckets[1]).toEqual({ start: NOW + HOUR, amount: 4, count: 1 });
+    expect(buckets.at(-1)).toEqual({ start: NOW + 7 * DAY, amount: 5, count: 1 });
+    expect(buckets.reduce((sum, bucket) => sum + bucket.amount, 0)).toBe(14);
+  });
+
+  it("buckets the past 7 days by hour, ending with the current hour", () => {
+    const buckets = bucketUnstakingByHour(
+      [
+        entry(-7 * DAY + 30 * MINUTE, 1), // exactly 7 days ago, outside
+        entry(-7 * DAY + 31 * MINUTE, 2),
+        entry(20 * MINUTE, 3),
+        entry(30 * MINUTE, 4), // unlocks at `now`, so released
+        entry(40 * MINUTE, 5), // still pending
+      ],
+      now,
+      { view: "past" },
+    );
+
+    expect(buckets).toHaveLength(7 * 24 + 1);
+    expect(buckets[0]).toEqual({ start: NOW - 7 * DAY, amount: 2, count: 1 });
+    expect(buckets.at(-1)).toEqual({ start: NOW, amount: 7, count: 2 });
+  });
+
+  it("returns empty buckets without a queue", () => {
+    const buckets = bucketUnstakingByHour(null, now);
+    expect(buckets.every((bucket) => bucket.amount === 0 && bucket.count === 0)).toBe(true);
   });
 });
 

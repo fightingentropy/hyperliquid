@@ -174,6 +174,35 @@ export function selectUnstakingRows(entries, now, { view = "upcoming", sort = "t
     : rows.sort((left, right) => right.time - left.time);
 }
 
+// HYPE per hour across the view's 7-day window, for the chart: (now, now + 7d]
+// when upcoming, (now - 7d, now] when past. Buckets start on the hour, so the
+// first and last ones only cover part of their hour.
+export function bucketUnstakingByHour(entries, now, { view = "upcoming" } = {}) {
+  const span = 7 * DAY_MS;
+  const [low, high] = view === "past" ? [now - span, now] : [now, now + span];
+  const first = Math.floor(low / HOUR_MS) * HOUR_MS;
+  const last = Math.floor(high / HOUR_MS) * HOUR_MS;
+  const buckets = [];
+
+  for (let start = first; start <= last; start += HOUR_MS) {
+    buckets.push({ start, amount: 0, count: 0 });
+  }
+
+  for (const entry of Array.isArray(entries) ? entries : []) {
+    if (!(entry.time > low && entry.time <= high)) {
+      continue;
+    }
+
+    const bucket = buckets[Math.floor((entry.time - first) / HOUR_MS)];
+    if (bucket) {
+      bucket.amount += entry.amount;
+      bucket.count += 1;
+    }
+  }
+
+  return buckets;
+}
+
 // Countdown text for a gap in ms: "42s", "12m 05s", "5h 12m", "3d 4h".
 export function formatUnstakingDuration(ms) {
   const totalSeconds = Math.max(0, Math.floor(Math.abs(ms) / SECOND_MS));

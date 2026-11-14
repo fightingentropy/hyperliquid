@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fetchAllUserFills } from "./hyperliquid";
+import { TWAP_SLICE_FILLS_LIMIT, fetchAllUserFills, mergeTwapSliceFills } from "./hyperliquid";
 
 function makePage(startTid, count, startTime) {
   return Array.from({ length: count }, (_, i) => ({
@@ -68,5 +68,41 @@ describe("fetchAllUserFills pagination", () => {
 
     const result = await fetchAllUserFills({ user: "0xabc", fetchPage });
     expect(result).toHaveLength(all.length);
+  });
+});
+
+describe("mergeTwapSliceFills", () => {
+  it("adds TWAP slices inside the window, tags them and sorts oldest first", () => {
+    const fills = [
+      { tid: 1, time: 5_000, coin: "BTC" },
+      { tid: 2, time: 9_000, coin: "BTC" },
+    ];
+    const slices = [
+      { twapId: 77, fill: { tid: 10, time: 7_000, coin: "BTC", twapId: null } },
+      { twapId: 77, fill: { tid: 11, time: 1_000, coin: "BTC", twapId: null } }, // before the window
+      { twapId: 78, fill: { tid: 2, time: 9_000, coin: "BTC", twapId: null } }, // already present
+    ];
+
+    const merged = mergeTwapSliceFills(fills, slices, { since: 4_000 });
+
+    expect(merged.fills.map((fill) => fill.tid)).toEqual([1, 10, 2]);
+    expect(merged.fills[1].twapId).toBe(77);
+    expect(merged.fills[2].twapId).toBeUndefined();
+    expect(merged.twapFillsFrom).toBeNull();
+  });
+
+  it("reports where TWAP coverage starts when the slice feed is capped inside the window", () => {
+    const slices = Array.from({ length: TWAP_SLICE_FILLS_LIMIT }, (_, i) => ({
+      twapId: 1,
+      fill: { tid: 100 + i, time: 6_000 + i, coin: "BTC" },
+    }));
+
+    expect(mergeTwapSliceFills([], slices, { since: 4_000 }).twapFillsFrom).toBe(6_000);
+    // Capped, but the oldest slice predates the window: nothing is missing.
+    expect(mergeTwapSliceFills([], slices, { since: 6_000 }).twapFillsFrom).toBeNull();
+  });
+
+  it("tolerates missing inputs", () => {
+    expect(mergeTwapSliceFills(null, undefined)).toEqual({ fills: [], twapFillsFrom: null });
   });
 });

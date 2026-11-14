@@ -463,7 +463,9 @@ const MIN_SIGNAL_USD = 50_000;
 
 // Plain-language findings, most decision-relevant first. Each rule only fires
 // when the numbers clear a floor, so quiet weeks produce few signals.
-export function buildSignals({ positioning, netFlows, liquidationWatch, snapshots, capitalFlows, windowLabel }) {
+// `partialTwap` lists wallets whose TWAP fills don't reach back to the start of
+// the window (`{ name, fromLabel }`), so their flows are undercounted.
+export function buildSignals({ positioning, netFlows, liquidationWatch, snapshots, capitalFlows, windowLabel, partialTwap = [] }) {
   const signals = [];
 
   const topBuy = netFlows.assets.filter((a) => a.netUsd >= MIN_SIGNAL_USD).sort((a, b) => b.netUsd - a.netUsd)[0];
@@ -544,6 +546,13 @@ export function buildSignals({ positioning, netFlows, liquidationWatch, snapshot
     signals.push({
       kind: "info",
       text: `${listNames(quiet)} ${quiet.length === 1 ? "hasn't" : "haven't"} traded in ${windowLabel}.`,
+    });
+  }
+
+  for (const gap of partialTwap) {
+    signals.push({
+      kind: "info",
+      text: `${gap.name}'s TWAP fills only go back to ${gap.fromLabel}, so its ${windowLabel} buying and selling before then is undercounted.`,
     });
   }
 

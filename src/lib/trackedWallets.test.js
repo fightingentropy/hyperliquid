@@ -254,4 +254,19 @@ describe("buildSignals", () => {
     expect(text).toContain("Alpha's $84K HYPE long is 10.6% from liquidation at $74.69.");
     expect(text).toContain("Beta hasn't traded in 24h.");
   });
+
+  it("flags wallets whose TWAP fills don't cover the whole window", () => {
+    const signals = buildSignals({
+      positioning: [],
+      netFlows: buildNetFlows([], { since: 0 }),
+      liquidationWatch: [],
+      snapshots: [],
+      capitalFlows: [],
+      windowLabel: "7d",
+      partialTwap: [{ name: "Alpha", fromLabel: "Nov 10, 16:02" }],
+    });
+    expect(signals.map((signal) => signal.text)).toContain(
+      "Alpha's TWAP fills only go back to Nov 10, 16:02, so its 7d buying and selling before then is undercounted.",
+    );
+  });
 });

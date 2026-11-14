@@ -334,6 +334,9 @@ function MyWalletsView() {
       { since, prices: pricing?.prices },
     );
     const bigTrades = buildBigMoves(walletFills, { since, spotPairNames });
+    const partialTwap = loaded
+      .filter(({ raw }) => raw.twapFillsFrom && raw.twapFillsFrom > since)
+      .map(({ wallet, raw }) => ({ name: walletDisplayName(wallet), fromLabel: formatTradeTime(raw.twapFillsFrom) }));
     const signals = buildSignals({
       positioning,
       netFlows,
@@ -341,6 +344,7 @@ function MyWalletsView() {
       snapshots,
       capitalFlows,
       windowLabel: flowWindow.label,
+      partialTwap,
     });
 
     const totals = snapshots.reduce(

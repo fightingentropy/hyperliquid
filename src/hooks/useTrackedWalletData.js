@@ -3,7 +3,7 @@ import {
   fetchAllClearinghouseStates,
   fetchAllMids,
   fetchClearinghouseState,
-  fetchAllUserFills,
+  fetchAllUserFillsWithTwap,
   fetchDelegatorSummary,
   fetchSpotClearinghouseState,
   fetchSpotMetaAndAssetCtxs,
@@ -14,8 +14,8 @@ import { runWithConcurrency, withRetry } from "../lib/async";
 import { MAX_FLOW_WINDOW_MS, buildSpotPairNames } from "../lib/trackedWallets";
 import { buildSpotPriceMap } from "../lib/wallet";
 
-// Each wallet costs roughly 80 Hyperliquid request weight (positions on every
-// perp dex, spot, staking, a week of fills and ledger updates). Three at a time
+// Each wallet costs roughly 100 Hyperliquid request weight (positions on every
+// perp dex, spot, staking, a week of fills plus TWAP fills, and ledger updates). Three at a time
 // keeps a dozen tracked wallets well inside the 1200/minute budget.
 const WALLET_CONCURRENCY = 3;
 // "positions" mode (market-flow leaders, ~50 wallets) skips staking, fills and
@@ -37,6 +37,7 @@ async function loadPositions(address, isCancelled) {
     spotState,
     stakingSummary: null,
     fills: [],
+    twapFillsFrom: null,
     ledger: [],
     lastTradeAt: null,
   };
@@ -44,11 +45,11 @@ async function loadPositions(address, isCancelled) {
 
 async function loadWallet(address, since, isCancelled) {
   const retry = (load) => withRetry(load, { isCancelled });
-  const [clearinghouseEntries, spotState, stakingSummary, fills, ledger] = await Promise.all([
+  const [clearinghouseEntries, spotState, stakingSummary, { fills, twapFillsFrom }, ledger] = await Promise.all([
     retry(() => fetchAllClearinghouseStates({ user: address })),
     retry(() => fetchSpotClearinghouseState({ user: address })),
     retry(() => fetchDelegatorSummary({ user: address })),
-    retry(() => fetchAllUserFills({ user: address, startTime: since })),
+    retry(() => fetchAllUserFillsWithTwap({ user: address, startTime: since })),
     retry(() => fetchUserNonFundingLedgerUpdates({ user: address, startTime: since })),
   ]);
 
@@ -63,7 +64,8 @@ async function loadWallet(address, since, isCancelled) {
     clearinghouseEntries,
     spotState,
     stakingSummary,
-    fills: Array.isArray(fills) ? fills : [],
+    fills,
+    twapFillsFrom,
     ledger: Array.isArray(ledger) ? ledger : [],
     lastTradeAt,
   };

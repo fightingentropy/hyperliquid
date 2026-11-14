@@ -499,6 +499,58 @@ export async function fetchAllUserFills({
   return Array.from(byKey.values());
 }
 
+export const TWAP_SLICE_FILLS_LIMIT = 2000;
+
+// TWAP child fills. `userFills` and `userFillsByTime` leave these out entirely;
+// this endpoint is the only source, and it serves just the most recent 2000
+// slices with no time filter.
+export async function fetchUserTwapSliceFills({ user }) {
+  return requestHyperliquidInfo({
+    type: "userTwapSliceFills",
+    user,
+  }, { cacheTtlMs: LIVE_CACHE_TTL_MS });
+}
+
+// Adds TWAP slice fills (`[{ fill, twapId }]`) to regular fills, oldest first.
+// `twapFillsFrom` is set when the slice feed hit its cap inside the window: TWAP
+// fills before that time are missing, so flows before it are undercounted.
+export function mergeTwapSliceFills(fills, slices, { since = 0 } = {}) {
+  const byKey = new Map();
+  const keyOf = (fill) => fill?.tid ?? `${fill?.hash}:${fill?.time}`;
+  for (const fill of Array.isArray(fills) ? fills : []) {
+    byKey.set(keyOf(fill), fill);
+  }
+
+  const sliceList = Array.isArray(slices) ? slices : [];
+  let oldestSliceAt = Infinity;
+  for (const slice of sliceList) {
+    const fill = slice?.fill;
+    const time = Number(fill?.time);
+    if (!fill || !Number.isFinite(time)) {
+      continue;
+    }
+    oldestSliceAt = Math.min(oldestSliceAt, time);
+    if (time >= since && !byKey.has(keyOf(fill))) {
+      byKey.set(keyOf(fill), { ...fill, twapId: slice.twapId ?? fill.twapId ?? null });
+    }
+  }
+
+  const capped = sliceList.length >= TWAP_SLICE_FILLS_LIMIT && oldestSliceAt > since;
+  return {
+    fills: Array.from(byKey.values()).sort((a, b) => Number(a.time) - Number(b.time)),
+    twapFillsFrom: capped ? oldestSliceAt : null,
+  };
+}
+
+// A wallet's fills since `startTime`, TWAP slices included.
+export async function fetchAllUserFillsWithTwap({ user, startTime = 0 }) {
+  const [fills, slices] = await Promise.all([
+    fetchAllUserFills({ user, startTime }),
+    fetchUserTwapSliceFills({ user }),
+  ]);
+  return mergeTwapSliceFills(fills, slices, { since: startTime });
+}
+
 // Ordered list of perp dexes; entry 0 is the primary universe (null name).
 // HIP-3 asset ids encode a dex by its index in this list.
 // Mid price per coin, keyed by perp name ("HYPE") or spot index ("@107").

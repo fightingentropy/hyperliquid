@@ -36,6 +36,14 @@ export const PINNED_WALLETS = [
     address: "0xda744273f80b22412417f7cfe0503f3d721f987d",
     label: "Flood",
   },
+  {
+    address: "0x5b5d51203a0f9079f8aeb098a6523a13f298c060",
+    label: "Abraxas Capital 1",
+  },
+  {
+    address: "0xb83de012dba672c76a7dbbbf3e459cb59d7d6e36",
+    label: "Abraxas Capital 2",
+  },
 ];
 
 export const PERFORMANCE_METRIC_OPTIONS = [

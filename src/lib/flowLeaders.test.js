@@ -47,6 +47,15 @@ describe("flowLeaders", () => {
     expect(leaders[1].avgEntry).toBeNull();
   });
 
+  it("prefers the user's own wallet labels over the batch's", () => {
+    const ownLabels = new Map([
+      [ADDR(1), "My whale"],
+      [ADDR(2), "Renamed maker"],
+      [ADDR(3), ""],
+    ]);
+    expect(buildLeaders(BATCH, { ownLabels }).map((leader) => leader.label)).toEqual(["My whale", "Renamed maker", null]);
+  });
+
   it("measures exposure to one asset across perps and spot", () => {
     const exposure = assetExposure({
       snapshot: snapshotWith([

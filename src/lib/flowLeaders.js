@@ -21,7 +21,9 @@ export function flowStyle(row) {
 }
 
 // Top net buyers and sellers from a Qwantify market-flow batch, with labels.
-export function buildLeaders(batch) {
+// `ownLabels` (lowercase address -> label) are the user's own names for wallets
+// they track; they win over the batch's labels.
+export function buildLeaders(batch, { ownLabels } = {}) {
   const labels = batch?.labels ?? {};
   const leaders = [];
   const seen = new Set();
@@ -40,7 +42,7 @@ export function buildLeaders(batch) {
       const netSize = toNumber(row.netSize);
       const entry = {
         address,
-        label: labels[address]?.name ?? null,
+        label: ownLabels?.get(address) || labels[address]?.name || null,
         cohort,
         rank: index + 1,
         netUsd,

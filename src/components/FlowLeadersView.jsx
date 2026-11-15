@@ -173,10 +173,11 @@ export default function FlowLeadersView({ myWallets, addWallet }) {
     { cacheKey: `flow-leaders:${market.marketId}:${windowValue}:${refreshToken}`, staleTimeMs: 60_000 },
   );
 
-  const leaders = useMemo(() => buildLeaders(batchResource.data), [batchResource.data]);
+  const ownLabels = useMemo(() => new Map(myWallets.map((wallet) => [wallet.address.toLowerCase(), wallet.label])), [myWallets]);
+  const leaders = useMemo(() => buildLeaders(batchResource.data, { ownLabels }), [batchResource.data, ownLabels]);
   const leaderWallets = useMemo(() => leaders.map((leader) => ({ address: leader.address, label: leader.label })), [leaders]);
   const data = useTrackedWalletData(leaderWallets, { mode: "positions" });
-  const tracked = useMemo(() => new Set(myWallets.map((wallet) => wallet.address.toLowerCase())), [myWallets]);
+  const tracked = useMemo(() => new Set(ownLabels.keys()), [ownLabels]);
   const failed = useMemo(() => new Set(Object.keys(data.failed)), [data.failed]);
 
   const analysis = useMemo(() => {

@@ -334,8 +334,12 @@ function MyWalletsView() {
       { since, prices: pricing?.prices },
     );
     const bigTrades = buildBigMoves(walletFills, { since, spotPairNames });
+    const partialFills = loaded
+      .filter(({ raw }) => raw.fillsFrom && raw.fillsFrom > since)
+      .map(({ wallet, raw }) => ({ name: walletDisplayName(wallet), fromLabel: formatTradeTime(raw.fillsFrom) }));
+    // A TWAP gap only adds something when it starts later than the fills do.
     const partialTwap = loaded
-      .filter(({ raw }) => raw.twapFillsFrom && raw.twapFillsFrom > since)
+      .filter(({ raw }) => raw.twapFillsFrom && raw.twapFillsFrom > Math.max(since, raw.fillsFrom ?? 0))
       .map(({ wallet, raw }) => ({ name: walletDisplayName(wallet), fromLabel: formatTradeTime(raw.twapFillsFrom) }));
     const signals = buildSignals({
       positioning,
@@ -345,6 +349,7 @@ function MyWalletsView() {
       capitalFlows,
       windowLabel: flowWindow.label,
       partialTwap,
+      partialFills,
     });
 
     const totals = snapshots.reduce(

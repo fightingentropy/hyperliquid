@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { TWAP_SLICE_FILLS_LIMIT, fetchAllUserFills, mergeTwapSliceFills } from "./hyperliquid";
+import { TWAP_SLICE_FILLS_LIMIT, fetchAllUserFills, fetchRecentUserFills, mergeTwapSliceFills } from "./hyperliquid";
 
 function makePage(startTid, count, startTime) {
   return Array.from({ length: count }, (_, i) => ({
@@ -104,5 +104,97 @@ describe("mergeTwapSliceFills", () => {
 
   it("tolerates missing inputs", () => {
     expect(mergeTwapSliceFills(null, undefined)).toEqual({ fills: [], twapFillsFrom: null });
+  });
+});
+
+describe("fetchRecentUserFills", () => {
+  const neverPage = async () => {
+    throw new Error("should not page");
+  };
+
+  it("needs one request when the latest page reaches back past the window", async () => {
+    // Short page: this is everything the wallet has.
+    const quiet = await fetchRecentUserFills({
+      user: "0xabc",
+      startTime: 1_200,
+      fetchLatest: async () => makePage(1, 500, 1_000).reverse(),
+      fetchPage: neverPage,
+    });
+    expect(quiet.fillsFrom).toBeNull();
+    expect(quiet.fills).toHaveLength(300);
+    expect(quiet.fills[0].time).toBe(1_200); // oldest first, window applied
+
+    // Full page that starts before the window.
+    const busy = await fetchRecentUserFills({
+      user: "0xabc",
+      startTime: 2_000,
+      fetchLatest: async () => makePage(1, 2000, 1_000),
+      fetchPage: neverPage,
+    });
+    expect(busy.fillsFrom).toBeNull();
+    expect(busy.fills).toHaveLength(1000);
+  });
+
+  it("pages across the gap between the window start and the latest page", async () => {
+    const calls = [];
+    const pages = [makePage(1, 2000, 6_000), makePage(2001, 1001, 8_000)]; // times 6000..7999, 8000..9000
+    const result = await fetchRecentUserFills({
+      user: "0xabc",
+      startTime: 6_000,
+      fetchLatest: async () => makePage(3001, 2000, 9_000), // times 9000..10999
+      fetchPage: async ({ startTime, endTime }) => {
+        calls.push([startTime, endTime]);
+        return pages.shift() ?? [];
+      },
+    });
+    expect(calls).toEqual([
+      [6_000, 9_000],
+      [7_999, 9_000],
+    ]);
+    expect(result.fillsFrom).toBeNull();
+    expect(result.fills).toHaveLength(5000); // the boundary fill at 9000 is deduped
+    expect(result.fills[0].time).toBe(6_000);
+    expect(result.fills.at(-1).time).toBe(10_999);
+  });
+
+  it("keeps only the latest page for a wallet that trades too fast", async () => {
+    // 2000 fills in 2 seconds, window 10x longer: far past the page budget.
+    const result = await fetchRecentUserFills({
+      user: "0xabc",
+      startTime: 0,
+      fetchLatest: async () => makePage(1, 2000, 20_000),
+      fetchPage: neverPage,
+    });
+    expect(result.fillsFrom).toBe(20_000);
+    expect(result.fills).toHaveLength(2000);
+  });
+
+  it("still covers a bursty wallet whose earlier trading was light", async () => {
+    // The latest page's pace alone says ~4 more pages, but the gap holds 3 fills.
+    const result = await fetchRecentUserFills({
+      user: "0xabc",
+      startTime: 0,
+      fetchLatest: async () => makePage(1, 2000, 8_000),
+      fetchPage: async () => makePage(5001, 3, 100),
+    });
+    expect(result.fillsFrom).toBeNull();
+    expect(result.fills).toHaveLength(2003);
+  });
+
+  it("stops paging once the gap is clearly out of reach", async () => {
+    let calls = 0;
+    const result = await fetchRecentUserFills({
+      user: "0xabc",
+      startTime: 0,
+      fetchLatest: async () => makePage(1, 2000, 9_000), // times 9000..10999
+      fetchPage: async () => {
+        calls += 1;
+        // Nothing is held before 5000, then 2000 fills in 100ms: ~39 pages to go.
+        return Array.from({ length: 2000 }, (_, i) => ({ tid: 10_000 + i, time: 5_000 + (i % 100) }));
+      },
+    });
+    expect(calls).toBe(1);
+    expect(result.fillsFrom).toBe(9_000);
+    expect(result.fills).toHaveLength(2000);
   });
 });

@@ -269,4 +269,19 @@ describe("buildSignals", () => {
       "Alpha's TWAP fills only go back to Nov 10, 16:02, so its 7d buying and selling before then is undercounted.",
     );
   });
+
+  it("flags wallets that trade too often to load the whole window", () => {
+    const signals = buildSignals({
+      positioning: [],
+      netFlows: buildNetFlows([], { since: 0 }),
+      liquidationWatch: [],
+      snapshots: [],
+      capitalFlows: [],
+      windowLabel: "7d",
+      partialFills: [{ name: "Maker", fromLabel: "Nov 15, 17:20" }],
+    });
+    expect(signals.map((signal) => signal.text)).toContain(
+      "Maker trades too often to load a full 7d: its buying and selling here only covers trades since Nov 15, 17:20.",
+    );
+  });
 });

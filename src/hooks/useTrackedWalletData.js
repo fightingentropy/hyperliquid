@@ -14,10 +14,12 @@ import { runWithConcurrency, withRetry } from "../lib/async";
 import { MAX_FLOW_WINDOW_MS, buildSpotPairNames } from "../lib/trackedWallets";
 import { buildSpotPriceMap } from "../lib/wallet";
 
-// Each wallet costs roughly 100 Hyperliquid request weight (positions on every
-// perp dex, spot, staking, a week of fills plus TWAP fills, and ledger updates). Three at a time
-// keeps a dozen tracked wallets well inside the 1200/minute budget.
+// Each wallet costs roughly 100-300 Hyperliquid request weight (positions on
+// every perp dex, spot, staking, up to a week of fills plus TWAP fills, and
+// ledger updates). Three at a time keeps a dozen tracked wallets close to the
+// 1200/minute budget; the retry delays below wait out a 429 until it refills.
 const WALLET_CONCURRENCY = 3;
+const WALLET_RETRY_DELAYS_MS = [4_000, 12_000, 30_000];
 // "positions" mode (market-flow leaders, ~50 wallets) skips staking, fills and
 // ledger and reads only the main and xyz perp dexes plus spot: ~6 weight each.
 const POSITIONS_CONCURRENCY = 4;
@@ -38,14 +40,15 @@ async function loadPositions(address, isCancelled) {
     stakingSummary: null,
     fills: [],
     twapFillsFrom: null,
+    fillsFrom: null,
     ledger: [],
     lastTradeAt: null,
   };
 }
 
 async function loadWallet(address, since, isCancelled) {
-  const retry = (load) => withRetry(load, { isCancelled });
-  const [clearinghouseEntries, spotState, stakingSummary, { fills, twapFillsFrom }, ledger] = await Promise.all([
+  const retry = (load) => withRetry(load, { isCancelled, delaysMs: WALLET_RETRY_DELAYS_MS });
+  const [clearinghouseEntries, spotState, stakingSummary, { fills, twapFillsFrom, fillsFrom }, ledger] = await Promise.all([
     retry(() => fetchAllClearinghouseStates({ user: address })),
     retry(() => fetchSpotClearinghouseState({ user: address })),
     retry(() => fetchDelegatorSummary({ user: address })),
@@ -66,6 +69,7 @@ async function loadWallet(address, since, isCancelled) {
     stakingSummary,
     fills,
     twapFillsFrom,
+    fillsFrom,
     ledger: Array.isArray(ledger) ? ledger : [],
     lastTradeAt,
   };

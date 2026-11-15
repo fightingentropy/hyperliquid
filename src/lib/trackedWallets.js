@@ -465,7 +465,17 @@ const MIN_SIGNAL_USD = 50_000;
 // when the numbers clear a floor, so quiet weeks produce few signals.
 // `partialTwap` lists wallets whose TWAP fills don't reach back to the start of
 // the window (`{ name, fromLabel }`), so their flows are undercounted.
-export function buildSignals({ positioning, netFlows, liquidationWatch, snapshots, capitalFlows, windowLabel, partialTwap = [] }) {
+// `partialFills` lists wallets that trade too often to load the whole window.
+export function buildSignals({
+  positioning,
+  netFlows,
+  liquidationWatch,
+  snapshots,
+  capitalFlows,
+  windowLabel,
+  partialTwap = [],
+  partialFills = [],
+}) {
   const signals = [];
 
   const topBuy = netFlows.assets.filter((a) => a.netUsd >= MIN_SIGNAL_USD).sort((a, b) => b.netUsd - a.netUsd)[0];
@@ -546,6 +556,13 @@ export function buildSignals({ positioning, netFlows, liquidationWatch, snapshot
     signals.push({
       kind: "info",
       text: `${listNames(quiet)} ${quiet.length === 1 ? "hasn't" : "haven't"} traded in ${windowLabel}.`,
+    });
+  }
+
+  for (const gap of partialFills) {
+    signals.push({
+      kind: "info",
+      text: `${gap.name} trades too often to load a full ${windowLabel}: its buying and selling here only covers trades since ${gap.fromLabel}.`,
     });
   }
 

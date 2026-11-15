@@ -499,6 +499,77 @@ export async function fetchAllUserFills({
   return Array.from(byKey.values());
 }
 
+const RECENT_FILLS_MAX_PAGES = 4;
+// Skip paging outright when the latest page's pace puts the window this many
+// times over the page budget; trading is bursty, so a nearer miss still tries.
+const RECENT_FILLS_HOPELESS_FACTOR = 3;
+
+// A wallet's fills since `startTime` for at most `maxPages` requests, newest
+// first: the latest page, then pages forward from `startTime` to meet it. A
+// wallet that trades too fast for that budget (a market maker fills thousands
+// of times an hour, and each page costs ~120 request weight) keeps only the
+// latest page, and `fillsFrom` says when that coverage starts.
+export async function fetchRecentUserFills({
+  user,
+  startTime = 0,
+  maxPages = RECENT_FILLS_MAX_PAGES,
+  fetchLatest = fetchUserFills,
+  fetchPage = fetchUserFillsByTime,
+}) {
+  const keyOf = (fill) => fill?.tid ?? `${fill?.hash}:${fill?.time}`;
+  const byTime = (a, b) => Number(a.time) - Number(b.time);
+  const latestPage = await fetchLatest({ user });
+  const latest = (Array.isArray(latestPage) ? latestPage : []).filter((fill) => Number.isFinite(Number(fill?.time)));
+  const inWindow = latest.filter((fill) => Number(fill.time) >= startTime).sort(byTime);
+  const oldest = latest.reduce((min, fill) => Math.min(min, Number(fill.time)), Infinity);
+  const newest = latest.reduce((max, fill) => Math.max(max, Number(fill.time)), -Infinity);
+  if (latest.length < USER_FILLS_PAGE_SIZE || oldest <= startTime) {
+    return { fills: inWindow, fillsFrom: null };
+  }
+
+  // The latest page stops short of `startTime`: page forward across the gap,
+  // giving up as soon as the pages left can't plausibly close it.
+  const partial = { fills: inWindow, fillsFrom: oldest };
+  const forwardPages = maxPages - 1;
+  if ((oldest - startTime) / Math.max(newest - oldest, 1) > forwardPages * RECENT_FILLS_HOPELESS_FACTOR) {
+    return partial;
+  }
+
+  const byKey = new Map();
+  let from = startTime;
+  let firstTime = Infinity;
+  for (let page = 1; page <= forwardPages; page += 1) {
+    const batch = await fetchPage({ user, startTime: from, endTime: oldest });
+    const list = Array.isArray(batch) ? batch : [];
+    let added = 0;
+    let maxTime = from;
+    for (const fill of list) {
+      if (!byKey.has(keyOf(fill))) {
+        byKey.set(keyOf(fill), fill);
+        added += 1;
+      }
+      const time = Number(fill?.time) || 0;
+      maxTime = Math.max(maxTime, time);
+      firstTime = Math.min(firstTime, time);
+    }
+    if (list.length < USER_FILLS_PAGE_SIZE || added === 0) {
+      for (const fill of inWindow) {
+        byKey.set(keyOf(fill), fill);
+      }
+      return { fills: Array.from(byKey.values()).sort(byTime), fillsFrom: null };
+    }
+    // Measured from the first fill seen, not `startTime`: Hyperliquid may hold
+    // nothing for the start of the window.
+    const perPage = Math.max(maxTime - firstTime, 1) / page;
+    if ((oldest - maxTime) / perPage > forwardPages - page) {
+      break;
+    }
+    from = maxTime;
+  }
+
+  return partial;
+}
+
 export const TWAP_SLICE_FILLS_LIMIT = 2000;
 
 // TWAP child fills. `userFills` and `userFillsByTime` leave these out entirely;
@@ -542,13 +613,15 @@ export function mergeTwapSliceFills(fills, slices, { since = 0 } = {}) {
   };
 }
 
-// A wallet's fills since `startTime`, TWAP slices included.
+// A wallet's fills since `startTime`, TWAP slices included. `fillsFrom` is set
+// when the wallet trades too fast to cover the whole window (see
+// `fetchRecentUserFills`); TWAP slices are then cut to the same start.
 export async function fetchAllUserFillsWithTwap({ user, startTime = 0 }) {
-  const [fills, slices] = await Promise.all([
-    fetchAllUserFills({ user, startTime }),
+  const [{ fills, fillsFrom }, slices] = await Promise.all([
+    fetchRecentUserFills({ user, startTime }),
     fetchUserTwapSliceFills({ user }),
   ]);
-  return mergeTwapSliceFills(fills, slices, { since: startTime });
+  return { ...mergeTwapSliceFills(fills, slices, { since: fillsFrom ?? startTime }), fillsFrom };
 }
 
 // Ordered list of perp dexes; entry 0 is the primary universe (null name).

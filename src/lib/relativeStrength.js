@@ -5,6 +5,18 @@ export const DEFAULT_RELATIVE_STRENGTH_WINDOW = "7d";
 export const DEFAULT_RELATIVE_STRENGTH_SCOPE = "combined";
 export const DEFAULT_RELATIVE_STRENGTH_UNIVERSE_SIZE = 24;
 
+// Markets omitted from the auto-populated universe (e.g. unadjusted stock split
+// in Hyperliquid's candle history). They remain selectable in the Model picker.
+export const RELATIVE_STRENGTH_AUTO_EXCLUDED = ["SNDK"];
+
+const AUTO_EXCLUDED_SET = new Set(
+  RELATIVE_STRENGTH_AUTO_EXCLUDED.map((symbol) => symbol.toUpperCase()),
+);
+
+export function isRelativeStrengthAutoExcluded(symbol) {
+  return AUTO_EXCLUDED_SET.has(String(symbol ?? "").trim().toUpperCase());
+}
+
 export const RELATIVE_STRENGTH_WINDOW_OPTIONS = [
   { value: "24h", label: "24H" },
   { value: "7d", label: "7D" },

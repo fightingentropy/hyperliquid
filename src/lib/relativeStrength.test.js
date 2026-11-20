@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { buildRelativeStrengthModel } from "./relativeStrength";
+import {
+  buildRelativeStrengthModel,
+  isRelativeStrengthAutoExcluded,
+} from "./relativeStrength";
 
 describe("relative-strength model builder", () => {
   it("rebases asset prices and ranks by latest relative change", () => {
@@ -28,5 +31,12 @@ describe("relative-strength model builder", () => {
     expect(model.assets.map((asset) => asset.symbol)).toEqual(["FAST", "SLOW"]);
     expect(model.chartData.at(-1).FAST).toBeCloseTo(10);
     expect(model.chartData.at(-1).SLOW).toBeCloseTo(-5);
+  });
+
+  it("flags SNDK as auto-excluded regardless of casing", () => {
+    expect(isRelativeStrengthAutoExcluded("SNDK")).toBe(true);
+    expect(isRelativeStrengthAutoExcluded(" sndk ")).toBe(true);
+    expect(isRelativeStrengthAutoExcluded("HYPE")).toBe(false);
+    expect(isRelativeStrengthAutoExcluded("")).toBe(false);
   });
 });

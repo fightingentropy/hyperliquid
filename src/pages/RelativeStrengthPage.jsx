@@ -18,6 +18,7 @@ import {
   RELATIVE_STRENGTH_WINDOW_OPTIONS,
   buildRelativeStrengthModel,
   buildRelativeStrengthSnapshot,
+  isRelativeStrengthAutoExcluded,
   resolveRelativeStrengthFocus,
 } from "../lib/relativeStrength";
 
@@ -58,6 +59,15 @@ function readStoredRelativeStrengthModel() {
       return fallback;
     }
 
+    const selectedSymbols = Array.isArray(parsed.selectedSymbols)
+      ? uniqueSymbols(parsed.selectedSymbols)
+      : fallback.selectedSymbols;
+    const rawBenchmark = String(parsed.benchmarkSymbol ?? fallback.benchmarkSymbol).toUpperCase();
+    const benchmarkSymbol =
+      !selectedSymbols?.length && isRelativeStrengthAutoExcluded(rawBenchmark)
+        ? fallback.benchmarkSymbol
+        : rawBenchmark;
+
     return {
       chartWindow: optionValueExists(RELATIVE_STRENGTH_WINDOW_OPTIONS, parsed.chartWindow)
         ? parsed.chartWindow
@@ -68,10 +78,8 @@ function readStoredRelativeStrengthModel() {
       universeSize: optionValueExists(RELATIVE_STRENGTH_UNIVERSE_OPTIONS, parsed.universeSize)
         ? parsed.universeSize
         : fallback.universeSize,
-      benchmarkSymbol: String(parsed.benchmarkSymbol ?? fallback.benchmarkSymbol).toUpperCase(),
-      selectedSymbols: Array.isArray(parsed.selectedSymbols)
-        ? uniqueSymbols(parsed.selectedSymbols)
-        : fallback.selectedSymbols,
+      benchmarkSymbol,
+      selectedSymbols,
     };
   } catch {
     return fallback;
@@ -201,12 +209,27 @@ export default function RelativeStrengthPage() {
   const handleMarketScopeChange = (nextScope) => {
     setMarketScope(nextScope);
     setSelectedSymbols(null);
+    if (isRelativeStrengthAutoExcluded(benchmarkSymbol)) {
+      setBenchmarkSymbol(DEFAULT_RELATIVE_STRENGTH_FOCUS);
+    }
+  };
+
+  const handleResetAutoModel = () => {
+    setSelectedSymbols(null);
+    if (isRelativeStrengthAutoExcluded(benchmarkSymbol)) {
+      setBenchmarkSymbol(DEFAULT_RELATIVE_STRENGTH_FOCUS);
+    }
   };
 
   const handleApplyModel = (nextModel) => {
+    const nextSelected = nextModel.selectedSymbols?.length ? nextModel.selectedSymbols : null;
     setMarketScope(nextModel.marketScope);
-    setBenchmarkSymbol(nextModel.benchmarkSymbol);
-    setSelectedSymbols(nextModel.selectedSymbols?.length ? nextModel.selectedSymbols : null);
+    setSelectedSymbols(nextSelected);
+    setBenchmarkSymbol(
+      !nextSelected && isRelativeStrengthAutoExcluded(nextModel.benchmarkSymbol)
+        ? DEFAULT_RELATIVE_STRENGTH_FOCUS
+        : nextModel.benchmarkSymbol,
+    );
   };
 
   return (
@@ -243,7 +266,7 @@ export default function RelativeStrengthPage() {
                 </span>
                 <button
                   type="button"
-                  onClick={() => setSelectedSymbols(null)}
+                  onClick={handleResetAutoModel}
                   className="rounded-sm px-3 py-1.5 text-xs font-medium text-muted-foreground transition hover:bg-muted/50 hover:text-foreground"
                 >
                   Auto

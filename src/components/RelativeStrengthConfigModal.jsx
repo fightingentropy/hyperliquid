@@ -5,6 +5,7 @@ import { cx } from "../lib/cx";
 import {
   DEFAULT_RELATIVE_STRENGTH_FOCUS,
   RELATIVE_STRENGTH_MARKET_OPTIONS,
+  isRelativeStrengthAutoExcluded,
 } from "../lib/relativeStrength";
 
 function formatMarketType(marketType) {
@@ -100,7 +101,9 @@ export default function RelativeStrengthConfigModal({
   );
   const fallbackBenchmark = scopedSymbolSet.has(DEFAULT_RELATIVE_STRENGTH_FOCUS)
     ? DEFAULT_RELATIVE_STRENGTH_FOCUS
-    : scopedMarkets[0]?.symbol ?? "";
+    : scopedMarkets.find((market) => !isRelativeStrengthAutoExcluded(market.symbol))?.symbol ??
+      scopedMarkets[0]?.symbol ??
+      "";
   const benchmarkValue = scopedSymbolSet.has(draftBenchmark)
     ? draftBenchmark
     : fallbackBenchmark;

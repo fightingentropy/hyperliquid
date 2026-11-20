@@ -1,5 +1,6 @@
 import { selectTwapMarketSources } from "../lib/hypurrscan";
 import { getChartLookbackHours } from "../lib/marketFlow";
+import { isRelativeStrengthAutoExcluded } from "../lib/relativeStrength";
 import { requestJson } from "./request";
 
 const HYPERLIQUID_INFO_URL = "https://api.hyperliquid.xyz/info";
@@ -22,7 +23,6 @@ const RELATIVE_STRENGTH_TRADFI_PINS = [
   "AMZN",
   "TSLA",
   "HOOD",
-  "SNDK",
   "MU",
   "HIMS",
   "LLY",
@@ -276,8 +276,9 @@ export async function fetchRelativeStrengthUniverse({
   const explicitSymbols = Array.isArray(includedSymbols)
     ? includedSymbols.filter(Boolean)
     : null;
+  const isCustomSelection = Boolean(explicitSymbols?.length);
   const benchmarkPins = benchmarkSymbol ? [benchmarkSymbol] : [];
-  const pinnedMarkets = explicitSymbols?.length
+  const pinnedMarkets = isCustomSelection
     ? [...benchmarkPins, ...explicitSymbols]
     : [...benchmarkPins, ...(pinnedCoins ?? getRelativeStrengthPinnedCoins(marketScope))];
 
@@ -292,13 +293,17 @@ export async function fetchRelativeStrengthUniverse({
       return;
     }
 
+    if (!isCustomSelection && isRelativeStrengthAutoExcluded(market.symbol)) {
+      return;
+    }
+
     seen.add(market.symbol);
     selectedMarkets.push(market);
   };
 
   pinnedMarkets.forEach(appendMarket);
 
-  if (!explicitSymbols?.length) {
+  if (!isCustomSelection) {
     rankedMarkets.forEach((market) => {
       if (selectedMarkets.length < limit) {
         appendMarket(market.symbol);
